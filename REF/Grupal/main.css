@@ -1,0 +1,256 @@
+body {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: Arial;
+  color: #000;
+  background-color: #000;
+  background-image: url(image/Fondo.jpg);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center bottom;
+  height: 100vh; /* Ajusta el alto del cuerpo al 100% del alto de la ventana */
+  overflow: hidden;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--main-bg-overlay-color);
+  z-index: -1;
+}
+
+#canvasContainer {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  z-index: 1; 
+}
+
+#canvas {
+  z-index: 2; 
+  width: 100%;
+  height: 100%;
+}
+
+#prizePointer {
+    position: absolute;
+    left: 50%;
+    top: 80%;
+    z-index: 999;
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0.5;
+}
+
+#resultados {
+  position: absolute;
+  top: 2%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+}
+
+#resultados img {
+  width: 80px;
+  height: 80px;
+  margin: 5px;
+  border: none;
+  opacity: 0.8;
+}
+
+#resultados img:last-child {
+  border: 4px solid yellow;
+}
+
+#ganador {
+  display: none;
+}
+
+#timerContainer {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    text-align: center;
+    z-index: 10; /* Asegura que el temporizador y los botones se muestren por encima de la ruleta */
+    background: rgba(255, 255, 255, 0.8); /* Fondo semitransparente para mayor visibilidad */
+    padding: 10px;
+    border-radius: 5px;
+}
+
+#timer {
+    font-size: 60px;
+    margin-bottom: 10px;
+    font-family: 'Luckiest Guy', cursive;
+}
+
+button {
+    display: block;
+    margin: 5px 0;
+    padding: 10px;
+    width: 30px; /* Ajusta el tamaño del botón según el tamaño de la imagen */
+    height: 30px; /* Ajusta el tamaño del botón según el tamaño de la imagen */
+    font-size: 0; /* Oculta el texto */
+    cursor: pointer;
+    background-color: transparent; /* Fondo transparente */
+    border: none;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain; /* Ajusta el tamaño de la imagen al botón */
+}
+
+#startButton {
+    background-image: url('image/start.png'); /* Ruta a la imagen del botón de inicio */
+}
+
+#resetButton {
+    background-image: url('image/reset.png'); /* Ruta a la imagen del botón de reinicio */
+}
+
+button:hover {
+    opacity: 0.8; /* Efecto de opacidad al pasar el cursor por encima */
+}
+
+
+#timerContainer h2 {
+    font-size: 1.5em; /* Tamaño de la fuente del título */
+    margin: 0 auto; /* Centra horizontalmente */
+    width: 100%; /* Ocupa todo el ancho del contenedor */
+    font-family: 'Luckiest Guy', cursive;
+}
+
+
+
+#youtubeContainer:hover {
+    transform: scale(1.5) translate(-50%, -50%);
+}
+
+#youtubePlayer {
+    width: 320px;
+    height: 180px;
+    transition: width 0.3s ease, height 0.3s ease;
+}
+
+#youtubeContainer:hover #youtubePlayer {
+    width: 480px; /* Ancho aumentado */
+    height: 270px; /* Alto aumentado */
+}
+
+#youtubeContainer {
+    position: absolute;
+    opacity: 0.7;
+    transition: opacity 0.5s ease;
+    transition: transform 0.3s ease;
+    transform-origin: bottom right;
+    bottom: 20px;
+    right: 20px;
+    width: 320px;
+    height: 180px;
+    z-index: 1000; /* Asegúrate de que se muestre encima de otros elementos */
+}
+
+#iframe {
+    width: 100%;
+    height: 100%;
+}
+
+#acumuladoContainer {
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 10;
+    background: transparent;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+#acumuladoContainer h2 {
+    font-size: 5em;
+    margin: 0;
+    color: black;
+}
+
+#acumuladoContainer button {
+    display: inline-block;
+    margin: 5px;
+    padding: 5px;
+    width: 20px; /* Ajusta el tamaño del botón según el tamaño de la imagen */
+    height: 20px; /* Ajusta el tamaño del botón según el tamaño de la imagen */
+    font-size: 1em;
+    cursor: pointer;
+    background-color: transparent; /* Fondo transparente */
+    border: 2px solid #000; /* Borde para mayor visibilidad */
+    border-radius: 5px; /* Bordes redondeados */
+}
+
+#acumuladoContainer button:hover {
+    opacity: 0.6;
+
+}
+#acumuladoLabel {
+    width: 300px; /* Ajusta el tamaño de la imagen */
+    height: auto; /* Ajusta el alto automáticamente */
+    margin-right: 10px;
+}
+
+#acumulado {
+    font-size: 1.2em; /* Tamaño del monto */
+    color: black; /* Color del texto */
+    -webkit-text-stroke: .5px white ; /* Borde sólido con 2px de ancho, para navegadores WebKit */
+    text-stroke: .5px white; /* Borde sólido con 2px de ancho */
+}
+#acumuladoContainer {
+    font-family: 'Luckiest Guy', cursive;
+}
+
+#confettiCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+}
+
+#toggleAcumuladoButton {
+    display: inline-block;
+    margin: 5px;
+    padding: 5px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    background-image: url('image/ocultar.png'); /* Ruta a la imagen del botón de inicio */
+}
+
+#toggleAcumuladoButton img {
+    width: 30px; /* Ajusta el tamaño de la imagen según sea necesario */
+    height: 30px; /* Ajusta el tamaño de la imagen según sea necesario */
+}
+
+#toggleYT {
+    display: inline-block;
+    margin: 5px;
+    padding: 5px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    background-image: url('image/youtube.png'); /* Ruta a la imagen del botón de inicio */
+}
+
+#toggleYT img {
+    width: 30px; /* Ajusta el tamaño de la imagen según sea necesario */
+    height: 30px; /* Ajusta el tamaño de la imagen según sea necesario */
+}

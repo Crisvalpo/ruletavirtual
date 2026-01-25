@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Narkis~Cristian</title>
+    <link rel="stylesheet" href="main.css" type="text/css" />
+    <script type="text/javascript" src="Winwheel.js"></script>
+    <script src="TweenMax.min.js"></script>
+    <script src="JS Animacion.js"></script>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head>
+<body scroll="no">
+    
+    
+<div id="canvasContainer">
+      <canvas id="canvas" width="1920" height="1080" style="background-color: ;" data-responsiveMinWidth="80" data-responsiveScaleHeight="true" onClick="startSpin();">
+        <p style="{color: white}" align="center">Sorry, your browser doesn't support canvas. Please try another.</p>
+      </canvas>
+    <img id="prizePointer" src="basic_pointer.png" alt="V"/>
+</div>
+<audio id="winsound">
+    <source src="boom.mp3"/>
+</audio>
+<div id="resultados"></div>
+<div id="ganador"></div>
+
+<!-- Agregar formulario para enviar los valores ganadores -->
+<form id="ganadorForm" method="POST" action="registro_ganador.php">
+    <input type="hidden" id="ganadorInput" name="ganador" value="">
+    <input type="hidden" id="fraseGanadorInput" name="frase_ganador" value="">
+</form>
+
+<script> 
+
+
+window.addEventListener('DOMContentLoaded', (event) => {
+  // Ocultar la barra de desplazamiento al cargar la página
+  document.body.style.overflow = 'hidden';
+});
+
+    let theWheel = new Winwheel({
+        'numSegments': 12,
+        'outerRadius': 1000,
+        'drawText': false,
+        'textFontSize': 60,
+        'textOrientation': 'horizontal',
+        'rotationAngle': -15,
+        'textAlignment': 'outer',
+        'textMargin': 10,
+        'textFontFamily': 'monospace',
+        'textStrokeStyle': 'white',
+        'textLineWidth': 1,
+        'textFillStyle': 'black',
+        'scaleFactor': 1.219,
+        'centerX': 790,
+        'centerY': 0,
+        'drawMode': 'segmentImage',
+        'segments': [
+            {'image': '1.png', 'text': '7', 'phrase': ' CAMILO'},
+            {'image': '2.png', 'text': '8', 'phrase': 'FELIX'},
+            {'image': '3.png', 'text': '9', 'phrase': 'ALMA'},
+            {'image': '4.png', 'text': '10', 'phrase': 'ANTONIO'},
+            {'image': '5.png', 'text': '11', 'phrase': 'PEPA'},
+            {'image': '6.png', 'text': '12', 'phrase': 'AGUSTIN'},
+            {'image': '7.png', 'text': '1', 'phrase': 'MIRABEL'},
+            {'image': '8.png', 'text': '2', 'phrase': 'BRUNO'},
+            {'image': '9.png', 'text': '3', 'phrase': 'ISABELA'},
+            {'image': '10.png', 'text': '4', 'phrase': 'LUISA'},
+            {'image': '11.png', 'text': '5', 'phrase': 'DOLORES'},
+            {'image': '12.png', 'text': '6', 'phrase': 'JULIETA'},
+        ],
+        'animation': {
+            'type': 'spinToStop',
+            'duration': 12,
+            'callbackSound': playSound,
+            'callbackFinished': 'winAnimation()',
+            'spins': 8,
+        }
+    });
+
+    let audio = new Audio('tick.mp3');
+
+    function playSound() {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.play();
+    }
+
+function winAnimation() {
+    let winsound = document.getElementById('winsound');
+    winsound.play();
+
+    let ganador = theWheel.getIndicatedSegment().text;
+    let fraseGanador = theWheel.getIndicatedSegment().phrase;
+
+    document.getElementById('ganador').textContent = ganador + ': ' + fraseGanador;
+    document.getElementById('ganador').style.display = 'block';
+
+    setTimeout(function() {
+        document.getElementById('ganador').style.display = 'none';
+    }, 3000);
+
+    let imagen = document.createElement('img');
+    imagen.src = ganador + '.jpg';
+    imagen.alt = ganador;
+    document.getElementById('resultados').appendChild(imagen);
+
+    if (document.getElementById('resultados').childElementCount > 10) {
+        document.getElementById('resultados').removeChild(document.getElementById('resultados').firstChild);
+    }
+
+    // Envío del ganador al archivo PHP
+    let formData = new FormData();
+    formData.append('ganador', ganador);
+
+    fetch('registro_ganador.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(data => console.log(data))
+    .catch(error => console.log(error));
+}
+
+    function startSpin() {
+        theWheel.stopAnimation(false);
+        theWheel.rotationAngle = theWheel.rotationAngle % 360;
+        theWheel.startAnimation();
+    }
+
+
+
+    window.onload = function() {
+    let resultadosIniciales = ganadores;
+    let resultadosDiv = document.getElementById('resultados');
+    for (let i = 0; i < resultadosIniciales.length; i++) {
+        let ganadorImg = document.createElement('img');
+        ganadorImg.src = resultadosIniciales[i] + '.jpg';
+        ganadorImg.width = 80;
+        ganadorImg.height = 80;
+        ganadorImg.style.margin = '5px';
+        ganadorImg.style.border = '1px solid #000';
+        resultadosDiv.appendChild(ganadorImg);
+    }
+}
+
+
+
+</script>
+</body>
+</html> 

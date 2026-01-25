@@ -1,0 +1,259 @@
+'use client';
+
+import { use, useEffect, useState } from 'react';
+import WheelCanvas from '@/components/individual/WheelCanvas';
+import { ANIMAL_LIST } from '@/lib/constants/animals';
+import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
+import { useRealtimeGame } from '@/hooks/useRealtimeGame';
+import { useVenueSettings } from '@/hooks/useVenueSettings';
+import { useGameStore } from '@/lib/store/gameStore';
+import Confetti from 'react-confetti';
+// Remove useWindowSize if not strictly needed or ensure package is present.
+// The code used window.innerWidth directly inside the check, which is fine.
+
+export default function DisplayScreenPage({
+    params
+}: {
+    params: Promise<{ screen: string }>
+}) {
+    const { screen } = use(params);
+    const screenIdNum = parseInt(screen);
+
+    // 1. Hooks
+    useRealtimeGame(screen);
+    const { venueMode, centralScreenId } = useVenueSettings();
+
+    // 2. Read from store (Individual Mode State)
+    const mode = useGameStore((state) => state.gameMode);
+    const activeWheelId = useGameStore((state) => state.activeWheelId);
+
+    // 3. Logic: Determine effective mode
+    const isGroupEvent = venueMode === 'group_event';
+    const isCentralScreen = isGroupEvent && screenIdNum === centralScreenId;
+    const isBillboardScreen = isGroupEvent && !isCentralScreen;
+
+    // Effective Wheel ID for Individual Play (ignored if Group Event)
+    const effectiveActiveWheelId = isGroupEvent ? null : activeWheelId;
+    const effectiveMode = isGroupEvent ? 'group' : mode; // Force group visual in event mode (or specific event visual)
+
+    // Celebration State
+    const [status, setStatus] = useState<'idle' | 'spinning' | 'result'>('idle');
+    const [result, setResult] = useState<number | null>(null);
+    const [showConfetti, setShowConfetti] = useState(false);
+    const [showBigWin, setShowBigWin] = useState(false);
+
+    // Local state for dynamic assets
+    const [activeWheelAssets, setActiveWheelAssets] = useState<{
+        background: string;
+        segments: any[];
+    } | null>(null);
+
+    const supabase = createClient();
+
+    // 3. Effect: When activeWheelId changes (via Realtime), fetch assets
+    useEffect(() => {
+        async function loadWheelAssets() {
+            // Logic refactored: if no ID is passed, we assume static group mode.
+            // If in Group Event, effectiveActiveWheelId is null -> loads static group wheel (correct for central screen)
+
+            if (effectiveMode === 'group' && !effectiveActiveWheelId) {
+                setActiveWheelAssets(null); // Default 36 animals
+                return;
+            }
+
+            if (!effectiveActiveWheelId) {
+                setActiveWheelAssets(null);
+                return;
+            }
+
+            console.log("📥 Loading assets for wheel:", effectiveActiveWheelId);
+
+            const { data: wheel } = await supabase
+                .from('individual_wheels')
+                .select('*')
+                .eq('id', effectiveActiveWheelId)
+                .single();
+
+            if (wheel) {
+                // ... (loading logic remains same) ...
+                const segments = [];
+                for (let i = 1; i <= wheel.segment_count; i++) {
+                    const { data } = supabase.storage
+                        .from('individual-wheels')
+                        .getPublicUrl(`${wheel.storage_path}/segments/${i}.png`);
+
+                    segments.push({
+                        id: i,
+                        label: `Seg ${i}`,
+                        color: 'transparent', // Image handles color
+                        imageWheel: data.publicUrl
+                    });
+                }
+
+                setActiveWheelAssets({
+                    background: wheel.background_image,
+                    segments: segments
+                });
+            }
+        }
+        loadWheelAssets();
+    }, [effectiveMode, effectiveActiveWheelId]);
+
+    // Handle Spin Complete
+    const handleSpinComplete = (winnerIndex: number) => {
+        setStatus('result');
+        setResult(winnerIndex);
+        setShowConfetti(true);
+        setShowBigWin(true);
+
+        // Hide celebration after 10 seconds
+        setTimeout(() => {
+            setShowConfetti(false);
+            setShowBigWin(false);
+            setStatus('idle');
+            setResult(null);
+        }, 10000);
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-8 overflow-hidden relative">
+            {/* Confetti Layer */}
+            {showConfetti && (
+                <div className="absolute inset-0 z-[100] pointer-events-none">
+                    <Confetti
+                        width={typeof window !== 'undefined' ? window.innerWidth : 1000}
+                        height={typeof window !== 'undefined' ? window.innerHeight : 800}
+                        recycle={true}
+                        numberOfPieces={500}
+                    />
+                </div>
+            )}
+
+            {/* BIG WIN OVERLAY */}
+            {showBigWin && (
+                <div className="absolute inset-0 z-[101] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
+                    <div className="text-center animate-bounce">
+                        <h1 className="text-8xl font-black text-yellow-400 drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)] stroke-black"
+                            style={{ WebkitTextStroke: '2px black' }}>
+                            ¡GANADOR!
+                        </h1>
+                        <div className="text-4xl text-white mt-4 font-bold bg-green-600 px-8 py-2 rounded-full inline-block shadow-lg border-4 border-white">
+                            {activeWheelAssets?.segments?.find(s => s.id === result)?.label || `Animal #${result}`}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="absolute top-8 left-8 bg-white/10 backdrop-blur-md px-6 py-3 rounded-xl border border-white/20 z-10">
+                <h2 className="text-2xl font-bold text-white">Pantalla {screen}</h2>
+                <div className="flex items-center gap-4 mt-1">
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-sm text-gray-300">Conectado</span>
+                    </div>
+                    <div className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded uppercase border border-blue-500/30">
+                        {mode === 'group' ? 'Modo Grupal' : 'Modo Personalizado'}
+                    </div>
+                </div>
+            </div>
+
+            {/* --- VISUALIZACIÓN SEGÚN MODO --- */}
+
+            {/* CASO 1: MODO EVENTO - PANTALLA LATERAL (CARTELERA) */}
+            {isBillboardScreen && (
+                <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center text-center p-12">
+                    <h1 className="text-6xl font-bold text-yellow-400 mb-8 animate-pulse">¡GRAN SORTEO EN CURSO!</h1>
+                    <div className="text-4xl text-white mb-12">Mira la Pantalla Central #{centralScreenId}</div>
+
+                    <div className="bg-white/10 p-8 rounded-3xl backdrop-blur-md border border-white/20 w-full max-w-2xl">
+                        <h3 className="text-2xl text-blue-300 mb-4">Últimos Ganadores</h3>
+                        <div className="space-y-4 text-xl text-white">
+                            <div className="flex justify-between border-b border-white/10 pb-2">
+                                <span>🎟️ Ticket #4592</span>
+                                <span className="text-green-400">$50,000</span>
+                            </div>
+                            <div className="flex justify-between border-b border-white/10 pb-2">
+                                <span>🎟️ Ticket #4588</span>
+                                <span className="text-green-400">$10,000</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CASO 2: MODO EVENTO - PANTALLA CENTRAL (RULETA DEDICADA) */}
+            {isCentralScreen && !isBillboardScreen && (
+                <div className="absolute top-0 left-0 w-full h-full border-8 border-yellow-500 z-40 pointer-events-none">
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-yellow-500 text-black font-bold px-12 py-2 rounded-b-xl text-xl shadow-lg">
+                        ⭐ RULETA OFFICIAL DEL EVENTO ⭐
+                    </div>
+                </div>
+            )}
+
+            {/* Background Image if Dynamic Wheel (Solo si NO es Billboard) */}
+            {activeWheelAssets?.background && !isBillboardScreen && (
+                <div className="absolute inset-0 z-0">
+                    <Image
+                        src={activeWheelAssets.background}
+                        alt="Background"
+                        fill
+                        className="object-cover opacity-100"
+                    />
+                    <div className="absolute inset-0 bg-black/40" />
+                </div>
+            )}
+
+            {/* Canvas Container (Oculto si es Billboard) */}
+            {!isBillboardScreen && (
+                <div className={`relative w-full max-w-4xl flex items-center justify-center z-10 transition-all duration-500 ${showBigWin ? 'scale-90 blur-sm' : 'scale-100'}`}>
+                    {/* Ruleta Gigante */}
+                    <div className="w-[800px] h-[800px] relative">
+                        <WheelCanvas
+                            isSpinning={status === 'spinning'}
+                            targetIndex={status === 'result' ? result : null}
+                            segments={activeWheelAssets?.segments}
+                            onSpinComplete={handleSpinComplete}
+                        />
+
+                        {/* Logo Central Overlay */}
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-white rounded-full shadow-2xl flex items-center justify-center z-10 p-4 border-4 border-gray-100">
+                            <span className="text-6xl">🎰</span>
+                        </div>
+
+                        {/* Pointer Overlay */}
+                        <div className="absolute top-1/2 right-[-20px] -translate-y-1/2 w-0 h-0 border-t-[20px] border-t-transparent border-l-[40px] border-l-red-600 border-b-[20px] border-b-transparent filter drop-shadow-lg z-20"></div>
+                    </div>
+                </div>
+            )}
+
+            {/* QR Sidebar (Solo en Modo Individual) */}
+            {!isGroupEvent && (
+                <div className="absolute right-0 top-0 h-full w-96 bg-gray-800/80 backdrop-blur-lg border-l border-white/10 p-8 flex flex-col items-center justify-center text-center">
+                    <h3 className="text-3xl font-bold text-white mb-6">¡Juega Ahora!</h3>
+                    <div className="bg-white p-4 rounded-3xl shadow-xl mb-6 transform hover:scale-105 transition-all">
+                        {/* Placeholder de QR */}
+                        <div className="w-64 h-64 bg-gray-100 flex items-center justify-center text-gray-400">
+                            [QR LINK A PANTALLA {screen}]
+                        </div>
+                    </div>
+                    <p className="text-xl text-primary font-bold mb-2">Escanea para unirte</p>
+                    <p className="text-gray-400">Solo $1,000 por jugada</p>
+
+                    {/* Visual Mode Indicator for Staff Debug */}
+                    <div className="mt-8 bg-black/50 p-2 rounded text-xs text-white">
+                        Mode: {venueMode} <br />
+                        Central ID: {centralScreenId} <br />
+                        IsGroupEvent: {isGroupEvent ? 'YES' : 'NO'}
+                    </div>
+                </div>
+            )}
+
+            {/* FORCE DEBUG OVERLAY - ALWAYS VISIBLE */}
+            <div className="fixed bottom-0 left-0 bg-red-600 text-white p-2 z-[9999] text-xs font-mono">
+                DEBUG: VenueMode={venueMode} | Screen={screen} | Central={centralScreenId}
+            </div>
+
+        </div>
+    );
+}

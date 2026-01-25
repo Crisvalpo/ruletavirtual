@@ -1,0 +1,86 @@
+body {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: arial;
+  color: #000;
+  background-color: #000;
+  background-image: url(Sport-stadiums-football-lawn_1920x12000.jpg);
+  background-repeat: no-repeat;
+  overflow: hidden;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5); /* Ajusta el valor de opacidad aquí */
+  z-index: -1;
+}
+
+#canvasContainer {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  z-index: 1; /* Añade un z-index para que la ruleta esté por encima de los resultados */
+}
+
+#canvas {
+  z-index: 2; /* Aumenta el z-index de la ruleta para que esté por encima de los resultados */
+  width: 100%;
+  height: 100%;
+}
+
+#prizePointer {
+  display: none;
+} 
+
+#resultados {
+  position: absolute;
+  bottom: 50px; /* Ajusta el valor para cambiar la posición vertical */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+}
+
+#resultados img {
+  width: 80px;
+  height: 80px;
+  margin: 5px;
+  border: none;
+  opacity: 0.8;
+}
+
+#resultados img:last-child {
+  border: 4px solid yellow;
+}
+
+
+
+
+
+#ganador {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 50px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
+  display: none;
+}
+
+
+
+

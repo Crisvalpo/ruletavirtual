@@ -1,0 +1,80 @@
+body {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: Arial;
+  color: #000;
+  background-color: #000;
+  background-image: url(Fondo.jpg);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center; /* Ajustar la posición al centro tanto horizontal como verticalmente */
+  height: 100vh; /* Ajustar el alto del cuerpo al 100% del alto de la ventana */
+  overflow: hidden;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.2); /* Ajusta el valor de opacidad aquí */
+  z-index: -1;
+}
+
+#canvasContainer {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  z-index: 1; 
+}
+
+#canvas {
+  z-index: 2; 
+  width: 100%;
+  height: 100%;
+}
+
+#prizePointer {
+    position: absolute;
+    left: 50%;
+    top: 20%;
+    z-index: 999;
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0.5;
+}
+
+#resultados {
+  position: absolute;
+  bottom: 5px; /* Ajusta el valor para cambiar la posición vertical */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+}
+
+#resultados img {
+  width: 80px;
+  height: 80px;
+  margin: 5px;
+  border: none;
+  opacity: 0.8;
+}
+
+#resultados img:last-child {
+  border: 4px solid yellow;
+}
+
+#ganador {
+
+  display: none;
+
+}

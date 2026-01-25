@@ -1,0 +1,123 @@
+
+<doctype html>
+<html>
+    <head>
+        <title>Narkis~Cristian</title>
+		<link rel="stylesheet" href="main.css" type="text/css" />
+        <style type="text/css">
+        </style>
+        <script type="text/javascript" src="Winwheel.js"></script>
+        <script src="TweenMax.min.js"></script>
+        <script src="JS Animacion.js"></script>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    </head>
+    <body scroll="no">
+    <div id="canvasContainer">
+      <canvas id="canvas" width="1920" height="1080" style="background-color: ;" data-responsiveMinWidth="80" data-responsiveScaleHeight="true" onClick="startSpin();">
+        <p style="{color: white}" align="center">Sorry, your browser doesn't support canvas. Please try another.</p>
+      </canvas>
+    <img id="prizePointer" src="basic_pointer.png" alt="V" />    </div>
+    <audio id="winsound">
+    <source src="boom.mp3" />
+</audio>
+    <script>
+             let theWheel = new Winwheel({
+                'numSegments'       : 12,                // Specify number of segments.
+                'outerRadius'       : 1000,              // Set outer radius so wheel fits inside the background.
+                'drawText'          : false,             // Code drawn text can be used with segment images.
+                'textFontSize'      : 60,               // Set text options as desired.
+                'textOrientation'   : 'horizontal',
+				'rotationAngle'     : -30, 
+                'textAlignment'     : 'outer',
+                'textMargin'        : 10,
+                'textFontFamily'    : 'monospace',
+                'textStrokeStyle'   : 'white',
+                'textLineWidth'     : 1,
+                'textFillStyle'     : 'black',
+				'scaleFactor'       : 1.219 , 
+				'centerX'    	    : 790,         // Set x and y as number.
+    			'centerY'           : 0,
+                'drawMode'          : 'segmentImage',    // Must be segmentImage to draw wheel using one image per segemnt.
+                'segments'          :                    // Define segments including image and text.
+                [
+                   {'image' : '1.png',  'text' : '1'},
+                   {'image' : '2.png',  'text' : '2'},
+                   {'image' : '3.png',  'text' : '3'},
+                   {'image' : '4.png',  'text' : '4'},
+                   {'image' : '5.png',  'text' : '5'},
+                   {'image' : '6.png',  'text' : '6'},
+                   {'image' : '7.png',  'text' : '7'},
+				   {'image' : '8.png',  'text' : '8'},
+                   {'image' : '9.png',   'text' : '9'},
+                   {'image' : '10.png',  'text' : '10'},
+                   {'image' : '11.png',  'text' : '11'},
+                   {'image' : '12.png', 'text' : '12'},
+                   {'image' : '13.png', 'text' : '13'},
+                   {'image' : '14.png',  'text' : '14'},
+				   {'image' : '15.png',  'text' : '15'},
+                   {'image' : '16.png',   'text' : '16'},
+                   {'image' : '17.png',  'text' : '17'},
+                   {'image' : '18.png',  'text' : '18'},
+                   {'image' : '19.png', 'text' : '19'},
+                   {'image' : '20.png', 'text' : '20'},
+                   {'image' : '21.png',  'text' : '21'},
+				   {'image' : '22.png',  'text' : '22'},
+                   {'image' : '23.png',  'text' : '23'},
+                   {'image' : '24.png', 'text' : '24'},
+                   {'image' : '25.png', 'text' : '25'},
+                   {'image' : '26.png',  'text' : '26'},
+				   {'image' : '27.png',  'text' : '27'},
+                   {'image' : '28.png',   'text' : '28'},
+                   {'image' : '29.png',  'text' : '29'},
+                   {'image' : '30.png',  'text' : '30'},
+                   {'image' : '31.png', 'text' : '31'},
+                   {'image' : '32.png', 'text' : '32'},
+                   {'image' : '33.png',  'text' : '33'},
+				   {'image' : '34.png', 'text' : '34'},
+                   {'image' : '35.png', 'text' : '35'},
+                   {'image' : '36.png',  'text' : '36'},
+				   
+                ],
+                'animation' :           // Specify the animation to use.
+                {
+                    'type'          : 'spinToStop',
+                    'duration'      : 12,     // Duration in seconds.
+					'callbackSound' : playSound,
+					'callbackFinished' : 'winAnimation()',
+                    'spins'         : 4,     // Number of complete spins.
+                }
+            });
+			
+			  let audio = new Audio('tick.mp3');  // Create audio object and load desired file.
+ 
+    function playSound()
+    {
+        // Stop and rewind the sound (stops it if already playing).
+        audio.pause();
+        audio.currentTime = 0;
+ 
+        // Play the sound.
+        audio.play();
+    }
+			
+            // Called by the onClick of the canvas, starts the spinning.
+            function startSpin()
+            {
+                // Stop any current animation.
+                theWheel.stopAnimation(false);
+
+                // Reset the rotation angle to less than or equal to 360 so spinning again
+                // works as expected. Setting to modulus (%) 360 keeps the current position.
+                theWheel.rotationAngle = theWheel.rotationAngle % 360;
+
+                // Start animation.
+                theWheel.startAnimation();
+            }
+			  function winAnimation()
+    {
+        // Get the audio with the sound it in, then play.
+        let winsound = document.getElementById('winsound');
+        winsound.play(); }
+        </script>
+    </body>
+</html>

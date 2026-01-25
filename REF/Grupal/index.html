@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Narkis~Cristian</title>
+    <link rel="stylesheet" href="main.css" type="text/css" />
+    <script type="text/javascript" src="Winwheel.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="TweenMax.min.js"></script>
+    <script src="JS.js"></script>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/confetti-js@0.0.18/dist/index.min.js"></script>
+
+</head>
+<body scroll="no">
+   
+
+    <div id="canvasContainer">
+        <canvas id="canvas" width="1920" height="1080" style="background-color: ;" data-responsiveMinWidth="80" data-responsiveScaleHeight="true">
+            <p style="{color: white}" align="center">Sorry, your browser doesn't support canvas. Please try another.</p>
+        </canvas>
+        <img id="prizePointer" src="image/basic_pointer.png" alt="V"/>
+     <canvas id="confettiCanvas"></canvas>
+    </div>
+
+    <div id="resultados"></div>
+    <div id="ganador"></div>
+
+    <audio id="warningSound">
+        <source src="audio/warning.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="timerContainer">
+        <h2>Próximo Sorteo en...</h2>
+        <div id="timer">05:00</div>
+        
+        <button id="botonRecargar"></button>
+        <button id="toggleYT"></button>
+        <button id="toggleAcumuladoButton"></button>
+        <button id="startButton"></button>       
+        <button id="resetButton"></button>
+       
+    </div>   
+
+    <div id="youtubeContainer">
+        <iframe id="youtubePlayer" width="320" height="180" src="https://www.youtube.com/embed/videoseries?si=P0vFbPphwgrILtAs&list=PLk_WtHyJIhM2JMRb_vy7Gyz7W3_EfcFgd" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    </div>
+
+    <div id="acumuladoContainer">
+        <img id="acumuladoLabel" src="image/jackpot.png" alt="Jackpot">
+        <h2>$ <span id="acumulado">3000</span></h2>
+        <button id="addAcumulado"></button>
+        <button id="resetAcumulado"></button>
+    </div>
+
+</body>
+</html>
