@@ -1,36 +1,72 @@
+import Link from 'next/link';
+
 export default function HomePage() {
     return (
-        <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-primary-light">
-            <div className="text-center text-white p-8">
-                <h1 className="text-6xl font-bold mb-4">
+        <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary to-primary-light p-4">
+            <div className="text-center text-white mb-8">
+                <h1 className="text-6xl font-black mb-2 drop-shadow-lg">
                     🎰 Ruleta Animalitos
                 </h1>
-                <p className="text-2xl mb-8">
-                    Fiestas Patrias 2026
+                <p className="text-2xl font-medium opacity-90">
+                    Fiestas Patrias 2026 - Dev Hub
                 </p>
-                <div className="space-y-4">
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
-                        <h2 className="text-xl font-semibold mb-2">✅ Proyecto Inicializado</h2>
-                        <p className="text-sm">Next.js 16 + TypeScript + Tailwind CSS</p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 mt-8">
-                        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                            <div className="text-4xl mb-2">🎮</div>
-                            <div className="font-semibold">Individual</div>
-                            <div className="text-xs text-white/70">4 pantallas</div>
-                        </div>
-                        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                            <div className="text-4xl mb-2">🎫</div>
-                            <div className="font-semibold">Grupal</div>
-                            <div className="text-xs text-white/70">Sorteos c/15min</div>
-                        </div>
-                        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                            <div className="text-4xl mb-2">⭐</div>
-                            <div className="font-semibold">Especial</div>
-                            <div className="text-xs text-white/70">Premios grandes</div>
-                        </div>
+            </div>
+
+            <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Mobile / Player Links */}
+                <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/20">
+                    <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                        📱 Modo Jugador (Celular)
+                    </h2>
+                    <div className="space-y-3">
+                        {[1, 2, 3, 4].map((id) => (
+                            <Link
+                                key={id}
+                                href={`/individual/screen/${id}`}
+                                className="block w-full bg-white text-primary font-bold py-3 px-4 rounded-xl hover:bg-gray-100 hover:scale-[1.02] transition-all flex justify-between items-center group"
+                            >
+                                <span>Pantalla #{id}</span>
+                                <span className="opacity-0 group-hover:opacity-100 transition-opacity">👉</span>
+                            </Link>
+                        ))}
                     </div>
                 </div>
+
+                {/* Display / TV Links */}
+                <div className="bg-black/40 backdrop-blur-md rounded-3xl p-6 border border-white/10">
+                    <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                        📺 Modo Pantalla (TV)
+                    </h2>
+                    <div className="space-y-3">
+                        {[1, 2, 3, 4].map((id) => (
+                            <Link
+                                key={id}
+                                href={`/display/individual/${id}`}
+                                target="_blank"
+                                className="block w-full bg-gray-900 border border-gray-700 text-white font-bold py-3 px-4 rounded-xl hover:bg-gray-800 hover:border-primary transition-all flex justify-between items-center"
+                            >
+                                <span>Display #{id}</span>
+                                <span>🖥️</span>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Admin & Tools */}
+            <div className="mt-8 w-full max-w-4xl">
+                <div className="bg-indigo-900/40 backdrop-blur-md rounded-3xl p-6 border border-indigo-500/30 flex gap-4 overflow-x-auto text-nowrap">
+                    <Link href="/admin/wheels" className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-500 transition-colors">
+                        ⚙️ Admin Panel
+                    </Link>
+                    <Link href="/admin" className="bg-indigo-900/50 text-indigo-200 px-6 py-3 rounded-xl font-bold hover:bg-indigo-800 transition-colors">
+                        📊 Dashboard
+                    </Link>
+                </div>
+            </div>
+
+            <div className="mt-12 text-white/40 text-sm">
+                Crisvalpo Dev Environment • Next.js 16
             </div>
         </main>
     );

@@ -31,13 +31,25 @@ export default function WheelCanvas({
     const imagesRef = useRef<{ [key: string]: HTMLImageElement }>({});
     const loadedCountRef = useRef(0);
 
+    // DEFAULT IDLE SEGMENTS (12 generic segments for Individual Mode Idle)
+    const DEFAULT_IDLE_SEGMENTS = Array.from({ length: 12 }, (_, i) => ({
+        id: i + 1,
+        label: `Juega`,
+        color: i % 2 === 0 ? '#ffcc00' : '#ff4400',
+        emoji: '🎰'
+    }));
+
     // Filter segments that have images
-    const items = segments || ANIMAL_LIST.map(a => ({
+    // If segments is undefined, use DEFAULT_IDLE_SEGMENTS (12) instead of ANIMAL_LIST (36)
+    // This fixes the "Group Wheel in Individual Mode" issue.
+    const effectiveSegments = segments || DEFAULT_IDLE_SEGMENTS;
+
+    const items = effectiveSegments.map((a: any) => ({
         id: a.id,
-        label: a.name,
+        label: a.label || a.name, // Handle both structures
         color: a.color,
         emoji: a.emoji,
-        image: a.imageWheel
+        image: a.imageWheel || a.image
     }));
 
     // Preload Images
@@ -73,36 +85,26 @@ export default function WheelCanvas({
         const totalSegments = wheelSegments.length;
         const segmentAngle = (2 * Math.PI) / totalSegments;
 
+        // FAN MODE CONFIGURATION: Define isFanMode FIRST so it's available
+        // Automatic detection: If segments <= 20, assume Individual Mode (Fan).
+        // If > 20 (e.g. 36), assume Group Mode (Full Wheel).
+        const isFanMode = totalSegments <= 20;
+
         // Reset if starting fresh spin
         if (isSpinning && targetIndex === null) {
             speedRef.current = 0.2; // Max speed
         }
 
+        // ONE-TIME SETUP: Apply initial rotation for Fan Mode alignment
+        // We want 90deg (Bottom) to be center of a segment.
+        // Currently 90deg is an Edge.
+        // Offset needed: -segmentAngle / 2.
+        const visualOffset = (isFanMode) ? -segmentAngle / 2 : 0;
+
         const drawWheel = () => {
             const centerX = canvas.width / 2;
             let centerY = canvas.height / 2;
             let radius = Math.min(centerX, centerY) - 20;
-
-            // Half-Wheel "Fan" Mode via simple heuristic or prop?
-            // User requested to replicate "Mario" reference which has centerY=0 (Fan from top).
-            // Let's implement a 'displayMode' prop or default to 'fan-top' if requested.
-            // Since we can't change props easily without changing parent, let's auto-detect or hardcode for now based on user request.
-            // Actually, best to use a prop 'variant': 'full' | 'fan'. 
-            // For now, I'll enforce 'fan' style if it's the "Display" screen (implied by large size?).
-            // Let's stick to the prop approach but set default, or better:
-            // Adjust loop var 'centerY' and 'radius' if we want the "Fan" look.
-
-            // FAN MODE CONFIGURATION (To match reference)
-            // Center at Top Middle
-            // Radius = Layout Height - Padding
-
-            // To enable this via prop in next step, I will defaulting to standard. 
-            // BUT user asked to "achieve how to show only half".
-            // So I will change the logic here to support it.
-
-            // NOTE: To make this robust, I'd usually add a prop. 
-            // But to fix it NOW for the user:
-            const isFanMode = true; // FORCE FAN MODE based on user request "can you render... half of the wheel"
 
             if (isFanMode) {
                 centerY = 0; // Top edge
