@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ANIMAL_LIST } from '@/lib/constants/animals';
 
 interface WheelSegment {
