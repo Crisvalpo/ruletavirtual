@@ -57,16 +57,21 @@ export default function DisplayScreenPage({
             const FORCE_DEBUG = true;
 
             if (FORCE_DEBUG) {
+                // Base URL for Supabase Storage (Public Bucket: individual-wheels)
+                // Corrected path based on Storage structure: mario/mario/segments/X.png
+                // Project ID: umimqlybmqivowsshtkt
+                const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+
                 const segments = Array.from({ length: 12 }, (_, i) => ({
                     id: i + 1,
                     label: `Seg ${i + 1}`,
                     color: 'transparent',
-                    imageWheel: `/wheels/mario/${i + 1}.png`,
-                    imageResult: `/wheels/mario/${i + 1}.png`
+                    imageWheel: `${STORAGE_BASE}/mario/segments/${i + 1}.png`,
+                    imageResult: `${STORAGE_BASE}/mario/selector/${i + 1}.png`
                 }));
 
                 setActiveWheelAssets({
-                    background: '/wheels/mario/background.jpg',
+                    background: `${STORAGE_BASE}/mario/background.jpg`,
                     segments: segments
                 });
                 return;
@@ -306,7 +311,7 @@ export default function DisplayScreenPage({
                                     // Assuming result_index matches ID (1-based)
                                     // If segments are 0-indexed in array but have IDs:
                                     const segment = activeWheelAssets.segments.find(s => s.id === spin.result_index);
-                                    if (segment) imageSrc = segment.imageResult || segment.imageWheel || segment.image;
+                                    if (segment) imageSrc = segment.imageResult || segment.imageWheel;
                                 }
 
                                 return (
