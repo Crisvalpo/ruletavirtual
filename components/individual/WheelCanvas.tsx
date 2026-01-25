@@ -22,8 +22,9 @@ export default function WheelCanvas({
     onSpinComplete,
     isSpinning = false,
     targetIndex = null,
-    segments
-}: WheelCanvasProps) {
+    segments,
+    className = ""
+}: WheelCanvasProps & { className?: string }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rotationRef = useRef(0);
     const speedRef = useRef(0);
@@ -74,6 +75,14 @@ export default function WheelCanvas({
         });
     }, [items]); // Re-run if map items change (e.g. wheel change)
 
+    // State for smooth stopping
+    const stoppingRef = useRef<{
+        startRotation: number;
+        targetRotation: number;
+        startTime: number;
+        duration: number;
+    } | null>(null);
+
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -84,22 +93,69 @@ export default function WheelCanvas({
         const wheelSegments = segments || ANIMAL_LIST;
         const totalSegments = wheelSegments.length;
         const segmentAngle = (2 * Math.PI) / totalSegments;
-
-        // FAN MODE CONFIGURATION: Define isFanMode FIRST so it's available
-        // Automatic detection: If segments <= 20, assume Individual Mode (Fan).
-        // If > 20 (e.g. 36), assume Group Mode (Full Wheel).
         const isFanMode = totalSegments <= 20;
 
-        // Reset if starting fresh spin
+        // Start Spin Logic
         if (isSpinning && targetIndex === null) {
-            speedRef.current = 0.2; // Max speed
+            speedRef.current = 0.05; // Initial kickoff
+            stoppingRef.current = null;
         }
 
-        // ONE-TIME SETUP: Apply initial rotation for Fan Mode alignment
-        // We want 90deg (Bottom) to be center of a segment.
-        // Currently 90deg is an Edge.
-        // Offset needed: -segmentAngle / 2.
-        const visualOffset = (isFanMode) ? -segmentAngle / 2 : 0;
+        // On Target Received Logic
+        if (isSpinning && targetIndex !== null && !stoppingRef.current) {
+            const targetIdx = wheelSegments.findIndex(s => s.id === targetIndex);
+            if (targetIdx !== -1) {
+                // Calculate stopping distance
+                // We want to land such that (Rotation + segmentCenter) aligns with Pointer (Angle 0 or PI depending on implementation)
+                // Pointer is fixed.
+                // For Fan Mode (PI/2 rotation drawing), Pointer is at BOTTOM (Angle PI/2)
+                // Wait, previous code:
+                // Fan Mode Pointer: Bottom Center (Angle PI/2 relative to Canvas Center?)
+                // Standard Mode Pointer: Right (Angle 0).
+
+                // Let's identify Pointer Angle in Radians (Wheel Space).
+                // Fan Mode Loop: drawWheel clears.
+                // items drawn at `rotationRef.current + i * segmentAngle`.
+                // Pointer Drawing: `moveTo(centerX, ptrY - 10)` which is effectively Bottom.
+                // Bottom in standard arc terms is PI/2 (90 deg).
+                // So Pointer Angle = Math.PI / 2.
+
+                // We want Target Segment Center to range [PointerAngle - e, PointerAngle + e].
+                // Target Segment Center = Rotation + idx * segAngle + segAngle/2.
+                // Loop Goal: Rotation + idx*segAngle + segAngle/2 = Math.PI/2 + 2PI*k.
+
+                // So Target Rotation = Math.PI/2 - (idx * segAngle + segAngle/2) + 2PI*k.
+
+                const pointerAngle = isFanMode ? Math.PI / 2 : 0;
+
+                // Current Rotation
+                const currentRot = rotationRef.current;
+
+                // Base Target (normalized)
+                const baseTarget = pointerAngle - (targetIdx * segmentAngle + segmentAngle / 2);
+
+                // Ensure we spin at least 2 full rounds more
+                // Find next 2PI*k greater than currentRot + 4PI
+                const minDistance = Math.PI * 4; // 2 spins
+                let targetRot = baseTarget;
+                while (targetRot < currentRot + minDistance) {
+                    targetRot += Math.PI * 2;
+                }
+
+                // Add random variation within segment? No, center is cleaner.
+
+                stoppingRef.current = {
+                    startRotation: currentRot,
+                    targetRotation: targetRot,
+                    startTime: performance.now(),
+                    duration: 4000 // 4 seconds deceleration
+                };
+            }
+        }
+
+        const easeOutCubic = (t: number): number => {
+            return 1 - Math.pow(1 - t, 3);
+        };
 
         const drawWheel = () => {
             const centerX = canvas.width / 2;
@@ -107,183 +163,124 @@ export default function WheelCanvas({
             let radius = Math.min(centerX, centerY) - 20;
 
             if (isFanMode) {
-                centerY = 0; // Top edge
-                radius = canvas.height - 50; // Fill height downwards
+                centerY = 0;
+                const maxRadiusByWidth = (canvas.width / 2) - 20;
+                const maxRadiusByHeight = canvas.height - 50;
+                radius = Math.min(maxRadiusByWidth, maxRadiusByHeight);
             }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Segments
             items.forEach((item, i) => {
                 const angle = rotationRef.current + i * segmentAngle;
-
-                // 1. Draw Segment Slice
                 ctx.beginPath();
                 ctx.moveTo(centerX, centerY);
                 ctx.arc(centerX, centerY, radius, angle, angle + segmentAngle);
                 ctx.fillStyle = item.color || (i % 2 === 0 ? '#ffcc00' : '#ff4400');
                 ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
 
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(angle + segmentAngle / 2);
 
-                // 2. Draw Image if available
                 if (item.image && imagesRef.current[item.image] && imagesRef.current[item.image].complete) {
                     const img = imagesRef.current[item.image];
+                    const aspect = img.naturalWidth / img.naturalHeight;
+                    let imgHeight, imgWidth, dist;
 
-                    // Adjust image size and position for fan mode
-                    const imgSize = isFanMode ? 120 : 40; // Larger for fan mode
-                    const dist = radius * (isFanMode ? 0.55 : 0.7); // Closer to edge in fan mode
-
-                    ctx.save();
-
-                    // For fan mode, images should be upright (not rotated with wheel)
-                    // For regular mode, rotate to face outward
-                    ctx.translate(dist, 0);
-
-                    if (!isFanMode) {
-                        ctx.rotate(Math.PI / 2); // Rotate 90 deg in regular mode
+                    if (isFanMode) {
+                        imgHeight = radius;
+                        imgWidth = imgHeight * aspect * 1.0;
+                        dist = radius / 2;
+                    } else {
+                        imgWidth = 40;
+                        imgHeight = 40;
+                        dist = radius * 0.7;
                     }
 
-                    ctx.drawImage(img, -imgSize / 2, -imgSize / 2, imgSize, imgSize);
+                    ctx.save();
+                    ctx.translate(dist, 0);
 
+                    if (isFanMode) {
+                        ctx.rotate(Math.PI / 2);
+                    } else {
+                        ctx.rotate(Math.PI / 2);
+                    }
+
+                    ctx.drawImage(img, -imgWidth / 2, -imgHeight / 2, imgWidth, imgHeight);
                     ctx.restore();
                 }
-
-                ctx.textAlign = 'right';
-
-                // Text/Emoji Rendering
-                if (item.emoji) {
-                    ctx.font = 'bold 24px Arial';
-                    ctx.fillStyle = '#000';
-                    ctx.fillText(item.emoji, radius - 25, 8);
-                } else if (item.label) {
-                    ctx.font = 'bold 16px Arial';
-                    ctx.fillStyle = '#000';
-                    ctx.fillText(item.label.substring(0, 10), radius - 25, 5);
-                }
-
-                // ID Number
-                ctx.font = '10px Arial';
-                ctx.fillStyle = '#fff';
-                ctx.fillText(`${item.id}`, radius - (totalSegments > 20 ? 55 : 40), 5); // Adjust for density
-
                 ctx.restore();
             });
 
-            // Draw Center Hub
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, 30, 0, 2 * Math.PI);
-            ctx.fillStyle = '#fff';
-            ctx.fill();
-            ctx.stroke();
-
-            // Draw Pointer
+            // Pointer
             if (isFanMode) {
-                // Pointer at Bottom Center (pointing UP)
-                // Position: (centerX, centerY + radius)
                 const ptrY = centerY + radius;
                 ctx.beginPath();
-                ctx.moveTo(centerX, ptrY + 20); // Base low
-                ctx.lineTo(centerX - 15, ptrY - 10); // Point Top Left
-                ctx.lineTo(centerX + 15, ptrY - 10); // Point Top Right
+                ctx.moveTo(centerX, ptrY - 10);
+                ctx.lineTo(centerX - 15, ptrY + 20);
+                ctx.lineTo(centerX + 15, ptrY + 20);
             } else {
-                // Default: Right side pointing Left
                 ctx.beginPath();
                 ctx.moveTo(centerX + radius + 10, centerY);
                 ctx.lineTo(centerX + radius - 20, centerY - 10);
                 ctx.lineTo(centerX + radius - 20, centerY + 10);
             }
-
             ctx.fillStyle = 'red';
             ctx.fill();
         };
 
-        let animationFrameId: number;
-
-        const animate = () => {
+        const animate = (time: number) => {
             if (isSpinning) {
-                if (targetIndex !== null) {
-                    // Calculate target angle to stop at 3 o'clock (angle 0)
-                    // The pointer is at angle 0.
-                    // To show segment T at angle 0, the wheel rotation must put segment T there.
-                    // Segment i starts at rotation + i * segmentAngle.
-                    // We want rotation + targetIndex * segmentAngle + segmentAngle/2 = 2PI * K (or 0)
-                    // Wait, usually items are 0-indexed. targetIndex is likely 1-indexed ID? 
-                    // Let's assume targetIndex is the ID.
+                if (stoppingRef.current) {
+                    // Deceleration Phase
+                    const { startTime, duration, startRotation, targetRotation } = stoppingRef.current;
+                    const elapsed = time - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const ease = easeOutCubic(progress);
 
-                    // Find index of target
-                    const targetIdx = wheelSegments.findIndex(s => s.id === targetIndex);
-                    if (targetIdx !== -1) {
-                        // Target Angle relative to wheel start
-                        const segmentCenter = targetIdx * segmentAngle + segmentAngle / 2;
+                    rotationRef.current = startRotation + (targetRotation - startRotation) * ease;
 
-                        // We want this segmentCenter to end up at Angle 0 (Pointer position)
-                        // So Rotation + segmentCenter = 2PI * N.
-                        // Target Rotation = (2PI * N) - segmentCenter.
-
-                        // Current Rotation mod 2PI
-                        const currentRot = rotationRef.current;
-
-                        // Distance to travel: We want to spin a few more times then stop.
-                        // This complex logic is easier simplified:
-                        // Just stop when speed is super low? No, must stop at specific spot.
-
-                        // SIMPLIFIED LOGIC FOR DEMO:
-                        // Just stop deceleration when "close enough" is harder without pre-calc.
-                        // Let's just snap to it for MVP or use a fixed duration tween?
-
-                        // Better: Pre-calculate end rotation when target is received.
-                        // But here we are in the loop. 
-
-                        // Let's implement a friction stop.
-                        speedRef.current *= 0.98; // Decelerate
-
-                        // STOP CONDITION (Hack for MVP stability):
-                        // If speed is very low, snap to target and stop.
-                        if (speedRef.current < 0.005) {
-                            speedRef.current = 0;
-
-                            // Calculate final snap angle
-                            // We want the target segment to be at 0 (East).
-                            // pointer is at 0.
-                            const targetOffset = -(targetIdx * segmentAngle + segmentAngle / 2);
-                            // Normalize angle
-                            rotationRef.current = targetOffset;
-
-                            if (onSpinComplete) {
-                                onSpinComplete(targetIndex);
-                            }
-                            // Stop animation loop for "spinning" state, but keep drawing?
-                            // React state will update to 'result', setting isSpinning false.
-                        }
+                    if (progress >= 1) {
+                        // Finished
+                        if (onSpinComplete) onSpinComplete(targetIndex!);
+                        // Do not loop anymore
                     }
                 } else {
-                    // Spin up or constant
-                    if (speedRef.current < 0.5) speedRef.current += 0.01;
+                    // Acceleration / Constant Speed Phase
+                    if (speedRef.current < 0.3) { // Max speed cap
+                        speedRef.current += 0.005;
+                    }
+                    rotationRef.current += speedRef.current;
                 }
-                rotationRef.current += speedRef.current;
             }
 
             drawWheel();
-            animationFrameId = requestAnimationFrame(animate);
+
+            // Continue loop only if spinning AND not finished stopping
+            if (isSpinning && (!stoppingRef.current || (performance.now() - stoppingRef.current.startTime < stoppingRef.current.duration))) {
+                animationFrameId = requestAnimationFrame(animate);
+            } else if (isSpinning && stoppingRef.current) {
+                // Ensure final frame is drawn perfectly
+                drawWheel();
+            } else {
+                // Idle loop just to draw
+                // animationFrameId = requestAnimationFrame(animate);
+                // Actually, if we stop spinning, react state changes 'status' to 'result'.
+                // Then isSpinning becomes false. We can stop animating or just draw once.
+            }
         };
 
-        animate();
-
+        let animationFrameId = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(animationFrameId);
     }, [isSpinning, targetIndex, segments]); // Re-bind when props change
 
     return (
-        <div className="relative w-full aspect-square max-w-lg mx-auto">
+        <div className={`relative w-full aspect-square ${className}`}>
             <canvas
                 ref={canvasRef}
-                width={500}
-                height={500}
+                width={1000} // Increased resolution for sharp rendering on large screens
+                height={1000}
                 className="w-full h-full"
             />
         </div>

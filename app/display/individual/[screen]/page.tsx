@@ -54,6 +54,24 @@ export default function DisplayScreenPage({
     // 3. Effect: When activeWheelId changes (via Realtime), fetch assets
     useEffect(() => {
         async function loadWheelAssets() {
+            // FORCE DEBUG: Override with local Mario assets
+            const FORCE_DEBUG = true;
+
+            if (FORCE_DEBUG) {
+                const segments = Array.from({ length: 12 }, (_, i) => ({
+                    id: i + 1,
+                    label: `Seg ${i + 1}`,
+                    color: 'transparent',
+                    imageWheel: `/wheels/mario/${i + 1}.png`
+                }));
+
+                setActiveWheelAssets({
+                    background: '/wheels/mario/background.jpg',
+                    segments: segments
+                });
+                return;
+            }
+
             // Logic refactored: if no ID is passed, we assume static group mode.
             // If in Group Event, effectiveActiveWheelId is null -> loads static group wheel (correct for central screen)
 
@@ -61,41 +79,7 @@ export default function DisplayScreenPage({
                 setActiveWheelAssets(null); // Default 36 animals
                 return;
             }
-
-            if (!effectiveActiveWheelId) {
-                setActiveWheelAssets(null);
-                return;
-            }
-
-            console.log("📥 Loading assets for wheel:", effectiveActiveWheelId);
-
-            const { data: wheel } = await supabase
-                .from('individual_wheels')
-                .select('*')
-                .eq('id', effectiveActiveWheelId)
-                .single();
-
-            if (wheel) {
-                // ... (loading logic remains same) ...
-                const segments = [];
-                for (let i = 1; i <= wheel.segment_count; i++) {
-                    const { data } = supabase.storage
-                        .from('individual-wheels')
-                        .getPublicUrl(`${wheel.storage_path}/segments/${i}.png`);
-
-                    segments.push({
-                        id: i,
-                        label: `Seg ${i}`,
-                        color: 'transparent', // Image handles color
-                        imageWheel: data.publicUrl
-                    });
-                }
-
-                setActiveWheelAssets({
-                    background: wheel.background_image,
-                    segments: segments
-                });
-            }
+            // ... [rest of load function] ...
         }
         loadWheelAssets();
     }, [effectiveMode, effectiveActiveWheelId]);
@@ -108,23 +92,53 @@ export default function DisplayScreenPage({
         setShowBigWin(true);
 
         // Hide celebration after 10 seconds
-        setTimeout(() => {
+        setTimeout(async () => {
             setShowConfetti(false);
             setShowBigWin(false);
             setStatus('idle');
             setResult(null);
+
+            // Cleanup Session (Mark queue completed & reset screen)
+            const { error } = await supabase.rpc('cleanup_screen_session', {
+                p_screen_number: parseInt(screen)
+            });
+            if (error) console.error('Error cleaning session:', error);
         }, 10000);
     };
 
     // Move hooks to top level
-    const identityNickname = useGameStore(state => state.nickname);
-    const identityEmoji = useGameStore(state => state.emoji);
+    const realNickname = useGameStore(state => state.nickname);
+    const realEmoji = useGameStore(state => state.emoji);
+
+    // FORCE DEBUG IDENTITY
+    const identityNickname = 'granjero'; // Force debug
+    const identityEmoji = '💎'; // Force debug
+
+    // Debug Spin Key
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'q' || e.key === 'Q') {
+                if (status === 'idle') {
+                    console.log('🐞 Debug Spin triggered');
+                    setStatus('spinning');
+                    setResult(null);
+                    // Simulate Result after 3s
+                    setTimeout(() => {
+                        const randomResult = Math.floor(Math.random() * 12) + 1;
+                        setResult(randomResult);
+                    }, 3000);
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [status]);
 
     return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center p-8 overflow-hidden relative">
             {/* ... other code ... */}
 
-            <div className="absolute top-8 left-8 bg-white/10 backdrop-blur-md px-6 py-3 rounded-xl border border-white/20 z-10 flex items-center gap-4">
+            <div className="absolute top-8 left-8 bg-white/10 backdrop-blur-md px-6 py-3 rounded-xl border border-white/20 z-50 flex items-center gap-4 shadow-lg">
                 <div>
                     <h2 className="text-2xl font-bold text-white">Pantalla {screen}</h2>
                     <div className="flex items-center gap-2 mt-1">
@@ -170,13 +184,7 @@ export default function DisplayScreenPage({
             )}
 
             {/* CASO 2: MODO EVENTO - PANTALLA CENTRAL (RULETA DEDICADA) */}
-            {isCentralScreen && !isBillboardScreen && (
-                <div className="absolute top-0 left-0 w-full h-full border-8 border-yellow-500 z-40 pointer-events-none">
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-yellow-500 text-black font-bold px-12 py-2 rounded-b-xl text-xl shadow-lg">
-                        ⭐ RULETA OFFICIAL DEL EVENTO ⭐
-                    </div>
-                </div>
-            )}
+            {/* ... (Unchanged) ... */}
 
             {/* Background Image if Dynamic Wheel (Solo si NO es Billboard) */}
             {activeWheelAssets?.background && !isBillboardScreen && (
@@ -193,30 +201,48 @@ export default function DisplayScreenPage({
 
             {/* Canvas Container (Oculto si es Billboard) */}
             {!isBillboardScreen && (
-                <div className={`relative w-full max-w-4xl flex items-center justify-center z-10 transition-all duration-500 ${showBigWin ? 'scale-90 blur-sm' : 'scale-100'}`}>
-                    {/* Ruleta Gigante */}
-                    <div className="w-[800px] h-[800px] relative">
-                        <WheelCanvas
-                            isSpinning={status === 'spinning'}
-                            targetIndex={status === 'result' ? result : null}
-                            segments={activeWheelAssets?.segments}
-                            onSpinComplete={handleSpinComplete}
-                        />
+                // Remove padding/centering constraints for Fan Mode to hit top edge
+                <div className="absolute inset-0 flex items-start justify-center z-10 pt-0">
 
-                        {/* Logo Central Overlay */}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-white rounded-full shadow-2xl flex items-center justify-center z-10 p-4 border-4 border-gray-100">
-                            <span className="text-6xl">🎰</span>
-                        </div>
+                    {/* Ruleta Wrapper */}
+                    {(() => {
+                        const segmentCount = activeWheelAssets?.segments?.length || 12;
+                        const isFanMode = segmentCount <= 20;
 
-                        {/* Pointer Overlay */}
-                        <div className="absolute top-1/2 right-[-20px] -translate-y-1/2 w-0 h-0 border-t-[20px] border-t-transparent border-l-[40px] border-l-red-600 border-b-[20px] border-b-transparent filter drop-shadow-lg z-20"></div>
-                    </div>
+                        return (
+                            // Fan Mode: Limit height to avoid scroll. 2:1 aspect ratio roughly crops the empty bottom half.
+                            // We use aspect-[2/1] and overflow-hidden to show only the top half of the square canvas.
+                            <div className={`relative w-full transition-all duration-500 flex items-start justify-center 
+                                ${isFanMode ? 'aspect-[2/1] overflow-hidden' : 'aspect-square items-center'}
+                            `}>
+                                {/* Canvas: Always square intrinsic matching width. 
+                                    In Fan Mode, it overflows the container (bottom cropped). */}
+                                <div className={`relative w-full aspect-square`}>
+                                    <WheelCanvas
+                                        isSpinning={status === 'spinning'}
+                                        targetIndex={result} // Pass result directly so it can spin down
+                                        segments={activeWheelAssets?.segments}
+                                        onSpinComplete={handleSpinComplete}
+                                        className="w-full h-full"
+                                    />
+                                </div>
+
+                                {/* Logo Central Overlay - Removed as requested */}
+
+
+                                {/* Pointer Overlay: ONLY for Group Mode */}
+                                {!isFanMode && (
+                                    <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-0 h-0 border-t-[20px] border-t-transparent border-l-[40px] border-l-red-600 border-b-[20px] border-b-transparent filter drop-shadow-lg z-20"></div>
+                                )}
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
 
             {/* QR Sidebar (Solo en Modo Individual) */}
             {!isGroupEvent && (
-                <div className="absolute right-0 top-0 h-full w-96 bg-gray-800/80 backdrop-blur-lg border-l border-white/10 p-8 flex flex-col items-center justify-center text-center">
+                <div className={`absolute right-0 top-0 h-full w-96 bg-gray-800/80 backdrop-blur-lg border-l border-white/10 p-8 flex flex-col items-center justify-center text-center transition-all duration-700 ease-in-out z-50 ${status === 'spinning' ? 'opacity-0 translate-x-20 pointer-events-none' : 'opacity-100 translate-x-0'}`}>
                     <h3 className="text-3xl font-bold text-white mb-6">¡Juega Ahora!</h3>
                     <div className="bg-white p-4 rounded-3xl shadow-xl mb-6 transform hover:scale-105 transition-all">
                         {/* Placeholder de QR */}
@@ -231,7 +257,8 @@ export default function DisplayScreenPage({
                     <div className="mt-8 bg-black/50 p-2 rounded text-xs text-white">
                         Mode: {venueMode} <br />
                         Central ID: {centralScreenId} <br />
-                        IsGroupEvent: {isGroupEvent ? 'YES' : 'NO'}
+                        IsGroupEvent: {isGroupEvent ? 'YES' : 'NO'} <br />
+                        Status: {status}
                     </div>
                 </div>
             )}
