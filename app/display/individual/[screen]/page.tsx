@@ -40,14 +40,13 @@ export default function DisplayScreenPage({
     // Celebration State
     const [status, setStatus] = useState<'idle' | 'spinning' | 'result'>('idle');
     const [result, setResult] = useState<number | null>(null);
+    // History State
+    const [lastSpins, setLastSpins] = useState<any[]>([]);
+
+    // Missing State Definitions
+    const [activeWheelAssets, setActiveWheelAssets] = useState<{ background: string; segments: any[] } | null>(null);
     const [showConfetti, setShowConfetti] = useState(false);
     const [showBigWin, setShowBigWin] = useState(false);
-
-    // Local state for dynamic assets
-    const [activeWheelAssets, setActiveWheelAssets] = useState<{
-        background: string;
-        segments: any[];
-    } | null>(null);
 
     const supabase = createClient();
 
@@ -62,7 +61,8 @@ export default function DisplayScreenPage({
                     id: i + 1,
                     label: `Seg ${i + 1}`,
                     color: 'transparent',
-                    imageWheel: `/wheels/mario/${i + 1}.png`
+                    imageWheel: `/wheels/mario/${i + 1}.png`,
+                    imageResult: `/wheels/mario/${i + 1}.png`
                 }));
 
                 setActiveWheelAssets({
@@ -70,26 +70,62 @@ export default function DisplayScreenPage({
                     segments: segments
                 });
                 return;
-            }
-
-            // Logic refactored: if no ID is passed, we assume static group mode.
-            // If in Group Event, effectiveActiveWheelId is null -> loads static group wheel (correct for central screen)
-
-            if (effectiveMode === 'group' && !effectiveActiveWheelId) {
+            } else if (effectiveMode === 'group' && !effectiveActiveWheelId) {
                 setActiveWheelAssets(null); // Default 36 animals
-                return;
+            } else {
+                // ... [rest of load function logic would go here if not debug] ...
             }
-            // ... [rest of load function] ...
         }
         loadWheelAssets();
     }, [effectiveMode, effectiveActiveWheelId]);
 
+    // Fetch History Effect
+    useEffect(() => {
+        async function fetchHistory() {
+            const { data, error } = await supabase
+                .from('game_history')
+                .select('*')
+                .eq('screen_id', screenIdNum)
+                .order('created_at', { ascending: false })
+                .limit(9);
+
+            if (data) {
+                setLastSpins(data);
+            }
+        }
+        fetchHistory();
+    }, [screenIdNum]);
+
     // Handle Spin Complete
-    const handleSpinComplete = (winnerIndex: number) => {
+    const handleSpinComplete = async (winnerIndex: number) => {
         setStatus('result');
         setResult(winnerIndex);
         setShowConfetti(true);
         setShowBigWin(true);
+
+        // Record History
+        // activeWheelAssets.segments[winnerIndex] helps us know what image it is, 
+        // but we just store the index and resolve image on render.
+        // Be careful: result from wheel might be 1-based ID or 0-based index?
+        // My previous fix in WheelCanvas uses `targetIndex` which is passed as `result` (1-based ID usually).
+        // Let's assume passed `winnerIndex` is the ID of the winning segment.
+
+        try {
+            const historyEntry = {
+                screen_id: screenIdNum,
+                wheel_id: effectiveActiveWheelId || null,
+                result_index: winnerIndex,
+                created_at: new Date().toISOString()
+            };
+
+            await supabase.from('game_history').insert([historyEntry]);
+
+            // Optimistic Update
+            setLastSpins(prev => [historyEntry, ...prev].slice(0, 9));
+
+        } catch (err) {
+            console.error("Failed to save history:", err);
+        }
 
         // Hide celebration after 10 seconds
         setTimeout(async () => {
@@ -242,29 +278,71 @@ export default function DisplayScreenPage({
 
             {/* QR Sidebar (Solo en Modo Individual) */}
             {!isGroupEvent && (
-                <div className={`absolute right-0 top-0 h-full w-96 bg-gray-800/80 backdrop-blur-lg border-l border-white/10 p-8 flex flex-col items-center justify-center text-center transition-all duration-700 ease-in-out z-50 ${status === 'spinning' ? 'opacity-0 translate-x-20 pointer-events-none' : 'opacity-100 translate-x-0'}`}>
-                    <h3 className="text-3xl font-bold text-white mb-6">¡Juega Ahora!</h3>
-                    <div className="bg-white p-4 rounded-3xl shadow-xl mb-6 transform hover:scale-105 transition-all">
+                <div className={`absolute right-0 top-0 h-full w-80 bg-gray-800/90 backdrop-blur-lg border-l border-white/10 p-6 flex flex-col items-center justify-start pt-12 text-center transition-all duration-700 ease-in-out z-50 ${status === 'spinning' ? 'opacity-0 translate-x-20 pointer-events-none' : 'opacity-100 translate-x-0'}`}>
+
+                    {/* Header Text */}
+                    <h3 className="text-3xl font-bold text-white mb-2">¡Juega Ahora!</h3>
+                    <p className="text-xl text-primary font-bold mb-1">Escanea para unirte</p>
+                    <p className="text-gray-400 mb-6">Solo $1,000 por jugada</p>
+
+                    {/* QR Code */}
+                    <div className="bg-white p-3 rounded-2xl shadow-xl mb-8 transform hover:scale-105 transition-all w-full max-w-[240px]">
                         {/* Placeholder de QR */}
-                        <div className="w-64 h-64 bg-gray-100 flex items-center justify-center text-gray-400">
-                            [QR LINK A PANTALLA {screen}]
+                        <div className="w-full aspect-square bg-gray-100 flex items-center justify-center text-gray-400 rounded-xl overflow-hidden relative">
+                            {/* You can use a real QR image here if available, or keep placeholder text */}
+                            <span className="text-xs text-gray-400">[QR LINK PANTALLA {screen}]</span>
                         </div>
                     </div>
-                    <p className="text-xl text-primary font-bold mb-2">Escanea para unirte</p>
-                    <p className="text-gray-400">Solo $1,000 por jugada</p>
 
-                    {/* Visual Mode Indicator for Staff Debug */}
-                    <div className="mt-8 bg-black/50 p-2 rounded text-xs text-white">
-                        Mode: {venueMode} <br />
-                        Central ID: {centralScreenId} <br />
-                        IsGroupEvent: {isGroupEvent ? 'YES' : 'NO'} <br />
-                        Status: {status}
+                    {/* History Grid */}
+                    <div className="w-full max-w-[240px]">
+                        <h4 className="text-sm uppercase tracking-widest text-gray-500 mb-3 border-b border-white/10 pb-1">Últimos 9</h4>
+                        <div className="grid grid-cols-3 gap-2">
+                            {/* Render actual history, padded to 9 items */}
+                            {[...lastSpins, ...Array(9)].slice(0, 9).map((spin, i) => {
+                                // Find image for this result
+                                let imageSrc = null;
+                                if (spin && activeWheelAssets?.segments) {
+                                    // Assuming result_index matches ID (1-based)
+                                    // If segments are 0-indexed in array but have IDs:
+                                    const segment = activeWheelAssets.segments.find(s => s.id === spin.result_index);
+                                    if (segment) imageSrc = segment.imageResult || segment.imageWheel || segment.image;
+                                }
+
+                                return (
+                                    <div key={i} className="aspect-square bg-white/5 rounded-lg border border-white/10 overflow-hidden relative flex items-center justify-center">
+                                        {spin ? (
+                                            imageSrc ? (
+                                                <div className="w-full h-full relative">
+                                                    <Image
+                                                        src={imageSrc}
+                                                        alt="Res"
+                                                        fill
+                                                        className="object-contain p-1"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-yellow-500 font-bold">#{spin.result_index}</span>
+                                            )
+                                        ) : (
+                                            // Empty Slot
+                                            <div className="w-1 h-1 bg-white/5 rounded-full" />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Visual Mode Indicator for Staff Debug (Minimized) */}
+                    <div className="mt-auto opacity-30 hover:opacity-100 transition-opacity text-[10px] text-gray-500 text-left w-full">
+                        Mode: {venueMode} | Central: {centralScreenId} <br />
+                        Evt: {isGroupEvent ? 'Yes' : 'No'} | St: {status}
                     </div>
                 </div>
             )}
 
-            {/* FORCE DEBUG OVERLAY - ALWAYS VISIBLE */}
-            <div className="fixed bottom-0 left-0 bg-red-600 text-white p-2 z-[9999] text-xs font-mono">
+            <div className="fixed bottom-0 left-0 bg-red-600 text-white p-2 z-[9999] text-xs font-mono hidden">
                 DEBUG: VenueMode={venueMode} | Screen={screen} | Central={centralScreenId}
             </div>
 

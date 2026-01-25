@@ -28,9 +28,11 @@ export default function WheelCanvas({
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rotationRef = useRef(0);
     const speedRef = useRef(0);
-    const requestRef = useRef<number>(0);
     const imagesRef = useRef<{ [key: string]: HTMLImageElement }>({});
     const loadedCountRef = useRef(0);
+
+    // Force re-render on image load
+    const [refresh, setRefresh] = useState(0);
 
     // DEFAULT IDLE SEGMENTS (12 generic segments for Individual Mode Idle)
     const DEFAULT_IDLE_SEGMENTS = Array.from({ length: 12 }, (_, i) => ({
@@ -66,6 +68,7 @@ export default function WheelCanvas({
                 img.src = item.image;
                 img.onload = () => {
                     loadedCountRef.current += 1;
+                    setRefresh(prev => prev + 1); // Trigger redraw
                 };
                 imagesRef.current[item.image] = img;
             } else if (item.image && imagesRef.current[item.image]) {
@@ -131,8 +134,11 @@ export default function WheelCanvas({
                 // Current Rotation
                 const currentRot = rotationRef.current;
 
-                // Base Target (normalized)
-                const baseTarget = pointerAngle - (targetIdx * segmentAngle + segmentAngle / 2);
+                // Base Target (normalized) with Random Variation
+                // Random offset: +/- 40% of segment width
+                // segmentAngle / 2 is half width. 0.8 factor means 80% range (40% each side).
+                const randomOffset = (Math.random() - 0.5) * segmentAngle * 0.8;
+                const baseTarget = pointerAngle - (targetIdx * segmentAngle + segmentAngle / 2) + randomOffset;
 
                 // Ensure we spin at least 2 full rounds more
                 // Find next 2PI*k greater than currentRot + 4PI
@@ -273,7 +279,7 @@ export default function WheelCanvas({
 
         let animationFrameId = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(animationFrameId);
-    }, [isSpinning, targetIndex, segments]); // Re-bind when props change
+    }, [isSpinning, targetIndex, segments, refresh]); // Added refresh to dependencies
 
     return (
         <div className={`relative w-full aspect-square ${className}`}>
