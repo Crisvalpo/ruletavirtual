@@ -3,6 +3,7 @@
 import { useGameStore } from '@/lib/store/gameStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function PaymentPage({
     params
@@ -16,17 +17,52 @@ export default function PaymentPage({
     const setPaymentStatus = useGameStore((state) => state.setPaymentStatus);
     const setGameMode = useGameStore((state) => state.setGameMode);
 
+    const supabase = createClient(); // Instantiate here if not present, but better to use import
+
     useEffect(() => {
-        const mode = (searchParams.get('mode') as 'group' | 'individual') || 'group';
         const wheelId = searchParams.get('wheelId');
+        // Default to individual if wheelId is present, otherwise group
+        const modeParam = searchParams.get('mode');
+        const mode = (modeParam as 'group' | 'individual') || (wheelId ? 'individual' : 'group');
+
         setGameMode(mode, wheelId || undefined);
-    }, [searchParams, setGameMode]);
+
+        // SYNC WITH TV: Update Supabase screen_state
+        if (wheelId) {
+            const syncScreen = async () => {
+                const { error } = await supabase
+                    .from('screen_state')
+                    .update({
+                        current_wheel_id: wheelId,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('screen_number', parseInt(id));
+
+                if (error) console.error("Error syncing screen:", error);
+            };
+            syncScreen();
+        }
+    }, [searchParams, setGameMode, id]); // Added id to dependency
 
     const handlePayment = (method: 'cash' | 'mercadopago') => {
         // En producción aquí iría la integración real
         // Por ahora simulamos pago exitoso
         setPaymentStatus(true, method);
-        router.push(`/individual/screen/${id}/select`);
+
+        const wheelId = searchParams.get('wheelId');
+        // Pass the wheelId forward to the select/spin page if needed, 
+        // though setGameMode above should have handled the store update.
+        // We navigate to 'spin' directly if we already selected a wheel?
+        // Flow: WheelSelector -> Payment -> Spin (if wheel selected) OR Select (if generic credit buy).
+        // Since we selected a specific wheel, we likely go straight to spin or a confirmation of that wheel.
+        // Let's go to spin directly if wheelId exists.
+
+        if (wheelId) {
+            // Correct Flow: Payment -> Select Preferences -> Spin
+            router.push(`/individual/screen/${id}/select`);
+        } else {
+            router.push(`/individual/screen/${id}/select`);
+        }
     };
 
     return (

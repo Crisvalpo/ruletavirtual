@@ -5,6 +5,7 @@ import { use } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 interface Wheel {
     id: string;
@@ -19,6 +20,7 @@ export default function WheelSelector({ screenId }: { screenId: string }) {
     const [wheels, setWheels] = useState<Wheel[]>([]);
     const [loading, setLoading] = useState(true);
     const supabase = createClient();
+    const router = useRouter();
 
     useEffect(() => {
         async function loadWheels() {
@@ -36,6 +38,16 @@ export default function WheelSelector({ screenId }: { screenId: string }) {
 
         loadWheels();
     }, []);
+
+    const handleSelectWheel = (mode: string, wheelId?: string) => {
+        console.log("Selected:", mode, wheelId);
+        if (wheelId) {
+            router.push(`/individual/screen/${screenId}/payment?wheelId=${wheelId}`);
+        } else if (mode === 'group') {
+            // Handle group mode selection if needed, or default
+            router.push(`/individual/screen/${screenId}/payment?mode=group`);
+        }
+    };
 
     if (loading) {
         return (

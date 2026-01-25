@@ -5,6 +5,7 @@ interface GameState {
     screenId: string | null;
     playerId: string | null; // UUID from temp session or auth
     nickname: string;
+    emoji: string; // New field
 
     // Mode
     gameMode: 'group' | 'individual';
@@ -24,7 +25,8 @@ interface GameState {
     // Actions
     setScreenId: (id: string) => void;
     setGameMode: (mode: 'group' | 'individual', wheelId?: string) => void;
-    setNickname: (name: string) => void;
+    setIdentity: (name: string, emoji: string) => void; // Consolidated action
+    setNickname: (name: string) => void; // Deprecated but kept for compat
     toggleAnimalSelection: (index: number) => void;
     setPaymentStatus: (paid: boolean, method: 'cash' | 'mercadopago') => void;
     resetGame: () => void;
@@ -36,6 +38,7 @@ export const useGameStore = create<GameState>()(
             screenId: null,
             playerId: null,
             nickname: 'Jugador',
+            emoji: '😎', // Default
             selectedAnimals: [],
             hasPaid: false,
             paymentMethod: null,
@@ -47,21 +50,19 @@ export const useGameStore = create<GameState>()(
             setGameMode: (mode, wheelId) => set({
                 gameMode: mode,
                 activeWheelId: wheelId || null,
-                // Reset selection when mode changes
                 selectedAnimals: []
             }),
 
+            setIdentity: (name, emoji) => set({ nickname: name, emoji: emoji }),
             setNickname: (name) => set({ nickname: name }),
 
             toggleAnimalSelection: (index) => set((state) => {
                 const isSelected = state.selectedAnimals.includes(index);
 
-                // Deselect
                 if (isSelected) {
                     return { selectedAnimals: state.selectedAnimals.filter(i => i !== index) };
                 }
 
-                // Select (max 3)
                 if (state.selectedAnimals.length < 3) {
                     return { selectedAnimals: [...state.selectedAnimals, index] };
                 }
@@ -81,11 +82,14 @@ export const useGameStore = create<GameState>()(
                 paymentMethod: null,
                 status: 'idle',
                 gameMode: 'group',
-                activeWheelId: null
+                activeWheelId: null,
+                // Keep identity if preferred, or reset? Let's reset for fresh start
+                // nickname: 'Jugador',
+                // emoji: '😎'
             })
         }),
         {
-            name: 'ruleta-game-storage', // local storage key
+            name: 'ruleta-game-storage',
         }
     )
 );

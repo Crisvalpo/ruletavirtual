@@ -1,8 +1,9 @@
 'use client';
 
 import WheelSelector from '@/components/individual/WheelSelector';
+import NickEntry from '@/components/individual/NickEntry'; // Auto-import if possible but explicit is better
 import { useGameStore } from '@/lib/store/gameStore';
-import { useEffect, use } from 'react';
+import { useEffect, use, useState } from 'react';
 
 export default function JoinScreenPage({
     params
@@ -11,13 +12,25 @@ export default function JoinScreenPage({
 }) {
     const { id } = use(params);
     const setScreenId = useGameStore((state) => state.setScreenId);
-    const resetGame = useGameStore((state) => state.resetGame);
+    const [hasIdentity, setHasIdentity] = useState(false);
+
+    // Check if store already has non-default identity
+    const nickname = useGameStore((state) => state.nickname);
 
     useEffect(() => {
         // Reset previous session and set new screen
-        resetGame();
+        // resetGame(); // Commented out to avoid resetting identity on refresh if we want persistence
+        // Or we should only reset if it's a truly new session.
         setScreenId(id);
-    }, [id, setScreenId, resetGame]);
+
+        if (nickname && nickname !== 'Jugador') {
+            setHasIdentity(true);
+        }
+    }, [id, setScreenId, nickname]);
+
+    if (!hasIdentity) {
+        return <NickEntry screenId={id} onComplete={() => setHasIdentity(true)} />;
+    }
 
     return <WheelSelector screenId={id} />;
 }

@@ -13,11 +13,9 @@ export default function SelectionPage({
     const { id } = use(params);
     const router = useRouter();
 
-    const { mode, wheelId, selectedAnimals } = useGameStore((state) => ({
-        mode: state.gameMode,
-        wheelId: state.activeWheelId,
-        selectedAnimals: state.selectedAnimals
-    }));
+    const mode = useGameStore((state) => state.gameMode);
+    const wheelId = useGameStore((state) => state.activeWheelId);
+    const selectedAnimals = useGameStore((state) => state.selectedAnimals);
 
     const handleConfirm = () => {
         if (selectedAnimals.length === 3) {

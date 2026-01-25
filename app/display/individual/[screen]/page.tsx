@@ -116,46 +116,33 @@ export default function DisplayScreenPage({
         }, 10000);
     };
 
+    // Move hooks to top level
+    const identityNickname = useGameStore(state => state.nickname);
+    const identityEmoji = useGameStore(state => state.emoji);
+
     return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center p-8 overflow-hidden relative">
-            {/* Confetti Layer */}
-            {showConfetti && (
-                <div className="absolute inset-0 z-[100] pointer-events-none">
-                    <Confetti
-                        width={typeof window !== 'undefined' ? window.innerWidth : 1000}
-                        height={typeof window !== 'undefined' ? window.innerHeight : 800}
-                        recycle={true}
-                        numberOfPieces={500}
-                    />
-                </div>
-            )}
+            {/* ... other code ... */}
 
-            {/* BIG WIN OVERLAY */}
-            {showBigWin && (
-                <div className="absolute inset-0 z-[101] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
-                    <div className="text-center animate-bounce">
-                        <h1 className="text-8xl font-black text-yellow-400 drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)] stroke-black"
-                            style={{ WebkitTextStroke: '2px black' }}>
-                            ¡GANADOR!
-                        </h1>
-                        <div className="text-4xl text-white mt-4 font-bold bg-green-600 px-8 py-2 rounded-full inline-block shadow-lg border-4 border-white">
-                            {activeWheelAssets?.segments?.find(s => s.id === result)?.label || `Animal #${result}`}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div className="absolute top-8 left-8 bg-white/10 backdrop-blur-md px-6 py-3 rounded-xl border border-white/20 z-10">
-                <h2 className="text-2xl font-bold text-white">Pantalla {screen}</h2>
-                <div className="flex items-center gap-4 mt-1">
-                    <div className="flex items-center gap-2">
+            <div className="absolute top-8 left-8 bg-white/10 backdrop-blur-md px-6 py-3 rounded-xl border border-white/20 z-10 flex items-center gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-white">Pantalla {screen}</h2>
+                    <div className="flex items-center gap-2 mt-1">
                         <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                         <span className="text-sm text-gray-300">Conectado</span>
                     </div>
-                    <div className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded uppercase border border-blue-500/30">
-                        {mode === 'group' ? 'Modo Grupal' : 'Modo Personalizado'}
-                    </div>
                 </div>
+
+                {/* Player Identity Badge */}
+                {identityNickname !== 'Jugador' && (
+                    <div className="border-l border-white/20 pl-4 animate-in fade-in slide-in-from-left-4 duration-500">
+                        <p className="text-xs text-gray-400 uppercase tracking-widest">Jugando ahora</p>
+                        <div className="flex items-center gap-2">
+                            <span className="text-3xl">{identityEmoji}</span>
+                            <span className="text-2xl font-bold text-yellow-400">{identityNickname}</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* --- VISUALIZACIÓN SEGÚN MODO --- */}

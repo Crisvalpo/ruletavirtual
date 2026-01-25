@@ -29,6 +29,20 @@ export function useRealtimeGame(screenId: string) {
                         setGameMode('group', undefined);
                     }
 
+                    // Sync Player Identity (for TV Display)
+                    if (newState.player_name) {
+                        // We don't have setIdentity exposed in the hook, let's just use useGameStore.setState or similar if we want to bypass action
+                        // But better to pull the action.
+                        // However, useRealtimeGame logic handles the *Display* part mostly. 
+                        // If we are the mobile updating it, we already have it in store.
+                        // Ideally we want the TV to have it in its store (even though TV doesn't use the store for "my identity", 
+                        // it uses it for "what to show").
+                        // Actually, Display Page reads `activeWheelAssets` based on `effectiveActiveWheelId` from store.
+                        // Display Page also needs to read `playerName` and `playerEmoji` from store.
+
+                        useGameStore.getState().setIdentity(newState.player_name, newState.player_emoji || '😎');
+                    }
+
                     // Future: Sync Status (Spinning, Result, etc.)
                     // if (newState.status === 'spinning') { ... }
                 }
