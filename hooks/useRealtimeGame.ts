@@ -33,9 +33,9 @@ export function useRealtimeGame(screenId: string) {
 
                 // Sync Status
                 if (data.status === 'spinning') {
-                    useGameStore.setState({ status: 'spinning' });
+                    useGameStore.setState({ status: 'spinning', isDemo: data.is_demo || false });
                 } else {
-                    useGameStore.setState({ status: 'idle' });
+                    useGameStore.setState({ status: 'idle', isDemo: data.is_demo || false });
                 }
             }
         };
@@ -77,9 +77,9 @@ export function useRealtimeGame(screenId: string) {
                     // Sync Status (Trigger Spin)
                     if (newState.status === 'spinning') {
                         // Directly update store to trigger reaction in components
-                        useGameStore.setState({ status: 'spinning' });
+                        useGameStore.setState({ status: 'spinning', isDemo: newState.is_demo || false });
                     } else if (newState.status === 'idle') {
-                        useGameStore.setState({ status: 'idle' });
+                        useGameStore.setState({ status: 'idle', isDemo: newState.is_demo || false });
                     }
                 }
             )

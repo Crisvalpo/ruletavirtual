@@ -17,9 +17,9 @@ BEGIN
     status = 'idle',
     -- Clear identity
     player_name = NULL,
-    player_emoji = NULL
+    player_emoji = NULL,
+    is_demo = false -- Ensure we exit demo mode
     -- Intentionally KEEP current_wheel_id to show Attract Mode with last theme
-  WHERE screen_number = p_screen_number;
   WHERE screen_number = p_screen_number;
 END;
 $$;

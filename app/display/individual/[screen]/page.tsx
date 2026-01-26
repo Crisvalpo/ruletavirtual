@@ -121,20 +121,25 @@ export default function DisplayScreenPage({
     const storeStatus = useGameStore(s => s.status);
 
     useEffect(() => {
+        // Start Spin
         if (storeStatus === 'spinning' && status === 'idle') {
             console.log('📱 Mobile Spin triggered');
             setStatus('spinning');
             setResult(null);
 
             // Generate Random Result locally (since mobile didn't send one)
-            // In a real betting system, backend should send the result ID.
             setTimeout(() => {
                 const randomResult = Math.floor(Math.random() * 12) + 1;
                 setResult(randomResult);
-            }, 500); // Start stopping almost immediately or wait a bit?
-            // Logic waits 3s in debug. 0.5s here means it starts the deceleration phase sooner? 
-            // No, setResult just tells WheelCanvas "This is the target". Canvas handles spin duration.
-            // Let's keep it simple.
+            }, 500);
+        }
+        // Reset / Cleanup (Driven by Realtime)
+        else if (storeStatus === 'idle' && status !== 'idle') {
+            console.log('🧹 Remote Reset triggered');
+            setStatus('idle');
+            setResult(null);
+            setShowConfetti(false);
+            setShowBigWin(false);
         }
     }, [storeStatus, status]);
 
@@ -162,12 +167,38 @@ export default function DisplayScreenPage({
         fetchHistory();
     }, [screenIdNum, effectiveActiveWheelId]);
 
+    const isDemo = useGameStore(state => state.isDemo);
+
     // Handle Spin Complete
     const handleSpinComplete = async (winnerIndex: number) => {
+        console.log(`🎰 Spin Complete! isDemo=${isDemo}, Index=${winnerIndex}`);
         setStatus('result');
         setResult(winnerIndex);
         setShowConfetti(true);
         setShowBigWin(true);
+
+        // Logic Branch: Demo vs Real
+        if (isDemo) {
+            console.log("🎓 Demo Spin Complete. Skipping History.");
+
+            // Fast Cleanup (2s)
+            setTimeout(async () => {
+                // Manual Reset for Demo (DB Only - Local follows via Realtime)
+                await supabase
+                    .from('screen_state')
+                    .update({
+                        status: 'idle',
+                        is_demo: false,
+                        player_name: null,
+                        player_emoji: null
+                    })
+                    .eq('screen_number', parseInt(screen));
+            }, 2000);
+
+            return; // EXIT EARLY
+        }
+
+        // --- REAL GAME LOGIC ---
 
         // Record History
         // activeWheelAssets.segments[winnerIndex] helps us know what image it is, 
@@ -194,13 +225,8 @@ export default function DisplayScreenPage({
             console.error("Failed to save history:", err);
         }
 
-        // Hide celebration after 10 seconds
+        // Hide celebration after 10 seconds (Trigger DB Reset)
         setTimeout(async () => {
-            setShowConfetti(false);
-            setShowBigWin(false);
-            setStatus('idle');
-            setResult(null);
-
             // Cleanup Session (Mark queue completed & reset screen)
             const { error } = await supabase.rpc('cleanup_screen_session', {
                 p_screen_number: parseInt(screen)

@@ -2,7 +2,8 @@
 
 import { useGameStore } from '@/lib/store/gameStore';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { use, useEffect } from 'react';
+import { use, useEffect, useState } from 'react';
+import React from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export default function PaymentPage({
@@ -45,6 +46,60 @@ export default function PaymentPage({
     }, [searchParams, setGameMode, id]); // Added id to dependency
 
     const { nickname, emoji, setQueueId, gameMode, activeWheelId } = useGameStore();
+
+    // Demo Mode State
+    const [demoSpins, setDemoSpins] = React.useState(2);
+    const [canDemo, setCanDemo] = React.useState(false);
+    const [isSpinningDemo, setIsSpinningDemo] = React.useState(false);
+
+    // Check Queue Availability for Demo
+    useEffect(() => {
+        const checkQueue = async () => {
+            const { count, error } = await supabase
+                .from('player_queue')
+                .select('*', { count: 'exact', head: true })
+                .eq('screen_number', parseInt(id))
+                .in('status', ['waiting', 'playing']);
+
+            // Allow demo only if NO ONE is waiting or playing
+            if (!error && count === 0) {
+                setCanDemo(true);
+            } else {
+                setCanDemo(false);
+            }
+        };
+        checkQueue();
+
+        // Optional: Poll every 5s to update availability
+        const interval = setInterval(checkQueue, 5000);
+        return () => clearInterval(interval);
+    }, [id, supabase]);
+
+    const handleDemoSpin = async () => {
+        if (demoSpins <= 0) return;
+
+        setIsSpinningDemo(true);
+        setDemoSpins(prev => prev - 1);
+
+        // Trigger Demo Spin on TV
+        const { error } = await supabase
+            .from('screen_state')
+            .update({
+                status: 'spinning', // Direct Spin
+                is_demo: true,
+                player_name: 'Modo Práctica',
+                player_emoji: '🎓'
+            })
+            .eq('screen_number', parseInt(id));
+
+        if (error) {
+            console.error("Demo Spin Error:", error);
+            setIsSpinningDemo(false);
+        } else {
+            // Re-enable button after 5s (approx spin time)
+            setTimeout(() => setIsSpinningDemo(false), 5000);
+        }
+    };
 
     const handlePayment = async (method: 'cash' | 'mercadopago') => {
         // En producción aquí iría la integración real
@@ -130,6 +185,38 @@ export default function PaymentPage({
                         Efectivo
                     </button>
                 </div>
+            </div>
+
+            {/* DEMO MODE Section */}
+            {canDemo && demoSpins > 0 && (
+                <div className="max-w-md mx-auto mt-8 text-center animate-in fade-in slide-in-from-bottom-4">
+                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-[1px] rounded-xl">
+                        <div className="bg-white rounded-[11px] p-4">
+                            <h3 className="font-bold text-gray-800 mb-2">🎓 Modo Práctica</h3>
+                            <p className="text-xs text-gray-500 mb-3">
+                                Prueba la ruleta gratis antes de jugar.<br />
+                                <span className="font-bold text-purple-600">{demoSpins} intento(s) disponible(s)</span>
+                            </p>
+                            <button
+                                onClick={handleDemoSpin}
+                                disabled={isSpinningDemo}
+                                className={`
+                                    w-full py-2 rounded-lg font-bold text-sm transition-all
+                                    ${isSpinningDemo
+                                        ? 'bg-gray-100 text-gray-400 cursor-wait'
+                                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}
+                                `}
+                            >
+                                {isSpinningDemo ? 'Girando...' : '🎲 Probar Ruleta Gratis'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Version Text */}
+            <div className="text-center mt-12 text-xs text-gray-300">
+                v1.2 - Queue Enabled
             </div>
         </div>
     );

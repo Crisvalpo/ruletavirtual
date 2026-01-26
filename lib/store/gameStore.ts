@@ -21,7 +21,7 @@ interface GameState {
 
     // Status
     status: 'idle' | 'selecting' | 'waiting' | 'ready_to_spin' | 'spinning' | 'won' | 'lost';
-
+    isDemo: boolean;
     // Queue
     queueId: string | null;
     setQueueId: (id: string) => void;
@@ -33,6 +33,7 @@ interface GameState {
     setNickname: (name: string) => void; // Deprecated but kept for compat
     toggleAnimalSelection: (index: number) => void;
     setPaymentStatus: (paid: boolean, method: 'cash' | 'mercadopago') => void;
+    setIsDemo: (isDemo: boolean) => void;
     resetGame: () => void;
 }
 
@@ -48,6 +49,7 @@ export const useGameStore = create<GameState>()(
             paymentMethod: null,
             credits: 0,
             status: 'idle',
+            isDemo: false,
             queueId: null,
 
             setScreenId: (id) => set({ screenId: id }),
@@ -81,6 +83,8 @@ export const useGameStore = create<GameState>()(
                 status: paid ? 'selecting' : 'idle'
             }),
 
+            setIsDemo: (val) => set({ isDemo: val }),
+
             setQueueId: (id) => set({ queueId: id }),
 
             resetGame: () => set({
@@ -88,6 +92,7 @@ export const useGameStore = create<GameState>()(
                 hasPaid: false,
                 paymentMethod: null,
                 status: 'idle',
+                isDemo: false,
                 gameMode: 'group',
                 activeWheelId: null,
                 queueId: null,
