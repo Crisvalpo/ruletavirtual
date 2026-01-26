@@ -51,6 +51,8 @@ export const useGameStore = create<GameState>()(
             status: 'idle',
             isDemo: false,
             queueId: null,
+            gameMode: 'group',
+            activeWheelId: null,
 
             setScreenId: (id) => set({ screenId: id }),
 

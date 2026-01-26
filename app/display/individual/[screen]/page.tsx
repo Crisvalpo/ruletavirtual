@@ -4,11 +4,13 @@ import { use, useEffect, useState } from 'react';
 import WheelCanvas from '@/components/individual/WheelCanvas';
 import { ANIMAL_LIST } from '@/lib/constants/animals';
 import Image from 'next/image';
+import BigWinOverlay from '@/components/individual/BigWinOverlay';
 import { createClient } from '@/lib/supabase/client';
 import { useRealtimeGame } from '@/hooks/useRealtimeGame';
 import { useVenueSettings } from '@/hooks/useVenueSettings';
 import { useGameStore } from '@/lib/store/gameStore';
 import Confetti from 'react-confetti';
+import QueueList from '@/components/individual/QueueList';
 // Remove useWindowSize if not strictly needed or ensure package is present.
 // The code used window.innerWidth directly inside the check, which is fine.
 
@@ -169,13 +171,59 @@ export default function DisplayScreenPage({
 
     const isDemo = useGameStore(state => state.isDemo);
 
+    // State for Win/Loss
+    const [isWin, setIsWin] = useState(false);
+
     // Handle Spin Complete
     const handleSpinComplete = async (winnerIndex: number) => {
         console.log(`🎰 Spin Complete! isDemo=${isDemo}, Index=${winnerIndex}`);
+
+        // 1. Determine Win/Loss (Fetch active player selection)
+        let playerWon = false;
+
+        // Fetch current active player from queue to check their selection
+        const { data: activePlayer } = await supabase
+            .from('player_queue')
+            .select('selected_animals')
+            .eq('screen_number', screenIdNum)
+            .eq('status', 'playing')
+            .single();
+
+        if (activePlayer && activePlayer.selected_animals) {
+            // Check if winnerIndex is in their selection
+            // Ensure types match (array of numbers)
+            const selection = activePlayer.selected_animals as number[];
+            if (selection.includes(winnerIndex)) {
+                playerWon = true;
+            }
+        } else if (isDemo) {
+            // Demo always wins for satisfaction? Or random? 
+            // Let's make demo random too or just win for testing visuals?
+            // Usually demo is just strictly visual, but let's assume 'win' context for confetti testing if needed.
+            // For now, let's say Demo always wins to show off particles.
+            playerWon = true;
+        }
+
+        setIsWin(playerWon);
         setStatus('result');
         setResult(winnerIndex);
-        setShowConfetti(true);
-        setShowBigWin(true);
+
+        // Only show confetti / BigWin if Won
+        if (playerWon) {
+            setShowConfetti(true);
+        }
+        setShowBigWin(true); // Show overlay for both (Win or Loss message)
+
+        // 2. Update Screen State (For Mobile Sync)
+        await supabase
+            .from('screen_state')
+            .update({
+                status: 'showing_result',
+                last_spin_result: winnerIndex,
+                updated_at: new Date().toISOString()
+            })
+            .eq('screen_number', parseInt(screen));
+
 
         // Logic Branch: Demo vs Real
         if (isDemo) {
@@ -183,17 +231,12 @@ export default function DisplayScreenPage({
 
             // Fast Cleanup (2s)
             setTimeout(async () => {
-                // Manual Reset for Demo (DB Only - Local follows via Realtime)
-                await supabase
-                    .from('screen_state')
-                    .update({
-                        status: 'idle',
-                        is_demo: false,
-                        player_name: null,
-                        player_emoji: null
-                    })
-                    .eq('screen_number', parseInt(screen));
-            }, 2000);
+                // Use Robust RPC to auto-promote next player if waiting
+                console.log("🎓 Demo Finished. Calling Force Advance.");
+                await supabase.rpc('force_advance_queue', {
+                    p_screen_number: parseInt(screen)
+                });
+            }, 5000); // Give them time to see result
 
             return; // EXIT EARLY
         }
@@ -201,12 +244,6 @@ export default function DisplayScreenPage({
         // --- REAL GAME LOGIC ---
 
         // Record History
-        // activeWheelAssets.segments[winnerIndex] helps us know what image it is, 
-        // but we just store the index and resolve image on render.
-        // Be careful: result from wheel might be 1-based ID or 0-based index?
-        // My previous fix in WheelCanvas uses `targetIndex` which is passed as `result` (1-based ID usually).
-        // Let's assume passed `winnerIndex` is the ID of the winning segment.
-
         try {
             const historyEntry = {
                 screen_id: screenIdNum,
@@ -227,8 +264,8 @@ export default function DisplayScreenPage({
 
         // Hide celebration after 10 seconds (Trigger DB Reset)
         setTimeout(async () => {
-            // Cleanup Session (Mark queue completed & reset screen)
-            const { error } = await supabase.rpc('cleanup_screen_session', {
+            // Cleanup Session (Mark queue completed & reset screen & PROMOTE NEXT)
+            const { error } = await supabase.rpc('force_advance_queue', {
                 p_screen_number: parseInt(screen)
             });
             if (error) console.error('Error cleaning session:', error);
@@ -261,25 +298,33 @@ export default function DisplayScreenPage({
         <div className="min-h-screen bg-gray-900 flex items-center justify-center p-8 overflow-hidden relative">
             {/* ... other code ... */}
 
-            <div className="absolute top-8 left-8 bg-white/10 backdrop-blur-md px-6 py-3 rounded-xl border border-white/20 z-50 flex items-center gap-4 shadow-lg">
-                <div>
-                    <h2 className="text-2xl font-bold text-white">Pantalla {screen}</h2>
-                    <div className="flex items-center gap-2 mt-1">
-                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                        <span className="text-sm text-gray-300">Conectado</span>
-                    </div>
-                </div>
+            {/* Top Left Container: Info & Queue */}
+            <div className="absolute top-8 left-8 z-50 flex flex-col gap-4 items-start">
 
-                {/* Player Identity Badge */}
-                {realNickname && realNickname !== 'Jugador' && (
-                    <div className="border-l border-white/20 pl-4 animate-in fade-in slide-in-from-left-4 duration-500">
-                        <p className="text-xs text-gray-400 uppercase tracking-widest">Jugando ahora</p>
-                        <div className="flex items-center gap-2">
-                            <span className="text-3xl">{realEmoji}</span>
-                            <span className="text-2xl font-bold text-yellow-400">{realNickname}</span>
+                {/* 1. Main Info Card */}
+                <div className="bg-white/10 backdrop-blur-md px-6 py-3 rounded-xl border border-white/20 flex items-center gap-4 shadow-lg">
+                    <div>
+                        <h2 className="text-2xl font-bold text-white">Pantalla {screen}</h2>
+                        <div className="flex items-center gap-2 mt-1">
+                            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-sm text-gray-300">Conectado</span>
                         </div>
                     </div>
-                )}
+
+                    {/* Player Identity Badge */}
+                    {realNickname && (realNickname !== 'Jugador' || status !== 'idle') && (
+                        <div className="border-l border-white/20 pl-4 animate-in fade-in slide-in-from-left-4 duration-500">
+                            <p className="text-xs text-gray-400 uppercase tracking-widest">Jugando ahora</p>
+                            <div className="flex items-center gap-2">
+                                <span className="text-3xl">{realEmoji}</span>
+                                <span className="text-2xl font-bold text-yellow-400">{realNickname}</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* 2. Queue List (Stacked Below) */}
+                <QueueList screenId={screenIdNum} />
             </div>
 
             {/* --- VISUALIZACIÓN SEGÚN MODO --- */}
@@ -308,6 +353,8 @@ export default function DisplayScreenPage({
 
             {/* CASO 2: MODO EVENTO - PANTALLA CENTRAL (RULETA DEDICADA) */}
             {/* ... (Unchanged) ... */}
+
+
 
             {/* Background Image if Dynamic Wheel (Solo si NO es Billboard) */}
             {activeWheelAssets?.background && !isBillboardScreen && (
@@ -429,6 +476,27 @@ export default function DisplayScreenPage({
                     </div>
                 </div>
             )}
+
+            {/* --- WINNER REACTIONS --- */}
+            {showConfetti && (
+                <Confetti
+                    width={typeof window !== 'undefined' ? window.innerWidth : 1000}
+                    height={typeof window !== 'undefined' ? window.innerHeight : 1000}
+                    recycle={true}
+                    numberOfPieces={500}
+                    gravity={0.2}
+                />
+            )}
+
+
+
+            <BigWinOverlay
+                isVisible={showBigWin}
+                resultIndex={result}
+                assets={activeWheelAssets}
+                playerName={realNickname}
+                type={isWin ? 'win' : 'loss'}
+            />
 
             <div className="fixed bottom-0 left-0 bg-red-600 text-white p-2 z-[9999] text-xs font-mono hidden">
                 DEBUG: VenueMode={venueMode} | Screen={screen} | Central={centralScreenId}

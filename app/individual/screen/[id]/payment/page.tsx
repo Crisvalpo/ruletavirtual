@@ -142,6 +142,49 @@ export default function PaymentPage({
         }
     };
 
+    // Payment / Code Redemption State
+    const [showCodeInput, setShowCodeInput] = useState(false);
+    const [redeemCode, setRedeemCode] = useState('');
+    const [redeemError, setRedeemError] = useState('');
+    const [isRedeeming, setIsRedeeming] = useState(false);
+
+    const handleCashClick = () => {
+        setShowCodeInput(true);
+        setRedeemError('');
+        setRedeemCode('');
+    };
+
+    const confirmRedemption = async () => {
+        if (!redeemCode.trim()) return;
+
+        setIsRedeeming(true);
+        setRedeemError('');
+
+        try {
+            const { data, error } = await supabase.rpc('redeem_game_package', {
+                p_code: redeemCode.trim().toUpperCase(),
+                p_screen_id: parseInt(id)
+            });
+
+            if (error) throw error;
+
+            console.log("Redemption Result:", data);
+
+            if (data && data.success) {
+                // Success! Proceed to handlePayment logic
+                handlePayment('cash');
+                // You might want to store package info in store?
+            } else {
+                setRedeemError(data?.message || 'Error al canjear código');
+            }
+        } catch (err: any) {
+            console.error("Redemption Error:", err);
+            setRedeemError(err.message || 'Error de conexión');
+        } finally {
+            setIsRedeeming(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 p-4">
             <h1 className="text-2xl font-bold text-center mb-6">💰 Elige tu Pack</h1>
@@ -155,10 +198,10 @@ export default function PaymentPage({
                     </div>
                     <p className="text-sm text-gray-500 mb-4">Ideal para probar suerte.</p>
                     <button
-                        onClick={() => handlePayment('cash')}
+                        onClick={handleCashClick}
                         className="block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg"
                     >
-                        Pagar en Efectivo
+                        Tengo un Cupón / Código
                     </button>
                 </div>
 
@@ -179,13 +222,61 @@ export default function PaymentPage({
                         Mercado Pago
                     </button>
                     <button
-                        onClick={() => handlePayment('cash')}
+                        onClick={handleCashClick}
                         className="w-full bg-gray-100 text-gray-700 font-semibold py-2 rounded-lg text-sm"
                     >
-                        Efectivo
+                        Tengo un Cupón / Código
                     </button>
                 </div>
             </div>
+
+            {/* Code Redemption Modal */}
+            {showCodeInput && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold">Ingresa tu Código</h3>
+                            <button onClick={() => setShowCodeInput(false)} className="text-gray-400 hover:text-gray-600">
+                                ✕
+                            </button>
+                        </div>
+
+                        <p className="text-sm text-gray-500 mb-4">
+                            Ingresa el código impreso en tu ticket del Kiosco.
+                        </p>
+
+                        <input
+                            type="text"
+                            className="w-full border-2 border-gray-200 rounded-lg p-3 text-center text-xl font-mono uppercase mb-4 focus:border-primary focus:outline-none"
+                            placeholder="EJ: KIOSK-1234"
+                            value={redeemCode}
+                            onChange={(e) => setRedeemCode(e.target.value)}
+                        />
+
+                        {redeemError && (
+                            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4 text-center border border-red-100">
+                                {redeemError}
+                            </div>
+                        )}
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowCodeInput(false)}
+                                className="flex-1 py-3 text-gray-600 font-bold bg-gray-100 rounded-lg"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmRedemption}
+                                disabled={isRedeeming || !redeemCode.trim()}
+                                className="flex-1 py-3 bg-green-500 text-white font-bold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-600 transition-colors"
+                            >
+                                {isRedeeming ? 'Validando...' : 'Canjear'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* DEMO MODE Section */}
             {canDemo && demoSpins > 0 && (
@@ -216,7 +307,7 @@ export default function PaymentPage({
 
             {/* Version Text */}
             <div className="text-center mt-12 text-xs text-gray-300">
-                v1.2 - Queue Enabled
+                v1.3 - Kiosk Codes Enabled
             </div>
         </div>
     );

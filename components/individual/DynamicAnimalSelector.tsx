@@ -71,13 +71,11 @@ export default function DynamicAnimalSelector({ wheelId, mode = 'group' }: Dynam
     }, [wheelId, mode]);
 
     if (loading) {
-        return <div className="flex items-center justify-center p-8">Cargando...</div>;
+        return <div className="flex items-center justify-center p-8 text-white/50">Cargando opciones...</div>;
     }
 
-    const maxSelection = mode === 'group' ? 3 : 3; // Both modes use 3 for now
-
     return (
-        <div className="grid grid-cols-6 gap-2 p-2 bg-gray-800 rounded-xl overflow-y-auto max-h-[60vh]">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 p-2 overflow-y-auto h-full content-start">
             {segments.map((segment) => {
                 const isSelected = selectedAnimals.includes(segment.id);
 
@@ -86,40 +84,39 @@ export default function DynamicAnimalSelector({ wheelId, mode = 'group' }: Dynam
                         key={segment.id}
                         onClick={() => toggleAnimal(segment.id)}
                         className={`
-              relative aspect-square rounded-lg flex flex-col items-center justify-center p-1 transition-all duration-200
+              relative aspect-square rounded-2xl flex flex-col items-center justify-center p-1.5 transition-all duration-300
               ${isSelected
-                                ? 'bg-primary scale-95 ring-2 ring-white shadow-lg opacity-100'
-                                : 'bg-white/10 hover:bg-white/20 opacity-80'}
+                                ? 'bg-gradient-to-br from-green-500/20 to-green-600/30 ring-2 ring-green-400 shadow-[0_0_15px_rgba(74,222,128,0.3)] scale-95'
+                                : 'bg-white/5 hover:bg-white/10 ring-1 ring-white/10'}
             `}
                     >
                         {/* Image */}
-                        <div className="relative w-8 h-8 mb-1">
+                        <div className="relative w-full h-full rounded-xl overflow-hidden">
                             <Image
                                 src={segment.selectorImage}
                                 alt={segment.name}
                                 fill
-                                className="object-contain"
+                                className={`object-cover transition-all duration-300 ${isSelected ? 'scale-110' : 'scale-100 opacity-90'}`}
                                 sizes="(max-width: 768px) 33vw, 20vw"
                             />
-                        </div>
 
-                        <span className={`
-              text-[8px] font-bold uppercase truncate w-full text-center
-              ${isSelected ? 'text-white' : 'text-gray-300'}
-            `}>
-                            {segment.name}
-                        </span>
+                            {/* Overlay specifically for non-selected items to make selected pop more */}
+                            {!isSelected && (
+                                <div className="absolute inset-0 bg-black/10" />
+                            )}
+                        </div>
 
                         {/* Selection Number Badge */}
                         {isSelected && (
-                            <div className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                            <div className="absolute -top-1 -right-1 z-10 bg-green-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-md ring-2 ring-black/50">
                                 {selectedAnimals.indexOf(segment.id) + 1}
                             </div>
                         )}
 
-                        {/* ID Badge */}
-                        <div className={`absolute top-0.5 left-1 text-[8px] opacity-50 ${isSelected ? 'text-white' : 'text-gray-400'}`}>
-                            {segment.id}
+                        {/* ID Badge - Minimalist */}
+                        <div className={`absolute bottom-1 left-1.5 z-10 text-[10px] font-medium px-1.5 py-0.5 rounded-md backdrop-blur-md ${isSelected ? 'bg-green-500/80 text-white' : 'bg-black/40 text-white/70'
+                            }`}>
+                            #{segment.id}
                         </div>
                     </button>
                 );
