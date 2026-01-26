@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function SpinPage({
     params
@@ -11,8 +12,20 @@ export default function SpinPage({
     const { id } = use(params);
     const router = useRouter();
 
-    const handleSpin = () => {
-        // Aquí se enviaría la señal al backend para girar la ruleta física/digital en pantalla
+    const supabase = createClient(); // Instantiate outside or getting from import
+    // Better to create inside component or import singleton
+
+    const handleSpin = async () => {
+        // Enviar señal de giro al backend
+        await supabase
+            .from('screen_state')
+            .update({
+                status: 'spinning',
+                updated_at: new Date().toISOString()
+            })
+            .eq('screen_number', parseInt(id));
+
+        // Navegar a resultado (feedback visual para el usuario móvil)
         router.push(`/individual/screen/${id}/result`);
     };
 

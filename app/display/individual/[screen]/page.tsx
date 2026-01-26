@@ -27,6 +27,8 @@ export default function DisplayScreenPage({
     // 2. Read from store (Individual Mode State)
     const mode = useGameStore((state) => state.gameMode);
     const activeWheelId = useGameStore((state) => state.activeWheelId);
+    const realNickname = useGameStore(state => state.nickname); // Moved up for access
+    const realEmoji = useGameStore(state => state.emoji); // Moved up
 
     // 3. Logic: Determine effective mode
     const isGroupEvent = venueMode === 'group_event';
@@ -54,7 +56,7 @@ export default function DisplayScreenPage({
     useEffect(() => {
         async function loadWheelAssets() {
             // FORCE DEBUG: Override with local Mario assets
-            const FORCE_DEBUG = true;
+            const FORCE_DEBUG = false; // Set to false to enable Real Database Fetching
 
             if (FORCE_DEBUG) {
                 // Base URL for Supabase Storage (Public Bucket: individual-wheels)
@@ -67,7 +69,7 @@ export default function DisplayScreenPage({
                     label: `Seg ${i + 1}`,
                     color: 'transparent',
                     imageWheel: `${STORAGE_BASE}/mario/segments/${i + 1}.png`,
-                    imageResult: `${STORAGE_BASE}/mario/selector/${i + 1}.png`
+                    imageResult: `${STORAGE_BASE}/mario/selector/${i + 1}.jpg`
                 }));
 
                 setActiveWheelAssets({
@@ -77,29 +79,88 @@ export default function DisplayScreenPage({
                 return;
             } else if (effectiveMode === 'group' && !effectiveActiveWheelId) {
                 setActiveWheelAssets(null); // Default 36 animals
-            } else {
-                // ... [rest of load function logic would go here if not debug] ...
+            } else if (effectiveActiveWheelId) {
+                // REAL LOGIC: Fetch Dynamic Wheel Data
+                try {
+                    const { data, error } = await supabase
+                        .from('individual_wheels')
+                        .select('storage_path, segment_count') // We need storage_path to build URLs
+                        .eq('id', effectiveActiveWheelId)
+                        .single();
+
+                    if (error) throw error;
+
+                    if (data) {
+                        const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+                        const path = data.storage_path; // e.g., 'mario' or 'sonic'
+
+                        const segments = Array.from({ length: data.segment_count || 12 }, (_, i) => ({
+                            id: i + 1,
+                            label: `Seg ${i + 1}`,
+                            color: 'transparent',
+                            // Convention verified in upload-mario.js:
+                            imageWheel: `${STORAGE_BASE}/${path}/segments/${i + 1}.png`,
+                            imageResult: `${STORAGE_BASE}/${path}/selector/${i + 1}.jpg`
+                        }));
+
+                        setActiveWheelAssets({
+                            background: `${STORAGE_BASE}/${path}/background.jpg`,
+                            segments: segments
+                        });
+                    }
+                } catch (err) {
+                    console.error("Failed to load wheel assets:", err);
+                    // Fallback? Currently keeps previous or null.
+                }
             }
         }
         loadWheelAssets();
     }, [effectiveMode, effectiveActiveWheelId]);
 
+    // 4. Listen to Store Status (Triggered by Realtime from Mobile)
+    const storeStatus = useGameStore(s => s.status);
+
+    useEffect(() => {
+        if (storeStatus === 'spinning' && status === 'idle') {
+            console.log('📱 Mobile Spin triggered');
+            setStatus('spinning');
+            setResult(null);
+
+            // Generate Random Result locally (since mobile didn't send one)
+            // In a real betting system, backend should send the result ID.
+            setTimeout(() => {
+                const randomResult = Math.floor(Math.random() * 12) + 1;
+                setResult(randomResult);
+            }, 500); // Start stopping almost immediately or wait a bit?
+            // Logic waits 3s in debug. 0.5s here means it starts the deceleration phase sooner? 
+            // No, setResult just tells WheelCanvas "This is the target". Canvas handles spin duration.
+            // Let's keep it simple.
+        }
+    }, [storeStatus, status]);
+
     // Fetch History Effect
     useEffect(() => {
         async function fetchHistory() {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('game_history')
                 .select('*')
                 .eq('screen_id', screenIdNum)
                 .order('created_at', { ascending: false })
                 .limit(9);
 
+            // Filter by Game/Wheel ID if active (prevents mixing Mario vs Sonic history)
+            if (effectiveActiveWheelId) {
+                query = query.eq('wheel_id', effectiveActiveWheelId);
+            }
+
+            const { data, error } = await query;
+
             if (data) {
                 setLastSpins(data);
             }
         }
         fetchHistory();
-    }, [screenIdNum]);
+    }, [screenIdNum, effectiveActiveWheelId]);
 
     // Handle Spin Complete
     const handleSpinComplete = async (winnerIndex: number) => {
@@ -120,6 +181,7 @@ export default function DisplayScreenPage({
                 screen_id: screenIdNum,
                 wheel_id: effectiveActiveWheelId || null,
                 result_index: winnerIndex,
+                player_name: realNickname || 'Anon',
                 created_at: new Date().toISOString()
             };
 
@@ -147,13 +209,7 @@ export default function DisplayScreenPage({
         }, 10000);
     };
 
-    // Move hooks to top level
-    const realNickname = useGameStore(state => state.nickname);
-    const realEmoji = useGameStore(state => state.emoji);
-
-    // FORCE DEBUG IDENTITY
-    const identityNickname = 'granjero'; // Force debug
-    const identityEmoji = '💎'; // Force debug
+    // Move hooks to top level (Done)
 
     // Debug Spin Key
     useEffect(() => {
@@ -189,12 +245,12 @@ export default function DisplayScreenPage({
                 </div>
 
                 {/* Player Identity Badge */}
-                {identityNickname !== 'Jugador' && (
+                {realNickname && realNickname !== 'Jugador' && (
                     <div className="border-l border-white/20 pl-4 animate-in fade-in slide-in-from-left-4 duration-500">
                         <p className="text-xs text-gray-400 uppercase tracking-widest">Jugando ahora</p>
                         <div className="flex items-center gap-2">
-                            <span className="text-3xl">{identityEmoji}</span>
-                            <span className="text-2xl font-bold text-yellow-400">{identityNickname}</span>
+                            <span className="text-3xl">{realEmoji}</span>
+                            <span className="text-2xl font-bold text-yellow-400">{realNickname}</span>
                         </div>
                     </div>
                 )}
@@ -261,6 +317,7 @@ export default function DisplayScreenPage({
                                 <div className={`relative w-full aspect-square`}>
                                     <WheelCanvas
                                         isSpinning={status === 'spinning'}
+                                        isIdle={status === 'idle'} // Enable Attract Mode
                                         targetIndex={result} // Pass result directly so it can spin down
                                         segments={activeWheelAssets?.segments}
                                         onSpinComplete={handleSpinComplete}

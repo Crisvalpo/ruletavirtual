@@ -14,6 +14,7 @@ interface WheelSegment {
 interface WheelCanvasProps {
     onSpinComplete?: (result: number) => void;
     isSpinning?: boolean;
+    isIdle?: boolean; // New prop for attract mode
     targetIndex?: number | null; // 1-36
     segments?: WheelSegment[]; // Optional: if provided, overrides default ANIMAL_LIST
 }
@@ -21,6 +22,7 @@ interface WheelCanvasProps {
 export default function WheelCanvas({
     onSpinComplete,
     isSpinning = false,
+    isIdle = false,
     targetIndex = null,
     segments,
     className = ""
@@ -259,21 +261,23 @@ export default function WheelCanvas({
                     }
                     rotationRef.current += speedRef.current;
                 }
+            } else if (isIdle) {
+                // IDLE ATTRACT MODE: Slow continuous spin
+                rotationRef.current += 0.002;
             }
 
             drawWheel();
 
-            // Continue loop only if spinning AND not finished stopping
-            if (isSpinning && (!stoppingRef.current || (performance.now() - stoppingRef.current.startTime < stoppingRef.current.duration))) {
+            // Continue loop only if:
+            // 1. Spinning (Game) AND not finished stopping
+            // 2. Idle Mode (Always loops)
+            const isGameSpinning = isSpinning && (!stoppingRef.current || (performance.now() - stoppingRef.current.startTime < stoppingRef.current.duration));
+
+            if (isGameSpinning || isIdle) {
                 animationFrameId = requestAnimationFrame(animate);
             } else if (isSpinning && stoppingRef.current) {
                 // Ensure final frame is drawn perfectly
                 drawWheel();
-            } else {
-                // Idle loop just to draw
-                // animationFrameId = requestAnimationFrame(animate);
-                // Actually, if we stop spinning, react state changes 'status' to 'result'.
-                // Then isSpinning becomes false. We can stop animating or just draw once.
             }
         };
 

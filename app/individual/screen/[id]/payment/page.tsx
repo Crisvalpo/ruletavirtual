@@ -44,18 +44,40 @@ export default function PaymentPage({
         }
     }, [searchParams, setGameMode, id]); // Added id to dependency
 
-    const handlePayment = (method: 'cash' | 'mercadopago') => {
+    const { nickname, emoji, setQueueId, gameMode, activeWheelId } = useGameStore();
+
+    const handlePayment = async (method: 'cash' | 'mercadopago') => {
         // En producción aquí iría la integración real
         // Por ahora simulamos pago exitoso
         setPaymentStatus(true, method);
 
         const wheelId = searchParams.get('wheelId');
-        // Pass the wheelId forward to the select/spin page if needed, 
-        // though setGameMode above should have handled the store update.
-        // We navigate to 'spin' directly if we already selected a wheel?
-        // Flow: WheelSelector -> Payment -> Spin (if wheel selected) OR Select (if generic credit buy).
-        // Since we selected a specific wheel, we likely go straight to spin or a confirmation of that wheel.
-        // Let's go to spin directly if wheelId exists.
+
+        // INSERT INTO QUEUE
+        try {
+            const { data, error } = await supabase
+                .from('player_queue')
+                .insert({
+                    screen_number: parseInt(id),
+                    player_name: nickname,
+                    player_emoji: emoji,
+                    status: 'selecting', // Choosing animals next
+                    created_at: new Date().toISOString(),
+                    // Optional: store game mode info if table supports it (JSON/columns)
+                    // For now, rely on screen_state update later or local flow
+                })
+                .select()
+                .single();
+
+            if (data && !error) {
+                console.log("Queue Item Created:", data.id);
+                setQueueId(data.id);
+            } else {
+                console.error("Queue Create Error:", error);
+            }
+        } catch (err) {
+            console.error("Queue Error:", err);
+        }
 
         if (wheelId) {
             // Correct Flow: Payment -> Select Preferences -> Spin

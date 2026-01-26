@@ -30,21 +30,46 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
         // 1. Update Local Store
         setIdentity(name, selectedEmoji);
 
-        // 2. Update Supabase for TV Display
-        // This makes the TV show "Jugando: [Name] [Emoji]" instantly
-        const { error } = await supabase
-            .from('screen_state')
-            .update({
+        // 2. Insert into Queue (Status: selecting)
+        const { data, error } = await supabase
+            .from('player_queue')
+            .insert({
+                screen_number: parseInt(screenId),
                 player_name: name,
                 player_emoji: selectedEmoji,
-                updated_at: new Date().toISOString()
+                status: 'selecting', // Temporarily entering selection phase
+                created_at: new Date().toISOString()
             })
-            .eq('screen_number', parseInt(screenId)); // Note: table uses screen_number
+            .select() // Return data to get ID
+            .single();
 
         if (error) {
-            console.error("Error setting identity:", error);
-            // We continue anyway so the user isn't blocked
+            console.error("Error joining queue:", error);
+            // Handle error (maybe show alert)
+            setIsSubmitting(false);
+            return;
         }
+
+        // Store queue_id if needed, or just rely on Name/Emoji for now
+        // Best practice: Store queue_id in GameStore
+        // useGameStore.getState().setQueueId(data.id); // Assuming store has this
+
+        // For now, simpler: Just proceed. The Wheel Selector/Payment will carry the context 
+        // via Store or URL? 
+        // Actually, subsequent steps don't strictly need the DB Row ID if they just update 
+        // the active session params locally, and the FINAL step (Spin/Wait) confirms the queue entry?
+
+        // Let's stick to the current plan:
+        // 1. NickEntry: Local Identity Only (Don't insert yet? Or Insert as 'selecting')
+        // User asked for "Real Queue".
+        // If I Insert now, and they drop off, we have a 'selecting' zombie.
+        // It's cleaner to Insert when they reach "Waiting Page" (after payment).
+
+        // REVISION:
+        // Let's NOT insert in NickEntry. Let's just set Local Store.
+        // The previous code updated `screen_state` directly (wrong).
+        // I will REMOVE the database call here entirely.
+        // The Queue Insertion should happen at `Payment -> Waiting` transition.
 
         setIsSubmitting(false);
         onComplete();

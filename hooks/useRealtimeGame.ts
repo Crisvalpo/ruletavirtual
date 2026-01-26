@@ -7,6 +7,41 @@ export function useRealtimeGame(screenId: string) {
     const setGameMode = useGameStore((state) => state.setGameMode);
 
     useEffect(() => {
+        // 0. Initial Fetch (Sync current state on load)
+        const fetchInitialState = async () => {
+            const { data, error } = await supabase
+                .from('screen_state')
+                .select('*')
+                .eq('screen_number', parseInt(screenId))
+                .single();
+
+            if (!error && data) {
+                console.log('📥 Initial Screen State:', data);
+
+                // Sync Mode/Wheel
+                if (data.current_wheel_id) {
+                    setGameMode('individual', data.current_wheel_id);
+                } else {
+                    setGameMode('group', undefined);
+                }
+
+                // Sync Identity
+                useGameStore.getState().setIdentity(
+                    data.player_name || 'Jugador',
+                    data.player_emoji || '😎'
+                );
+
+                // Sync Status
+                if (data.status === 'spinning') {
+                    useGameStore.setState({ status: 'spinning' });
+                } else {
+                    useGameStore.setState({ status: 'idle' });
+                }
+            }
+        };
+
+        fetchInitialState();
+
         // 1. Subscribe to screen_state changes for this screen
         const channel = supabase
             .channel(`screen_${screenId}`)
@@ -16,7 +51,10 @@ export function useRealtimeGame(screenId: string) {
                     event: 'UPDATE',
                     schema: 'public',
                     table: 'screen_state',
-                    filter: `screen_id=eq.${screenId}`
+                    filter: `screen_number=eq.${screenId}` // Fixed filter column name if it was wrong? Table uses screen_number, filter used screen_id?
+                    // Wait, previous code used screen_id=eq.${screenId}. Let's verify column name in table.
+                    // 003_screen_state.sql says: screen_number INTEGER UNIQUE NOT NULL.
+                    // So filter should be screen_number=eq.${screenId}.
                 },
                 (payload) => {
                     const newState = payload.new;
@@ -30,21 +68,19 @@ export function useRealtimeGame(screenId: string) {
                     }
 
                     // Sync Player Identity (for TV Display)
-                    if (newState.player_name) {
-                        // We don't have setIdentity exposed in the hook, let's just use useGameStore.setState or similar if we want to bypass action
-                        // But better to pull the action.
-                        // However, useRealtimeGame logic handles the *Display* part mostly. 
-                        // If we are the mobile updating it, we already have it in store.
-                        // Ideally we want the TV to have it in its store (even though TV doesn't use the store for "my identity", 
-                        // it uses it for "what to show").
-                        // Actually, Display Page reads `activeWheelAssets` based on `effectiveActiveWheelId` from store.
-                        // Display Page also needs to read `playerName` and `playerEmoji` from store.
+                    // If name is null (idle), reset to default Jugador/😎
+                    useGameStore.getState().setIdentity(
+                        newState.player_name || 'Jugador',
+                        newState.player_emoji || '😎'
+                    );
 
-                        useGameStore.getState().setIdentity(newState.player_name, newState.player_emoji || '😎');
+                    // Sync Status (Trigger Spin)
+                    if (newState.status === 'spinning') {
+                        // Directly update store to trigger reaction in components
+                        useGameStore.setState({ status: 'spinning' });
+                    } else if (newState.status === 'idle') {
+                        useGameStore.setState({ status: 'idle' });
                     }
-
-                    // Future: Sync Status (Spinning, Result, etc.)
-                    // if (newState.status === 'spinning') { ... }
                 }
             )
             .subscribe();

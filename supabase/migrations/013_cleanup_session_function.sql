@@ -16,11 +16,10 @@ BEGIN
   SET 
     status = 'idle',
     -- Clear identity
-    player_id = NULL,
     player_name = NULL,
-    player_emoji = NULL,
-    -- Clear wheel selection (return to default or prompt)
-    current_wheel_id = NULL
+    player_emoji = NULL
+    -- Intentionally KEEP current_wheel_id to show Attract Mode with last theme
+  WHERE screen_number = p_screen_number;
   WHERE screen_number = p_screen_number;
 END;
 $$;

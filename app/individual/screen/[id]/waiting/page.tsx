@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { use, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { useGameStore } from '@/lib/store/gameStore';
 
 export default function WaitingPage({
     params
@@ -11,14 +13,50 @@ export default function WaitingPage({
     const { id } = use(params);
     const router = useRouter();
 
-    // Simulación de cola (esto iría con Realtime en prod)
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            router.push(`/individual/screen/${id}/spin`);
-        }, 5000); // 5 segundos de espera simulada
+    const supabase = createClient();
+    const { queueId } = useGameStore();
 
-        return () => clearTimeout(timer);
-    }, [id, router]);
+    // 1. Poll Queue Status (Are we Playing yet?)
+    useEffect(() => {
+        if (!queueId) return;
+
+        const checkStatus = async () => {
+            const { data } = await supabase
+                .from('player_queue')
+                .select('status')
+                .eq('id', queueId)
+                .single();
+
+            if (data?.status === 'playing') {
+                router.push(`/individual/screen/${id}/spin`);
+            }
+        };
+
+        const interval = setInterval(checkStatus, 1000);
+        return () => clearInterval(interval);
+    }, [queueId, id, router]);
+
+    // 2. Poll Screen & Try to Promote (If we are waiting)
+    useEffect(() => {
+        const tryPromote = async () => {
+            // Only try if screen is idle (this avoids unnecessary RPC calls)
+            const { data: screenData } = await supabase
+                .from('screen_state')
+                .select('status')
+                .eq('screen_number', parseInt(id))
+                .single();
+
+            if (screenData?.status === 'idle') {
+                console.log("Screen Idle - Attempting Promotion...");
+                await supabase.rpc('promote_next_player', {
+                    p_screen_number: parseInt(id)
+                });
+            }
+        };
+
+        const interval = setInterval(tryPromote, 3000); // Check every 3s
+        return () => clearInterval(interval);
+    }, [id]);
 
     return (
         <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-8 text-white text-center">

@@ -4,6 +4,7 @@ import { useGameStore } from '@/lib/store/gameStore';
 import DynamicAnimalSelector from '@/components/individual/DynamicAnimalSelector';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function SelectionPage({
     params
@@ -14,11 +15,25 @@ export default function SelectionPage({
     const router = useRouter();
 
     const mode = useGameStore((state) => state.gameMode);
-    const wheelId = useGameStore((state) => state.activeWheelId);
-    const selectedAnimals = useGameStore((state) => state.selectedAnimals);
+    const { queueId, selectedAnimals, activeWheelId } = useGameStore(); // Use queueId
+    const wheelId = activeWheelId;
+    const supabase = createClient();
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
         if (selectedAnimals.length === 3) {
+
+            if (queueId) {
+                // Update Queue Logic
+                await supabase
+                    .from('player_queue')
+                    .update({
+                        status: 'waiting',
+                        selected_animals: selectedAnimals,
+                        // We could also set 'ready' here if we want an explicit state
+                    })
+                    .eq('id', queueId);
+            }
+
             router.push(`/individual/screen/${id}/waiting`);
         }
     };

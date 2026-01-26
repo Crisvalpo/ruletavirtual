@@ -3,7 +3,7 @@ create table public.game_history (
   id uuid default gen_random_uuid() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   screen_id integer not null, -- The physical screen number (e.g., 1, 2)
-  wheel_id uuid references public.wheels(id), -- The design being played (optional, can be null if generic)
+  wheel_id uuid references public.individual_wheels(id), -- The design being played (optional, can be null if generic)
   result_index integer not null, -- The winning segment index (0-based or 1-based depending on logic, let's store what the wheel returns)
   player_name text, -- Optional: who spun it
   

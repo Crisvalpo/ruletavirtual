@@ -22,6 +22,10 @@ interface GameState {
     // Status
     status: 'idle' | 'selecting' | 'waiting' | 'ready_to_spin' | 'spinning' | 'won' | 'lost';
 
+    // Queue
+    queueId: string | null;
+    setQueueId: (id: string) => void;
+
     // Actions
     setScreenId: (id: string) => void;
     setGameMode: (mode: 'group' | 'individual', wheelId?: string) => void;
@@ -44,6 +48,7 @@ export const useGameStore = create<GameState>()(
             paymentMethod: null,
             credits: 0,
             status: 'idle',
+            queueId: null,
 
             setScreenId: (id) => set({ screenId: id }),
 
@@ -76,6 +81,8 @@ export const useGameStore = create<GameState>()(
                 status: paid ? 'selecting' : 'idle'
             }),
 
+            setQueueId: (id) => set({ queueId: id }),
+
             resetGame: () => set({
                 selectedAnimals: [],
                 hasPaid: false,
@@ -83,6 +90,7 @@ export const useGameStore = create<GameState>()(
                 status: 'idle',
                 gameMode: 'group',
                 activeWheelId: null,
+                queueId: null,
                 // Keep identity if preferred, or reset? Let's reset for fresh start
                 // nickname: 'Jugador',
                 // emoji: '😎'
