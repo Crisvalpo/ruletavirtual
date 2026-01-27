@@ -30,65 +30,6 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
         // 1. Update Local Store
         setIdentity(name, selectedEmoji);
 
-        // CHECK EXISTING SESSION
-        // Prevent duplicates if user refreshes or re-enters same name while active
-        const { data: existingSession } = await supabase
-            .from('player_queue')
-            .select('id, status')
-            .eq('screen_number', parseInt(screenId))
-            .eq('player_name', name)
-            .in('status', ['selecting', 'waiting', 'ready', 'playing', 'spinning'])
-            .maybeSingle();
-
-        if (existingSession) {
-            console.log("Resuming existing session:", existingSession.id);
-            // We don't need to insert. Just proceed.
-            // Ideally we'd update the emoji if it changed?
-            if (existingSession.status === 'selecting') {
-                // Update emoji in case they changed it
-                await supabase
-                    .from('player_queue')
-                    .update({ player_emoji: selectedEmoji })
-                    .eq('id', existingSession.id);
-            }
-        } else {
-            // 2. Insert into Queue (Status: selecting)
-            const { error } = await supabase
-                .from('player_queue')
-                .insert({
-                    screen_number: parseInt(screenId),
-                    player_name: name,
-                    player_emoji: selectedEmoji,
-                    status: 'selecting',
-                    created_at: new Date().toISOString()
-                })
-                .single();
-
-            if (error) {
-                console.error("Error joining queue:", error);
-                setIsSubmitting(false);
-                return;
-            }
-        }
-
-        // Proceed
-        // For now, simpler: Just proceed. The Wheel Selector/Payment will carry the context 
-        // via Store or URL? 
-        // Actually, subsequent steps don't strictly need the DB Row ID if they just update 
-        // the active session params locally, and the FINAL step (Spin/Wait) confirms the queue entry?
-
-        // Let's stick to the current plan:
-        // 1. NickEntry: Local Identity Only (Don't insert yet? Or Insert as 'selecting')
-        // User asked for "Real Queue".
-        // If I Insert now, and they drop off, we have a 'selecting' zombie.
-        // It's cleaner to Insert when they reach "Waiting Page" (after payment).
-
-        // REVISION:
-        // Let's NOT insert in NickEntry. Let's just set Local Store.
-        // The previous code updated `screen_state` directly (wrong).
-        // I will REMOVE the database call here entirely.
-        // The Queue Insertion should happen at `Payment -> Waiting` transition.
-
         setIsSubmitting(false);
         onComplete();
     };

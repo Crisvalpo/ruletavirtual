@@ -88,12 +88,18 @@ export default function SelectionPage({
                 useGameStore.getState().setGameMode('individual', resolvedWheelId ?? undefined);
             }
 
+            if (!queueId) {
+                console.warn("🚫 No active queue session found. Redirecting to ID page...");
+                router.push(`/individual/screen/${id}`);
+                return;
+            }
+
             setIsInitializing(false);
         };
 
         if (!isInitializing) setIsInitializing(true);
         init();
-    }, [queueId, supabase, id, activeWheelId]);
+    }, [queueId, supabase, id, activeWheelId, router]);
 
     // REALTIME: Listen for Queue Updates (Am I playing?)
     React.useEffect(() => {

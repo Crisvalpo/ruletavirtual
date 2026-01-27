@@ -205,7 +205,7 @@ export default function ScreenControlDashboard() {
                                     />
                                 </div>
 
-                                {screen.status === 'idle' && (
+                                {screen.status === 'idle' && !nextPlayer && (
                                     <button
                                         onClick={() => handleDemoSpin(screen.screen_number)}
                                         className="w-full bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
