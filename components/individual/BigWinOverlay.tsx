@@ -36,14 +36,14 @@ export default function BigWinOverlay({ isVisible, resultIndex, assets, playerNa
     const titleColor = isLoss ? 'text-blue-400' : 'text-yellow-400';
 
     return (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center pointer-events-none">
-            <div className="relative animate-zoom-in flex flex-col items-center">
+        <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/90 backdrop-blur-md transition-opacity duration-500">
+            <div className="relative animate-zoom-in flex flex-col items-center scale-125">
 
                 {/* Glow Effect */}
-                <div className={`absolute inset-0 ${glowColor} blur-[100px] rounded-full scale-150 animate-pulse`}></div>
+                <div className={`absolute inset-0 ${glowColor} blur-[120px] rounded-full scale-150 animate-pulse opacity-50`}></div>
 
                 {/* Main Card */}
-                <div className={`bg-black/80 backdrop-blur-xl p-8 rounded-3xl border-4 ${borderColor} ${shadowColor} flex flex-col items-center text-center transform hover:scale-105 transition-transform duration-500 relative overflow-hidden`}>
+                <div className={`bg-black/80 backdrop-blur-xl p-12 rounded-[3rem] border-4 ${borderColor} ${shadowColor} flex flex-col items-center text-center transform hover:scale-105 transition-transform duration-500 relative overflow-hidden min-w-[500px]`}>
 
                     {/* Shimmer Effect (Only for Win?) Let's keep for both for premium look */}
                     <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>

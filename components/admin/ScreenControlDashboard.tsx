@@ -9,6 +9,7 @@ interface ScreenState {
     player_name: string | null;
     player_emoji: string | null;
     current_wheel_id: string | null;
+    idle_speed?: number;
 }
 
 interface QueueHead {
@@ -183,6 +184,27 @@ export default function ScreenControlDashboard() {
 
                             {/* ACCIONES */}
                             <div className="pt-3 border-t border-black/5 flex flex-col gap-2">
+                                <div className="px-1 mb-2">
+                                    <label className="text-[10px] uppercase text-gray-500 font-bold block mb-1">
+                                        Velocidad ({screen.idle_speed?.toFixed(1) || '1.0'}x)
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min="0.1"
+                                        max="8.0"
+                                        step="0.1"
+                                        defaultValue={screen.idle_speed || 1.0}
+                                        onMouseUp={async (e) => {
+                                            const val = parseFloat(e.currentTarget.value);
+                                            await supabase
+                                                .from('screen_state')
+                                                .update({ idle_speed: val })
+                                                .eq('screen_number', screen.screen_number);
+                                        }}
+                                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                    />
+                                </div>
+
                                 {screen.status === 'idle' && (
                                     <button
                                         onClick={() => handleDemoSpin(screen.screen_number)}

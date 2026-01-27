@@ -20,10 +20,27 @@ export default function SelectionPage({
     const wheelId = activeWheelId;
     const supabase = createClient();
 
+    // REALTIME: Sync Selection to DB
+    React.useEffect(() => {
+        if (!queueId) return;
+
+        const syncSelection = async () => {
+            const { error } = await supabase
+                .from('player_queue')
+                .update({ selected_animals: selectedAnimals })
+                .eq('id', queueId)
+                .eq('status', 'selecting'); // Only update if still selecting
+
+            if (error) console.error("Error syncing selection:", error);
+        };
+
+        syncSelection();
+    }, [selectedAnimals, queueId, supabase]);
+
     const [uiStatus, setUiStatus] = React.useState<'selecting' | 'waiting' | 'ready'>('selecting');
     const [queuePosition, setQueuePosition] = React.useState<number | null>(null);
 
-    // Initial check on mount to see if we were already waiting (reloads)
+    // Initial check on mount
     React.useEffect(() => {
         const checkExistingStatus = async () => {
             if (queueId) {
@@ -32,8 +49,22 @@ export default function SelectionPage({
                 if (data?.status === 'playing') setUiStatus('ready');
             }
         };
+
+        const syncScreenState = async () => {
+            const { data } = await supabase
+                .from('screen_state')
+                .select('current_wheel_id')
+                .eq('screen_number', parseInt(id))
+                .single();
+
+            if (data && data.current_wheel_id) {
+                useGameStore.getState().setGameMode('individual', data.current_wheel_id);
+            }
+        };
+
         checkExistingStatus();
-    }, [queueId, supabase]);
+        syncScreenState();
+    }, [queueId, supabase, id]);
 
     // REALTIME: Listen for Queue Updates (Am I playing?)
     React.useEffect(() => {
@@ -97,35 +128,55 @@ export default function SelectionPage({
             if (!error) {
                 setUiStatus('waiting');
 
-                // 2. Check Optimization (If screen idle, jump queue logic via RPC or polling will catch it)
-                // If we want immediate feedback if screen is idle:
-                const { data: screenData } = await supabase
-                    .from('screen_state')
-                    .select('status')
-                    .eq('screen_number', parseInt(id))
-                    .single();
+                // 2. Try to promote immediately (SQL will validate if screen is actually idle)
+                console.log("🚀 Selection Confirmed. Attempting promotion...");
 
-                if (screenData?.status === 'idle') {
-                    // SAFE PROMOTION STRATEGY: 
-                    // Don't write directly. Ask the Database to promote the next person (Us).
-                    // This avoids race conditions with TV cleanup scripts.
-                    console.log("🚀 Screen Idle. Triggering Safe Promotion...");
+                await supabase.rpc('promote_next_player', {
+                    p_screen_number: parseInt(id)
+                });
 
-                    await supabase.rpc('force_advance_queue', {
-                        p_screen_number: parseInt(id)
-                    });
-
-                    // The Realtime subscription (above) will detect when we are promoted to 'playing'
-                    // and update the UI Status to 'ready'.
-                }
+                // The Realtime subscription will handle the UI switch if successful.
             }
         }
     };
 
-    const handleSpinClick = () => {
-        // Now navigate to spin page logic
-        router.push(`/individual/screen/${id}/spin`);
+    const handleSpin = async () => {
+        // Enviar señal de giro al backend
+        await supabase
+            .from('screen_state')
+            .update({
+                status: 'spinning',
+                updated_at: new Date().toISOString()
+            })
+            .eq('screen_number', parseInt(id));
+
+        // Navegar a resultado (feedback visual para el usuario móvil)
+        router.push(`/individual/screen/${id}/result`);
     };
+
+    if (uiStatus === 'ready') {
+        return (
+            <div className="min-h-screen bg-red-600 flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in duration-300 fixed inset-0 z-50">
+                <h1 className="text-white text-2xl font-bold mb-8 animate-bounce">
+                    ¡ES TU TURNO!
+                </h1>
+
+                <button
+                    onClick={handleSpin}
+                    className="w-64 h-64 rounded-full bg-white shadow-[0_0_50px_rgba(255,255,255,0.5)] flex items-center justify-center transform transition-all active:scale-95 border-8 border-yellow-400 group"
+                >
+                    <div className="text-center">
+                        <span className="block text-5xl mb-2 group-hover:rotate-12 transition-transform">🎲</span>
+                        <span className="block text-2xl font-black text-red-600 tracking-wider">GIRAR</span>
+                    </div>
+                </button>
+
+                <p className="text-white/80 mt-8 text-sm text-center">
+                    Presiona el botón rojo para lanzar la ruleta en la pantalla {id}
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="h-[100dvh] bg-gray-900 text-white flex flex-col overflow-hidden">
@@ -171,15 +222,6 @@ export default function SelectionPage({
                     <button disabled className="w-full py-4 rounded-xl font-bold text-lg tracking-wide bg-yellow-600/20 text-yellow-400 border border-yellow-600/50 flex items-center justify-center gap-3 animate-pulse">
                         <span className="text-2xl animate-spin">🎲</span>
                         ESTÁS EN LA FILA...
-                    </button>
-                )}
-
-                {uiStatus === 'ready' && (
-                    <button
-                        onClick={handleSpinClick}
-                        className="w-full py-4 rounded-xl font-bold text-xl tracking-wide bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30 animate-bounce"
-                    >
-                        🚀 GIRAR AHORA
                     </button>
                 )}
             </div>

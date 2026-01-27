@@ -30,30 +30,48 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
         // 1. Update Local Store
         setIdentity(name, selectedEmoji);
 
-        // 2. Insert into Queue (Status: selecting)
-        const { data, error } = await supabase
+        // CHECK EXISTING SESSION
+        // Prevent duplicates if user refreshes or re-enters same name while active
+        const { data: existingSession } = await supabase
             .from('player_queue')
-            .insert({
-                screen_number: parseInt(screenId),
-                player_name: name,
-                player_emoji: selectedEmoji,
-                status: 'selecting', // Temporarily entering selection phase
-                created_at: new Date().toISOString()
-            })
-            .select() // Return data to get ID
-            .single();
+            .select('id, status')
+            .eq('screen_number', parseInt(screenId))
+            .eq('player_name', name)
+            .in('status', ['selecting', 'waiting', 'ready', 'playing', 'spinning'])
+            .maybeSingle();
 
-        if (error) {
-            console.error("Error joining queue:", error);
-            // Handle error (maybe show alert)
-            setIsSubmitting(false);
-            return;
+        if (existingSession) {
+            console.log("Resuming existing session:", existingSession.id);
+            // We don't need to insert. Just proceed.
+            // Ideally we'd update the emoji if it changed?
+            if (existingSession.status === 'selecting') {
+                // Update emoji in case they changed it
+                await supabase
+                    .from('player_queue')
+                    .update({ player_emoji: selectedEmoji })
+                    .eq('id', existingSession.id);
+            }
+        } else {
+            // 2. Insert into Queue (Status: selecting)
+            const { error } = await supabase
+                .from('player_queue')
+                .insert({
+                    screen_number: parseInt(screenId),
+                    player_name: name,
+                    player_emoji: selectedEmoji,
+                    status: 'selecting',
+                    created_at: new Date().toISOString()
+                })
+                .single();
+
+            if (error) {
+                console.error("Error joining queue:", error);
+                setIsSubmitting(false);
+                return;
+            }
         }
 
-        // Store queue_id if needed, or just rely on Name/Emoji for now
-        // Best practice: Store queue_id in GameStore
-        // useGameStore.getState().setQueueId(data.id); // Assuming store has this
-
+        // Proceed
         // For now, simpler: Just proceed. The Wheel Selector/Payment will carry the context 
         // via Store or URL? 
         // Actually, subsequent steps don't strictly need the DB Row ID if they just update 

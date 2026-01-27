@@ -22,6 +22,7 @@ interface GameState {
     // Status
     status: 'idle' | 'selecting' | 'waiting' | 'ready_to_spin' | 'spinning' | 'won' | 'lost';
     isDemo: boolean;
+    idleSpeed: number;
     // Queue
     queueId: string | null;
     setQueueId: (id: string) => void;
@@ -50,6 +51,7 @@ export const useGameStore = create<GameState>()(
             credits: 0,
             status: 'idle',
             isDemo: false,
+            idleSpeed: 1.0, // Default
             queueId: null,
             gameMode: 'group',
             activeWheelId: null,

@@ -51,6 +51,7 @@ export default function DisplayScreenPage({
     const [activeWheelAssets, setActiveWheelAssets] = useState<{ background: string; segments: any[] } | null>(null);
     const [showConfetti, setShowConfetti] = useState(false);
     const [showBigWin, setShowBigWin] = useState(false);
+    const [currentSelections, setCurrentSelections] = useState<number[]>([]);
 
     const supabase = createClient();
 
@@ -121,6 +122,7 @@ export default function DisplayScreenPage({
 
     // 4. Listen to Store Status (Triggered by Realtime from Mobile)
     const storeStatus = useGameStore(s => s.status);
+    const idleSpeed = useGameStore(s => s.idleSpeed);
 
     useEffect(() => {
         // Start Spin
@@ -144,6 +146,32 @@ export default function DisplayScreenPage({
             setShowBigWin(false);
         }
     }, [storeStatus, status]);
+
+    // Fetch Active Player Selections
+    useEffect(() => {
+        if (status === 'idle' && !realNickname) {
+            setCurrentSelections([]);
+            return;
+        }
+
+        async function fetchSelections() {
+            // Only fetch if we have a player name but no selections yet, or if status changed
+            const { data } = await supabase
+                .from('player_queue')
+                .select('selected_animals')
+                .eq('screen_number', screenIdNum)
+                .eq('status', 'playing')
+                .maybeSingle();
+
+            if (data?.selected_animals) {
+                setCurrentSelections(data.selected_animals as number[]);
+            } else {
+                setCurrentSelections([]);
+            }
+        }
+
+        fetchSelections();
+    }, [screenIdNum, status, realNickname]);
 
     // Fetch History Effect
     useEffect(() => {
@@ -321,35 +349,70 @@ export default function DisplayScreenPage({
                             </div>
                         </div>
                     )}
+
+                    {/* Active Selections Visualization */}
+                    {currentSelections.length > 0 && (
+                        <div className="flex items-center gap-2 border-l border-white/20 pl-4 animate-in fade-in slide-in-from-right-4 duration-700 delay-200">
+                            <div className="flex -space-x-3 hover:space-x-1 transition-all">
+                                {currentSelections.map((selId, idx) => {
+                                    // Resolve Image
+                                    let imgSrc = null;
+                                    if (activeWheelAssets?.segments) {
+                                        const seg = activeWheelAssets.segments.find(s => s.id === selId);
+                                        // Use imageResult (selector icon) instead of wedge
+                                        if (seg) imgSrc = seg.imageResult || seg.imageWheel;
+                                    }
+                                    if (!imgSrc) {
+                                        const animal = ANIMAL_LIST.find(a => a.id === selId);
+                                        // Use imageSelector (animal portrait)
+                                        if (animal) imgSrc = animal.imageSelector || animal.imageWheel;
+                                    }
+
+                                    return (
+                                        <div key={idx} className="w-10 h-10 rounded-full border-2 border-gray-800 bg-gray-700 relative overflow-hidden shadow-lg">
+                                            {imgSrc ? (
+                                                <Image src={imgSrc} alt="Choice" fill className="object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">{selId}</div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-mono tracking-tighter">APUESTA<br />ACTIVA</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* 2. Queue List (Stacked Below) */}
-                <QueueList screenId={screenIdNum} />
-            </div>
+                <QueueList screenId={screenIdNum} assets={activeWheelAssets} />
+            </div >
 
             {/* --- VISUALIZACIÓN SEGÚN MODO --- */}
 
             {/* CASO 1: MODO EVENTO - PANTALLA LATERAL (CARTELERA) */}
-            {isBillboardScreen && (
-                <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center text-center p-12">
-                    <h1 className="text-6xl font-bold text-yellow-400 mb-8 animate-pulse">¡GRAN SORTEO EN CURSO!</h1>
-                    <div className="text-4xl text-white mb-12">Mira la Pantalla Central #{centralScreenId}</div>
+            {
+                isBillboardScreen && (
+                    <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center text-center p-12">
+                        <h1 className="text-6xl font-bold text-yellow-400 mb-8 animate-pulse">¡GRAN SORTEO EN CURSO!</h1>
+                        <div className="text-4xl text-white mb-12">Mira la Pantalla Central #{centralScreenId}</div>
 
-                    <div className="bg-white/10 p-8 rounded-3xl backdrop-blur-md border border-white/20 w-full max-w-2xl">
-                        <h3 className="text-2xl text-blue-300 mb-4">Últimos Ganadores</h3>
-                        <div className="space-y-4 text-xl text-white">
-                            <div className="flex justify-between border-b border-white/10 pb-2">
-                                <span>🎟️ Ticket #4592</span>
-                                <span className="text-green-400">$50,000</span>
-                            </div>
-                            <div className="flex justify-between border-b border-white/10 pb-2">
-                                <span>🎟️ Ticket #4588</span>
-                                <span className="text-green-400">$10,000</span>
+                        <div className="bg-white/10 p-8 rounded-3xl backdrop-blur-md border border-white/20 w-full max-w-2xl">
+                            <h3 className="text-2xl text-blue-300 mb-4">Últimos Ganadores</h3>
+                            <div className="space-y-4 text-xl text-white">
+                                <div className="flex justify-between border-b border-white/10 pb-2">
+                                    <span>🎟️ Ticket #4592</span>
+                                    <span className="text-green-400">$50,000</span>
+                                </div>
+                                <div className="flex justify-between border-b border-white/10 pb-2">
+                                    <span>🎟️ Ticket #4588</span>
+                                    <span className="text-green-400">$10,000</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* CASO 2: MODO EVENTO - PANTALLA CENTRAL (RULETA DEDICADA) */}
             {/* ... (Unchanged) ... */}
@@ -357,139 +420,134 @@ export default function DisplayScreenPage({
 
 
             {/* Background Image if Dynamic Wheel (Solo si NO es Billboard) */}
-            {activeWheelAssets?.background && !isBillboardScreen && (
-                <div className="absolute inset-0 z-0">
-                    <Image
-                        src={activeWheelAssets.background}
-                        alt="Background"
-                        fill
-                        className="object-cover opacity-100"
-                    />
-                    <div className="absolute inset-0 bg-black/40" />
-                </div>
-            )}
+            {
+                activeWheelAssets?.background && !isBillboardScreen && (
+                    <div className="absolute inset-0 z-0">
+                        <Image
+                            src={activeWheelAssets.background}
+                            alt="Background"
+                            fill
+                            className="object-cover opacity-100"
+                        />
+                        <div className="absolute inset-0 bg-black/40" />
+                    </div>
+                )
+            }
 
             {/* Canvas Container (Oculto si es Billboard) */}
-            {!isBillboardScreen && (
-                // Remove padding/centering constraints for Fan Mode to hit top edge
-                <div className="absolute inset-0 flex items-start justify-center z-10 pt-0">
+            {
+                !isBillboardScreen && (
+                    // Remove padding/centering constraints for Fan Mode to hit top edge
+                    <div className="absolute inset-0 flex items-start justify-center z-10 pt-0">
 
-                    {/* Ruleta Wrapper */}
-                    {(() => {
-                        const segmentCount = activeWheelAssets?.segments?.length || 12;
-                        const isFanMode = segmentCount <= 20;
+                        {/* Ruleta Wrapper */}
+                        {(() => {
+                            const segmentCount = activeWheelAssets?.segments?.length || 12;
+                            const isFanMode = segmentCount <= 20;
 
-                        return (
-                            // Fan Mode: Limit height to avoid scroll. 2:1 aspect ratio roughly crops the empty bottom half.
-                            // We use aspect-[2/1] and overflow-hidden to show only the top half of the square canvas.
-                            <div className={`relative w-full transition-all duration-500 flex items-start justify-center 
+                            return (
+                                // Fan Mode: Limit height to avoid scroll. 2:1 aspect ratio roughly crops the empty bottom half.
+                                // We use aspect-[2/1] and overflow-hidden to show only the top half of the square canvas.
+                                <div className={`relative w-full transition-all duration-500 flex items-start justify-center 
                                 ${isFanMode ? 'aspect-[2/1] overflow-hidden' : 'aspect-square items-center'}
                             `}>
-                                {/* Canvas: Always square intrinsic matching width. 
+                                    {/* Canvas: Always square intrinsic matching width. 
                                     In Fan Mode, it overflows the container (bottom cropped). */}
-                                <div className={`relative w-full aspect-square`}>
-                                    <WheelCanvas
-                                        isSpinning={status === 'spinning'}
-                                        isIdle={status === 'idle'} // Enable Attract Mode
-                                        targetIndex={result} // Pass result directly so it can spin down
-                                        segments={activeWheelAssets?.segments}
-                                        onSpinComplete={handleSpinComplete}
-                                        className="w-full h-full"
-                                    />
+                                    <div className={`relative w-full aspect-square`}>
+                                        <WheelCanvas
+                                            isSpinning={storeStatus === 'spinning'}
+                                            isIdle={storeStatus === 'idle'}
+                                            idleSpeed={idleSpeed || 1.0} // Use subscribed value
+                                            targetIndex={result}
+                                            onSpinComplete={handleSpinComplete}
+                                            segments={activeWheelAssets?.segments}
+                                            className="w-full h-full"
+                                        />
+                                    </div>
+
+                                    {/* Logo Central Overlay - Removed as requested */}
+
+
+                                    {/* Pointer Overlay: ONLY for Group Mode */}
+                                    {!isFanMode && (
+                                        <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-0 h-0 border-t-[20px] border-t-transparent border-l-[40px] border-l-red-600 border-b-[20px] border-b-transparent filter drop-shadow-lg z-20"></div>
+                                    )}
                                 </div>
-
-                                {/* Logo Central Overlay - Removed as requested */}
-
-
-                                {/* Pointer Overlay: ONLY for Group Mode */}
-                                {!isFanMode && (
-                                    <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-0 h-0 border-t-[20px] border-t-transparent border-l-[40px] border-l-red-600 border-b-[20px] border-b-transparent filter drop-shadow-lg z-20"></div>
-                                )}
-                            </div>
-                        );
-                    })()}
-                </div>
-            )}
+                            );
+                        })()}
+                    </div>
+                )
+            }
 
             {/* QR Sidebar (Solo en Modo Individual) */}
-            {!isGroupEvent && (
-                <div className={`absolute right-0 top-0 h-full w-80 bg-gray-800/90 backdrop-blur-lg border-l border-white/10 p-6 flex flex-col items-center justify-start pt-12 text-center transition-all duration-700 ease-in-out z-50 ${status === 'spinning' ? 'opacity-0 translate-x-20 pointer-events-none' : 'opacity-100 translate-x-0'}`}>
+            {
+                !isGroupEvent && (
+                    <div className={`absolute right-0 top-0 h-full w-80 bg-gray-800/90 backdrop-blur-lg border-l border-white/10 p-6 flex flex-col items-center justify-start pt-12 text-center transition-all duration-700 ease-in-out z-50 ${status === 'spinning' ? 'opacity-0 translate-x-20 pointer-events-none' : 'opacity-100 translate-x-0'}`}>
 
-                    {/* Header Text */}
-                    <h3 className="text-3xl font-bold text-white mb-2">¡Juega Ahora!</h3>
-                    <p className="text-xl text-primary font-bold mb-1">Escanea para unirte</p>
-                    <p className="text-gray-400 mb-6">Solo $1,000 por jugada</p>
+                        {/* Header Text */}
+                        <h3 className="text-3xl font-bold text-white mb-2">¡Juega Ahora!</h3>
+                        <p className="text-xl text-primary font-bold mb-1">Escanea para unirte</p>
+                        <p className="text-gray-400 mb-6">Solo $1,000 por jugada</p>
 
-                    {/* QR Code */}
-                    <div className="bg-white p-3 rounded-2xl shadow-xl mb-8 transform hover:scale-105 transition-all w-full max-w-[240px]">
-                        {/* Placeholder de QR */}
-                        <div className="w-full aspect-square bg-gray-100 flex items-center justify-center text-gray-400 rounded-xl overflow-hidden relative">
-                            {/* You can use a real QR image here if available, or keep placeholder text */}
-                            <span className="text-xs text-gray-400">[QR LINK PANTALLA {screen}]</span>
+                        {/* QR Code */}
+                        <div className="bg-white p-3 rounded-2xl shadow-xl mb-8 transform hover:scale-105 transition-all w-full max-w-[240px]">
+                            {/* Placeholder de QR */}
+                            <div className="w-full aspect-square bg-gray-100 flex items-center justify-center text-gray-400 rounded-xl overflow-hidden relative">
+                                {/* You can use a real QR image here if available, or keep placeholder text */}
+                                <span className="text-xs text-gray-400">[QR LINK PANTALLA {screen}]</span>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* History Grid */}
-                    <div className="w-full max-w-[240px]">
-                        <h4 className="text-sm uppercase tracking-widest text-gray-500 mb-3 border-b border-white/10 pb-1">Últimos 9</h4>
-                        <div className="grid grid-cols-3 gap-2">
-                            {/* Render actual history, padded to 9 items */}
-                            {[...lastSpins, ...Array(9)].slice(0, 9).map((spin, i) => {
-                                // Find image for this result
-                                let imageSrc = null;
-                                if (spin && activeWheelAssets?.segments) {
-                                    // Assuming result_index matches ID (1-based)
-                                    // If segments are 0-indexed in array but have IDs:
-                                    const segment = activeWheelAssets.segments.find(s => s.id === spin.result_index);
-                                    if (segment) imageSrc = segment.imageResult || segment.imageWheel;
-                                }
+                        {/* History Grid */}
+                        <div className="w-full max-w-[240px]">
+                            <h4 className="text-sm uppercase tracking-widest text-gray-500 mb-3 border-b border-white/10 pb-1">Últimos 9</h4>
+                            <div className="grid grid-cols-3 gap-2">
+                                {/* Render actual history, padded to 9 items */}
+                                {[...lastSpins, ...Array(9)].slice(0, 9).map((spin, i) => {
+                                    // Find image for this result
+                                    let imageSrc = null;
+                                    if (spin && activeWheelAssets?.segments) {
+                                        // Assuming result_index matches ID (1-based)
+                                        // If segments are 0-indexed in array but have IDs:
+                                        const segment = activeWheelAssets.segments.find(s => s.id === spin.result_index);
+                                        if (segment) imageSrc = segment.imageResult || segment.imageWheel;
+                                    }
 
-                                return (
-                                    <div key={i} className="aspect-square bg-white/5 rounded-lg border border-white/10 overflow-hidden relative flex items-center justify-center">
-                                        {spin ? (
-                                            imageSrc ? (
-                                                <div className="w-full h-full relative">
-                                                    <Image
-                                                        src={imageSrc}
-                                                        alt="Res"
-                                                        fill
-                                                        className="object-contain p-1"
-                                                    />
-                                                </div>
+                                    return (
+                                        <div key={i} className="aspect-square bg-white/5 rounded-lg border border-white/10 overflow-hidden relative flex items-center justify-center">
+                                            {spin ? (
+                                                imageSrc ? (
+                                                    <div className="w-full h-full relative">
+                                                        <Image
+                                                            src={imageSrc}
+                                                            alt="Res"
+                                                            fill
+                                                            className="object-contain p-1"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-yellow-500 font-bold">#{spin.result_index}</span>
+                                                )
                                             ) : (
-                                                <span className="text-xs text-yellow-500 font-bold">#{spin.result_index}</span>
-                                            )
-                                        ) : (
-                                            // Empty Slot
-                                            <div className="w-1 h-1 bg-white/5 rounded-full" />
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                                // Empty Slot
+                                                <div className="w-1 h-1 bg-white/5 rounded-full" />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Visual Mode Indicator for Staff Debug (Minimized) */}
+                        <div className="mt-auto opacity-30 hover:opacity-100 transition-opacity text-[10px] text-gray-500 text-left w-full">
+                            Mode: {venueMode} | Central: {centralScreenId} <br />
+                            Evt: {isGroupEvent ? 'Yes' : 'No'} | St: {status}
                         </div>
                     </div>
-
-                    {/* Visual Mode Indicator for Staff Debug (Minimized) */}
-                    <div className="mt-auto opacity-30 hover:opacity-100 transition-opacity text-[10px] text-gray-500 text-left w-full">
-                        Mode: {venueMode} | Central: {centralScreenId} <br />
-                        Evt: {isGroupEvent ? 'Yes' : 'No'} | St: {status}
-                    </div>
-                </div>
-            )}
+                )
+            }
 
             {/* --- WINNER REACTIONS --- */}
-            {showConfetti && (
-                <Confetti
-                    width={typeof window !== 'undefined' ? window.innerWidth : 1000}
-                    height={typeof window !== 'undefined' ? window.innerHeight : 1000}
-                    recycle={true}
-                    numberOfPieces={500}
-                    gravity={0.2}
-                />
-            )}
-
-
-
             <BigWinOverlay
                 isVisible={showBigWin}
                 resultIndex={result}
@@ -498,10 +556,22 @@ export default function DisplayScreenPage({
                 type={isWin ? 'win' : 'loss'}
             />
 
+            {showConfetti && (
+                <div className="absolute inset-0 z-[100] pointer-events-none">
+                    <Confetti
+                        width={typeof window !== 'undefined' ? window.innerWidth : 1000}
+                        height={typeof window !== 'undefined' ? window.innerHeight : 1000}
+                        recycle={true}
+                        numberOfPieces={500}
+                        gravity={0.2}
+                    />
+                </div>
+            )}
+
             <div className="fixed bottom-0 left-0 bg-red-600 text-white p-2 z-[9999] text-xs font-mono hidden">
                 DEBUG: VenueMode={venueMode} | Screen={screen} | Central={centralScreenId}
             </div>
 
-        </div>
+        </div >
     );
 }

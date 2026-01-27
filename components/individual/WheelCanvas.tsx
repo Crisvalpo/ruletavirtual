@@ -25,8 +25,9 @@ export default function WheelCanvas({
     isIdle = false,
     targetIndex = null,
     segments,
+    idleSpeed = 1.0, // New Prop
     className = ""
-}: WheelCanvasProps & { className?: string }) {
+}: WheelCanvasProps & { className?: string; idleSpeed?: number }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rotationRef = useRef(0);
     const speedRef = useRef(0);
@@ -263,7 +264,7 @@ export default function WheelCanvas({
                 }
             } else if (isIdle) {
                 // IDLE ATTRACT MODE: Slow continuous spin
-                rotationRef.current += 0.002;
+                rotationRef.current += 0.002 * idleSpeed;
             }
 
             drawWheel();
@@ -283,7 +284,7 @@ export default function WheelCanvas({
 
         let animationFrameId = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(animationFrameId);
-    }, [isSpinning, targetIndex, segments, refresh]); // Added refresh to dependencies
+    }, [isSpinning, targetIndex, segments, refresh, idleSpeed]); // Added idleSpeed to dependencies
 
     return (
         <div className={`relative w-full aspect-square ${className}`}>
