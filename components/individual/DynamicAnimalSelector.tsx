@@ -38,30 +38,33 @@ export default function DynamicAnimalSelector({ wheelId, mode = 'group' }: Dynam
                 setLoading(false);
             } else if (wheelId) {
                 // Load from storage
-                const { data: wheel } = await supabase
-                    .from('individual_wheels')
-                    .select('storage_path')
-                    .eq('id', wheelId)
-                    .single();
+                try {
+                    const { data: dbSegments, error } = await supabase
+                        .from('individual_wheel_segments')
+                        .select('position, name, selector_image')
+                        .eq('wheel_id', wheelId)
+                        .order('position', { ascending: true });
 
-                if (wheel) {
-                    const storagePath = wheel.storage_path;
-                    const tempSegments: DynamicSegment[] = [];
+                    if (error) throw error;
 
-                    for (let i = 1; i <= 12; i++) {
-                        const { data } = supabase.storage
-                            .from('individual-wheels')
-                            .getPublicUrl(`${storagePath}/selector/${i}.jpg`);
+                    if (dbSegments && dbSegments.length > 0) {
+                        const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
 
-                        tempSegments.push({
-                            id: i,
-                            name: `Segmento ${i}`,
+                        const tempSegments = dbSegments.map(s => ({
+                            id: s.position,
+                            name: s.name,
                             emoji: '🎮',
-                            selectorImage: data.publicUrl
-                        });
+                            selectorImage: s.selector_image?.startsWith('http')
+                                ? s.selector_image
+                                : `${STORAGE_BASE}/${s.selector_image}`
+                        }));
+                        setSegments(tempSegments);
+                    } else {
+                        // Fallback fallback (legacy)
+                        // This shouldn't happen with proper seeds
                     }
-
-                    setSegments(tempSegments);
+                } catch (err) {
+                    console.error("Error loading segments:", err);
                 }
                 setLoading(false);
             }

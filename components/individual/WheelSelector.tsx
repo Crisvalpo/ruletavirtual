@@ -31,7 +31,16 @@ export default function WheelSelector({ screenId }: { screenId: string }) {
                 .order('created_at', { ascending: false });
 
             if (!error && data) {
-                setWheels(data);
+                // Ensure absolute URLs for Next.js Image component
+                const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+
+                const processedWheels = data.map(w => ({
+                    ...w,
+                    background_image: w.background_image?.startsWith('http')
+                        ? w.background_image
+                        : `${STORAGE_BASE}/${w.background_image}`
+                }));
+                setWheels(processedWheels);
             }
             setLoading(false);
         }
