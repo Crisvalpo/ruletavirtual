@@ -26,9 +26,9 @@ SET
 
 -- 3. Re-seed essential defaults
 -- Mario is the only one with actual assets in the bucket
-INSERT INTO public.individual_wheels (name, theme_category, segment_count, is_active, storage_path, background_image)
+INSERT INTO public.individual_wheels (name, theme_category, segment_count, is_active, storage_path, background_image, image_preview)
 VALUES 
-('Mario Bros', 'infantil', 12, true, 'mario', 'mario/background.jpg')
+('Mario Bros', 'infantil', 12, true, 'mario', 'mario/background.jpg', 'mario/selector/1.jpg')
 ON CONFLICT DO NOTHING;
 
 -- 4. Ensure Screen rows exist (Restore defaults if table was empty)

@@ -22,28 +22,14 @@ export default function PaymentPage({
 
     useEffect(() => {
         const wheelId = searchParams.get('wheelId');
-        // Default to individual if wheelId is present, otherwise group
         const modeParam = searchParams.get('mode');
         const mode = (modeParam as 'group' | 'individual') || (wheelId ? 'individual' : 'group');
 
         setGameMode(mode, wheelId || undefined);
 
-        // SYNC WITH TV: Update Supabase screen_state
-        if (wheelId) {
-            const syncScreen = async () => {
-                const { error } = await supabase
-                    .from('screen_state')
-                    .update({
-                        current_wheel_id: wheelId,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('screen_number', parseInt(id));
-
-                if (error) console.error("Error syncing screen:", error);
-            };
-            syncScreen();
-        }
-    }, [searchParams, setGameMode, id]); // Added id to dependency
+        // REMOVED: Immediate screen_state sync. 
+        // We now wait for the player turn to promote and switch theme.
+    }, [searchParams, setGameMode, id]);
 
     const { nickname, emoji, setQueueId, gameMode, activeWheelId } = useGameStore();
 
@@ -59,9 +45,9 @@ export default function PaymentPage({
                 .from('player_queue')
                 .select('*', { count: 'exact', head: true })
                 .eq('screen_number', parseInt(id))
-                .in('status', ['waiting', 'playing']);
+                .in('status', ['waiting', 'playing', 'selecting', 'ready', 'spinning']);
 
-            // Allow demo only if NO ONE is waiting or playing
+            // Allow demo only if NO ONE is waiting, playing or in selection process
             if (!error && count === 0) {
                 setCanDemo(true);
             } else {
@@ -77,6 +63,19 @@ export default function PaymentPage({
 
     const handleDemoSpin = async () => {
         if (demoSpins <= 0) return;
+
+        // Double check queue before firing (Race condition protection)
+        const { count } = await supabase
+            .from('player_queue')
+            .select('*', { count: 'exact', head: true })
+            .eq('screen_number', parseInt(id))
+            .in('status', ['waiting', 'playing', 'selecting', 'ready', 'spinning']);
+
+        if (count && count > 0) {
+            setCanDemo(false);
+            alert("⚠️ Alguien se unió a la fila. El Modo Práctica ya no está disponible.");
+            return;
+        }
 
         setIsSpinningDemo(true);
         setDemoSpins(prev => prev - 1);
@@ -110,22 +109,22 @@ export default function PaymentPage({
 
         // INSERT INTO QUEUE
         try {
+            const wheelId = searchParams.get('wheelId');
             const { data, error } = await supabase
                 .from('player_queue')
                 .insert({
                     screen_number: parseInt(id),
                     player_name: nickname,
                     player_emoji: emoji,
-                    status: 'selecting', // Choosing animals next
-                    created_at: new Date().toISOString(),
-                    // Optional: store game mode info if table supports it (JSON/columns)
-                    // For now, rely on screen_state update later or local flow
+                    status: 'selecting',
+                    selected_wheel_id: wheelId || null,
+                    created_at: new Date().toISOString()
                 })
                 .select()
                 .single();
 
             if (data && !error) {
-                console.log("Queue Item Created:", data.id);
+                console.log("Queue Item Created with Wheel:", wheelId);
                 setQueueId(data.id);
             } else {
                 console.error("Queue Create Error:", error);

@@ -38,33 +38,62 @@ export default function SelectionPage({
     }, [selectedAnimals, queueId, supabase]);
 
     const [uiStatus, setUiStatus] = React.useState<'selecting' | 'waiting' | 'ready'>('selecting');
+    const [isInitializing, setIsInitializing] = React.useState(true);
     const [queuePosition, setQueuePosition] = React.useState<number | null>(null);
+    const [currentLocalWheelId, setCurrentLocalWheelId] = React.useState<string | null>(activeWheelId);
 
     // Initial check on mount
     React.useEffect(() => {
-        const checkExistingStatus = async () => {
-            if (queueId) {
-                const { data } = await supabase.from('player_queue').select('status').eq('id', queueId).single();
-                if (data?.status === 'waiting') setUiStatus('waiting');
-                if (data?.status === 'playing') setUiStatus('ready');
+        const init = async () => {
+            setIsInitializing(true);
+
+            // 1. Resolve correct wheel ID
+            // PRIORITIZE what the user selected in the previous screen (stored in activeWheelId)
+            let resolvedWheelId = activeWheelId;
+
+            // If we don't have it in the store (e.g. HARD REFRESH), try to recover from the queue
+            if (!resolvedWheelId && queueId) {
+                const { data: queueData } = await supabase
+                    .from('player_queue')
+                    .select('selected_wheel_id, status')
+                    .eq('id', queueId)
+                    .single();
+
+                if (queueData?.selected_wheel_id) {
+                    resolvedWheelId = queueData.selected_wheel_id;
+                    useGameStore.getState().setGameMode('individual', resolvedWheelId ?? undefined);
+                }
+
+                // Also sync UI status from queue
+                if (queueData?.status === 'waiting') setUiStatus('waiting');
+                if (queueData?.status === 'playing') setUiStatus('ready');
             }
+
+            // 2. Only if STILL no wheelId and NO queue, fallback to screen (emergency fallback)
+            if (!resolvedWheelId) {
+                const { data: screenData } = await supabase
+                    .from('screen_state')
+                    .select('current_wheel_id')
+                    .eq('screen_number', parseInt(id))
+                    .single();
+
+                if (screenData?.current_wheel_id) {
+                    resolvedWheelId = screenData.current_wheel_id;
+                    useGameStore.getState().setGameMode('individual', resolvedWheelId ?? undefined);
+                }
+            }
+
+            if (resolvedWheelId) {
+                setCurrentLocalWheelId(resolvedWheelId);
+                useGameStore.getState().setGameMode('individual', resolvedWheelId ?? undefined);
+            }
+
+            setIsInitializing(false);
         };
 
-        const syncScreenState = async () => {
-            const { data } = await supabase
-                .from('screen_state')
-                .select('current_wheel_id')
-                .eq('screen_number', parseInt(id))
-                .single();
-
-            if (data && data.current_wheel_id) {
-                useGameStore.getState().setGameMode('individual', data.current_wheel_id);
-            }
-        };
-
-        checkExistingStatus();
-        syncScreenState();
-    }, [queueId, supabase, id]);
+        if (!isInitializing) setIsInitializing(true);
+        init();
+    }, [queueId, supabase, id, activeWheelId]);
 
     // REALTIME: Listen for Queue Updates (Am I playing?)
     React.useEffect(() => {
@@ -93,24 +122,59 @@ export default function SelectionPage({
     // Actually, queue logic (promote_next_player) sets us to 'playing', so the subscription above handles the trigger.
     // BUT we also need to update position.
 
-    // Position Polling
+    // 4. Position & Failsafe Background Polling
     React.useEffect(() => {
-        if (uiStatus !== 'waiting') return;
+        const interval = setInterval(async () => {
+            // A. Position Check (If waiting)
+            if (uiStatus === 'waiting' && queueId) {
+                const { data: myItem } = await supabase
+                    .from('player_queue')
+                    .select('created_at')
+                    .eq('id', queueId)
+                    .single();
 
-        const fetchPos = async () => {
-            const { count } = await supabase
-                .from('player_queue')
-                .select('*', { count: 'exact', head: true })
+                if (myItem) {
+                    const { count } = await supabase
+                        .from('player_queue')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('screen_number', parseInt(id))
+                        .eq('status', 'waiting')
+                        .lt('created_at', myItem.created_at);
+
+                    if (count !== null) setQueuePosition(count + 1);
+                }
+            }
+
+            // B. Failsafe: Try to Promote if screen is IDLE
+            const { data: screenData } = await supabase
+                .from('screen_state')
+                .select('status, updated_at')
                 .eq('screen_number', parseInt(id))
-                .eq('status', 'waiting')
-                .lt('created_at', new Date().toISOString()); // Logic approximation
+                .single();
 
-            // Better: Get my creation time and count how many older 'waiting' exist
-            // Simplification: just count.
-            // Given short queues, simple count is okay-ish but we prefer index.
-        };
-        // Simplified: Just show "En Fila"
-    }, [uiStatus]);
+            if (screenData?.status === 'idle') {
+                console.log("🛠️ Failsafe: Screen Idle. Attempting Promotion...");
+                await supabase.rpc('promote_next_player', {
+                    p_screen_number: parseInt(id)
+                });
+            }
+            // C. Failsafe: Stuck on Result (> 12s)
+            else if (screenData?.status === 'showing_result') {
+                const lastUpdate = new Date(screenData.updated_at).getTime();
+                const now = new Date().getTime();
+                const diffSeconds = (now - lastUpdate) / 1000;
+
+                if (diffSeconds > 12) {
+                    console.warn("⚠️ Failsafe: Screen stuck on result! Forcing advance...");
+                    await supabase.rpc('force_advance_queue', {
+                        p_screen_number: parseInt(id)
+                    });
+                }
+            }
+        }, 3000); // Robust check every 3s
+
+        return () => clearInterval(interval);
+    }, [uiStatus, queueId, id, supabase]);
 
 
     const handleConfirm = async () => {
@@ -153,6 +217,18 @@ export default function SelectionPage({
         // Navegar a resultado (feedback visual para el usuario móvil)
         router.push(`/individual/screen/${id}/result`);
     };
+
+    if (isInitializing) {
+        return (
+            <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-8 text-white space-y-6">
+                <div className="w-16 h-16 border-4 border-white/10 border-t-green-500 rounded-full animate-spin" />
+                <div className="text-center animate-pulse">
+                    <p className="text-lg font-bold tracking-widest text-white/50 uppercase">Sincronizando</p>
+                    <p className="text-xs text-white/30">Cargando la configuración del mundo...</p>
+                </div>
+            </div>
+        );
+    }
 
     if (uiStatus === 'ready') {
         return (
@@ -199,7 +275,7 @@ export default function SelectionPage({
 
             {/* Grid Interactivo Real (Disabled if not selecting) */}
             <div className={`flex-1 overflow-hidden relative ${uiStatus !== 'selecting' ? 'opacity-50 pointer-events-none grayscale-[0.5]' : ''}`}>
-                <DynamicAnimalSelector wheelId={wheelId} mode={mode} />
+                <DynamicAnimalSelector wheelId={currentLocalWheelId} mode={mode} />
             </div>
 
             <div className="flex-none p-4 bg-gray-900/95 backdrop-blur-md border-t border-gray-800">
@@ -208,17 +284,29 @@ export default function SelectionPage({
                         onClick={handleConfirm}
                         disabled={selectedAnimals.length !== 3}
                         className={`
-                            w-full py-4 rounded-xl font-bold text-lg tracking-wide transition-all shadow-lg
-                            ${selectedAnimals.length === 3
+                        w-full py-4 rounded-xl font-bold text-lg tracking-wide transition-all shadow-lg
+                        ${selectedAnimals.length === 3
                                 ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white transform active:scale-[0.98] shadow-green-500/20'
                                 : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'}
-                        `}
+                    `}
                     >
                         {selectedAnimals.length === 3 ? 'CONFIRMAR JUGADA' : `Selecciona ${3 - selectedAnimals.length} más`}
                     </button>
                 )}
 
-                {uiStatus === 'waiting' && (
+                {uiStatus === 'waiting' && queuePosition !== null && (
+                    <div className="flex flex-col gap-2">
+                        <button disabled className="w-full py-4 rounded-xl font-bold text-lg tracking-wide bg-yellow-600/20 text-yellow-400 border border-yellow-600/50 flex items-center justify-center gap-3">
+                            <span className="text-2xl animate-spin">🎲</span>
+                            ESTÁS EN LA FILA...
+                        </button>
+                        <p className="text-center text-xs text-yellow-500/70 font-bold uppercase tracking-widest">
+                            Posición: {queuePosition}
+                        </p>
+                    </div>
+                )}
+
+                {uiStatus === 'waiting' && queuePosition === null && (
                     <button disabled className="w-full py-4 rounded-xl font-bold text-lg tracking-wide bg-yellow-600/20 text-yellow-400 border border-yellow-600/50 flex items-center justify-center gap-3 animate-pulse">
                         <span className="text-2xl animate-spin">🎲</span>
                         ESTÁS EN LA FILA...

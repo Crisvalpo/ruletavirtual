@@ -23,7 +23,7 @@ BEGIN
                 'Item ' || i, 
                 'mario/segments/' || i || '.png',
                 'mario/selector/' || i || '.jpg',
-                '#E70012' -- Mario Red as base
+                'transparent'
             );
         END LOOP;
     END IF;

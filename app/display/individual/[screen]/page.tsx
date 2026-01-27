@@ -85,35 +85,48 @@ export default function DisplayScreenPage({
             } else if (effectiveActiveWheelId) {
                 // REAL LOGIC: Fetch Dynamic Wheel Data
                 try {
-                    const { data, error } = await supabase
+                    const { data: wheel, error: wheelError } = await supabase
                         .from('individual_wheels')
-                        .select('storage_path, segment_count') // We need storage_path to build URLs
+                        .select('storage_path, segment_count, background_image')
                         .eq('id', effectiveActiveWheelId)
                         .single();
 
-                    if (error) throw error;
+                    if (wheelError) throw wheelError;
 
-                    if (data) {
+                    const { data: dbSegments, error: segmentError } = await supabase
+                        .from('individual_wheel_segments')
+                        .select('position, name, segment_image, selector_image, color')
+                        .eq('wheel_id', effectiveActiveWheelId)
+                        .order('position', { ascending: true });
+
+                    if (segmentError) throw segmentError;
+
+                    if (wheel) {
                         const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
-                        const path = data.storage_path; // e.g., 'mario' or 'sonic'
 
-                        const segments = Array.from({ length: data.segment_count || 12 }, (_, i) => ({
-                            id: i + 1,
-                            label: `Seg ${i + 1}`,
-                            color: 'transparent',
-                            // Convention verified in upload-mario.js:
-                            imageWheel: `${STORAGE_BASE}/${path}/segments/${i + 1}.png`,
-                            imageResult: `${STORAGE_BASE}/${path}/selector/${i + 1}.jpg`
+                        // Handle both relative and absolute paths
+                        const getFullUrl = (path: string | null) => {
+                            if (!path) return null;
+                            return path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`;
+                        };
+
+                        const segments = dbSegments.map(s => ({
+                            id: s.position,
+                            label: s.name,
+                            color: s.color || 'transparent',
+                            imageWheel: getFullUrl(s.segment_image),
+                            imageResult: getFullUrl(s.selector_image)
                         }));
 
                         setActiveWheelAssets({
-                            background: `${STORAGE_BASE}/${path}/background.jpg`,
+                            background: getFullUrl(wheel.background_image) || '',
                             segments: segments
                         });
                     }
                 } catch (err) {
                     console.error("Failed to load wheel assets:", err);
-                    // Fallback? Currently keeps previous or null.
+                    // If not found or error, we could reset to null (group mode)
+                    // but for now we log it.
                 }
             }
         }
@@ -131,10 +144,35 @@ export default function DisplayScreenPage({
             setStatus('spinning');
             setResult(null);
 
-            // Generate Random Result locally (since mobile didn't send one)
+            // 1. Clear previous result in DB immediately so phone stays in "Loading" state
+            supabase
+                .from('screen_state')
+                .update({
+                    last_spin_result: null,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('screen_number', screenIdNum)
+                .then(({ error }) => {
+                    if (error) console.error("Error clearing spin result:", error);
+                });
+
+            // 2. Generate Result & Start Animation
             setTimeout(() => {
                 const randomResult = Math.floor(Math.random() * 12) + 1;
-                setResult(randomResult);
+                setResult(randomResult); // This starts the 4s stopping animation in WheelCanvas
+
+                // 3. CALIBRATION: Sync to DB 3.5s after starting (500ms BEFORE it stops)
+                // This lead time compensates for internet/Realtime latency so both screens 
+                // show the result overlay at the exact same moment.
+                setTimeout(async () => {
+                    await supabase
+                        .from('screen_state')
+                        .update({
+                            last_spin_result: randomResult,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('screen_number', screenIdNum);
+                }, 3500);
             }, 500);
         }
         // Reset / Cleanup (Driven by Realtime)
@@ -257,13 +295,19 @@ export default function DisplayScreenPage({
         if (isDemo) {
             console.log("🎓 Demo Spin Complete. Skipping History.");
 
-            // Fast Cleanup (2s)
+            // Passive Cleanup: Only reset screen state without touching player queue
             setTimeout(async () => {
-                // Use Robust RPC to auto-promote next player if waiting
-                console.log("🎓 Demo Finished. Calling Force Advance.");
-                await supabase.rpc('force_advance_queue', {
-                    p_screen_number: parseInt(screen)
-                });
+                console.log("🎓 Demo Finished. Passive Reset.");
+                await supabase
+                    .from('screen_state')
+                    .update({
+                        status: 'idle',
+                        player_name: null,
+                        player_emoji: null,
+                        is_demo: false,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('screen_number', parseInt(screen));
             }, 5000); // Give them time to see result
 
             return; // EXIT EARLY

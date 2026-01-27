@@ -16,28 +16,95 @@ export default function ResultPage({
     const { selectedAnimals, nickname } = useGameStore();
 
     const [status, setStatus] = useState<'loading' | 'winning' | 'losing'>('loading');
+    const [dbSelections, setDbSelections] = useState<number[]>([]);
 
     useEffect(() => {
-        const checkResult = async () => {
-            // 1. Get Screen State (Did we win?)
+        let isMounted = true;
+
+        const checkResult = async (currentStatus?: string, currentResult?: number | null) => {
+            // 2. Resolve Selections (Store or Database)
+            let effectiveSelections = selectedAnimals;
+            if (effectiveSelections.length === 0) {
+                const { data: queueData } = await supabase
+                    .from('player_queue')
+                    .select('selected_animals')
+                    .eq('screen_number', parseInt(id))
+                    .in('status', ['playing', 'completed'])
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (queueData?.selected_animals && isMounted) {
+                    effectiveSelections = queueData.selected_animals as number[];
+                    setDbSelections(effectiveSelections);
+                }
+            }
+
+            // 3. Logic based on screen status/result
+            if (currentResult) {
+                const isWin = effectiveSelections.includes(currentResult);
+                setStatus(isWin ? 'winning' : 'losing');
+            }
+            else if (currentStatus === 'idle') {
+                // TV already finished and reset. Fallback to Game History.
+                const { data: history } = await supabase
+                    .from('game_history')
+                    .select('result_index')
+                    .eq('screen_id', parseInt(id))
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (history && isMounted) {
+                    const isWin = effectiveSelections.includes(history.result_index);
+                    setStatus(isWin ? 'winning' : 'losing');
+                } else if (isMounted) {
+                    setStatus('losing'); // Default fallback
+                }
+            }
+            else {
+                setStatus('loading');
+            }
+        };
+
+        // 1. Initial Fetch
+        const init = async () => {
             const { data: screenData } = await supabase
                 .from('screen_state')
                 .select('last_spin_result, status')
                 .eq('screen_number', parseInt(id))
                 .single();
 
-            if (screenData?.status === 'showing_result' && screenData.last_spin_result) {
-                const resultIndex = screenData.last_spin_result;
-                const isWin = selectedAnimals.includes(resultIndex);
-                setStatus(isWin ? 'winning' : 'losing');
-            } else if (screenData?.status === 'spinning') {
-                setStatus('loading');
+            if (isMounted && screenData) {
+                checkResult(screenData.status, screenData.last_spin_result);
             }
         };
+        init();
 
-        // Poll every 1s
-        const interval = setInterval(checkResult, 1000);
-        return () => clearInterval(interval);
+        // 2. Realtime Subscription for instant update
+        const channel = supabase
+            .channel(`result_sync_${id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'screen_state',
+                    filter: `screen_number=eq.${id}`
+                },
+                (payload) => {
+                    if (isMounted) {
+                        console.log("🎯 Result Received via Realtime:", payload.new);
+                        checkResult(payload.new.status, payload.new.last_spin_result);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            isMounted = false;
+            supabase.removeChannel(channel);
+        };
     }, [id, selectedAnimals, supabase]);
 
     const handlePlayAgain = () => {

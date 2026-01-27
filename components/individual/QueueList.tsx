@@ -12,11 +12,13 @@ interface QueueItem {
     created_at: string;
     status: string;
     selected_animals?: number[];
+    selected_wheel_id?: string;
 }
 
-export default function QueueList({ screenId, assets }: { screenId: number; assets: any }) {
+export default function QueueList({ screenId, assets: screenAssets }: { screenId: number; assets: any }) {
     const [queue, setQueue] = useState<QueueItem[]>([]); // Waiting
     const [activeSelectors, setActiveSelectors] = useState<QueueItem[]>([]); // Selecting
+    const [wheelAssetsMap, setWheelAssetsMap] = useState<Record<string, any>>({});
     const supabase = createClient();
 
     useEffect(() => {
@@ -24,7 +26,7 @@ export default function QueueList({ screenId, assets }: { screenId: number; asse
             // Fetch Waiting
             const { data: waitingData } = await supabase
                 .from('player_queue')
-                .select('id, player_name, player_emoji, created_at, status')
+                .select('id, player_name, player_emoji, created_at, status, selected_wheel_id')
                 .eq('screen_number', screenId)
                 .eq('status', 'waiting')
                 .order('created_at', { ascending: true });
@@ -34,16 +36,53 @@ export default function QueueList({ screenId, assets }: { screenId: number; asse
             // Fetch Selecting (Live)
             const { data: selectingData } = await supabase
                 .from('player_queue')
-                .select('id, player_name, player_emoji, created_at, status, selected_animals')
+                .select('id, player_name, player_emoji, created_at, status, selected_animals, selected_wheel_id')
                 .eq('screen_number', screenId)
                 .eq('status', 'selecting')
                 .order('created_at', { ascending: true });
 
-            if (selectingData) setActiveSelectors(selectingData);
+            if (selectingData) {
+                setActiveSelectors(selectingData);
+
+                // Fetch segments for unique wheel IDs in the queue
+                const uniqueWheelIds = Array.from(new Set(
+                    selectingData
+                        .map(p => p.selected_wheel_id)
+                        .filter(id => id && !wheelAssetsMap[id])
+                )) as string[];
+
+                if (uniqueWheelIds.length > 0) {
+                    const { data: segmentsData } = await supabase
+                        .from('individual_wheel_segments')
+                        .select('wheel_id, position, selector_image, segment_image')
+                        .in('wheel_id', uniqueWheelIds);
+
+                    if (segmentsData) {
+                        const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+                        const getFullUrl = (path: string | null) => {
+                            if (!path) return null;
+                            return path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`;
+                        };
+
+                        const newMap = { ...wheelAssetsMap };
+                        uniqueWheelIds.forEach(wid => {
+                            newMap[wid] = segmentsData
+                                .filter(s => s.wheel_id === wid)
+                                .map(s => ({
+                                    id: s.position,
+                                    imageResult: getFullUrl(s.selector_image),
+                                    imageWheel: getFullUrl(s.segment_image)
+                                }));
+                        });
+                        setWheelAssetsMap(newMap);
+                    }
+                }
+            }
         };
 
         // Initial fetch
         fetchQueue();
+        // ... (subscription logic continues)
 
         // Realtime Subscription
         const channel = supabase
@@ -97,9 +136,13 @@ export default function QueueList({ screenId, assets }: { screenId: number; asse
                                     player.selected_animals.map((idx, i) => {
                                         let imgSrc: string | null = null;
 
-                                        if (assets?.segments) {
-                                            const seg = assets.segments.find((s: any) => s.id === idx);
-                                            // PRIORITIZE SELECTOR IMAGE (Square/Icon) over Wheel Image (Wedge)
+                                        // 1. Get correct assets for this player
+                                        const playerAssets = player.selected_wheel_id ? wheelAssetsMap[player.selected_wheel_id] : null;
+                                        // 2. Fallback to screenAssets if no specific assets yet
+                                        const relevantSegments = playerAssets || screenAssets?.segments;
+
+                                        if (relevantSegments) {
+                                            const seg = relevantSegments.find((s: any) => s.id === idx);
                                             if (seg) imgSrc = seg.imageResult || seg.imageWheel;
                                         }
 
