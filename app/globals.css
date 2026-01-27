@@ -65,3 +65,16 @@ a {
 .animate-zoom-in {
   animation: zoomIn 0.5s ease-out forwards;
 }
+
+/* Hide Scrollbars (for display/TV screens) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari, Opera */
+}

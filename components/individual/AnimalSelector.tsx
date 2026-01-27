@@ -6,10 +6,10 @@ import Image from 'next/image';
 
 export default function AnimalSelector() {
     const selectedAnimals = useGameStore((state) => state.selectedAnimals);
-    const toggleAnimal = useGameStore((state) => state.toggleAnimalSelection);
+    const toggleAnimal = useGameStore((state) => state.toggleAnimal);
 
     return (
-        <div className="grid grid-cols-6 gap-2 p-2 bg-gray-800 rounded-xl overflow-y-auto max-h-[60vh]">
+        <div className="grid grid-cols-6 gap-2 p-2 bg-gray-800 rounded-xl overflow-y-auto max-h-[60vh] no-scrollbar">
             {ANIMAL_LIST.map((animal) => {
                 const isSelected = selectedAnimals.includes(animal.id);
 

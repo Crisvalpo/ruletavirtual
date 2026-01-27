@@ -2,39 +2,28 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface GameState {
+    // Session & Identity
     screenId: string | null;
-    playerId: string | null; // UUID from temp session or auth
     nickname: string;
-    emoji: string; // New field
+    emoji: string;
+    queueId: string | null;
+    currentQueueId: string | null; // Sync for TV
 
-    // Mode
-    gameMode: 'group' | 'individual';
-    activeWheelId: string | null;
-
-    // Selection
-    selectedAnimals: number[]; // Indices 1-36
-
-    // Payment
-    hasPaid: boolean;
-    paymentMethod: 'cash' | 'mercadopago' | null;
-    credits: number;
-
-    // Status
-    status: 'idle' | 'selecting' | 'waiting' | 'ready_to_spin' | 'spinning' | 'won' | 'lost';
+    // Game State
+    status: 'idle' | 'spinning';
     isDemo: boolean;
     idleSpeed: number;
-    // Queue
-    queueId: string | null;
-    setQueueId: (id: string) => void;
+    gameMode: 'individual' | 'group';
+    activeWheelId: string | null;
+    selectedAnimals: number[];
 
     // Actions
-    setScreenId: (id: string) => void;
-    setGameMode: (mode: 'group' | 'individual', wheelId?: string) => void;
-    setIdentity: (name: string, emoji: string) => void; // Consolidated action
-    setNickname: (name: string) => void; // Deprecated but kept for compat
-    toggleAnimalSelection: (index: number) => void;
-    setPaymentStatus: (paid: boolean, method: 'cash' | 'mercadopago') => void;
-    setIsDemo: (isDemo: boolean) => void;
+    setScreenId: (id: string | null) => void;
+    setIdentity: (nickname: string, emoji: string) => void;
+    setQueueId: (id: string | null) => void;
+    setGameMode: (mode: 'individual' | 'group', wheelId?: string) => void;
+    setSelectedAnimals: (animals: number[]) => void;
+    toggleAnimal: (id: number) => void;
     resetGame: () => void;
 }
 
@@ -42,71 +31,60 @@ export const useGameStore = create<GameState>()(
     persist(
         (set) => ({
             screenId: null,
-            playerId: null,
             nickname: 'Jugador',
-            emoji: '😎', // Default
-            selectedAnimals: [],
-            hasPaid: false,
-            paymentMethod: null,
-            credits: 0,
+            emoji: '😎',
+            queueId: null,
+            currentQueueId: null,
+
             status: 'idle',
             isDemo: false,
-            idleSpeed: 1.0, // Default
-            queueId: null,
+            idleSpeed: 1.0,
             gameMode: 'group',
             activeWheelId: null,
+            selectedAnimals: [],
 
             setScreenId: (id) => set({ screenId: id }),
+            setIdentity: (nickname, emoji) => set({ nickname, emoji }),
+            setQueueId: (id) => set({ queueId: id }),
 
             setGameMode: (mode, wheelId) => set({
                 gameMode: mode,
-                activeWheelId: wheelId || null,
-                selectedAnimals: []
+                activeWheelId: wheelId || null
             }),
 
-            setIdentity: (name, emoji) => set({ nickname: name, emoji: emoji }),
-            setNickname: (name) => set({ nickname: name }),
+            setSelectedAnimals: (animals) => set({ selectedAnimals: animals }),
 
-            toggleAnimalSelection: (index) => set((state) => {
-                const isSelected = state.selectedAnimals.includes(index);
-
+            toggleAnimal: (id) => set((state) => {
+                const isSelected = state.selectedAnimals.includes(id);
                 if (isSelected) {
-                    return { selectedAnimals: state.selectedAnimals.filter(i => i !== index) };
+                    return { selectedAnimals: state.selectedAnimals.filter(a => a !== id) };
                 }
-
                 if (state.selectedAnimals.length < 3) {
-                    return { selectedAnimals: [...state.selectedAnimals, index] };
+                    return { selectedAnimals: [...state.selectedAnimals, id] };
                 }
-
                 return state;
             }),
 
-            setPaymentStatus: (paid, method) => set({
-                hasPaid: paid,
-                paymentMethod: method,
-                status: paid ? 'selecting' : 'idle'
-            }),
-
-            setIsDemo: (val) => set({ isDemo: val }),
-
-            setQueueId: (id) => set({ queueId: id }),
-
             resetGame: () => set({
                 selectedAnimals: [],
-                hasPaid: false,
-                paymentMethod: null,
                 status: 'idle',
                 isDemo: false,
                 gameMode: 'group',
                 activeWheelId: null,
                 queueId: null,
-                // Keep identity if preferred, or reset? Let's reset for fresh start
-                // nickname: 'Jugador',
-                // emoji: '😎'
-            })
+                currentQueueId: null,
+            }),
         }),
         {
             name: 'ruleta-game-storage',
+            partialize: (state) => ({
+                nickname: state.nickname,
+                emoji: state.emoji,
+                queueId: state.queueId,
+                activeWheelId: state.activeWheelId,
+                gameMode: state.gameMode,
+                screenId: state.screenId,
+            }),
         }
     )
 );

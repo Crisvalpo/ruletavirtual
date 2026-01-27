@@ -33,9 +33,19 @@ export function useRealtimeGame(screenId: string) {
 
                 // Sync Status
                 if (data.status === 'spinning') {
-                    useGameStore.setState({ status: 'spinning', isDemo: data.is_demo || false, idleSpeed: data.idle_speed || 1.0 });
+                    useGameStore.setState({
+                        status: 'spinning',
+                        isDemo: data.is_demo || false,
+                        idleSpeed: data.idle_speed || 1.0,
+                        currentQueueId: data.current_queue_id
+                    });
                 } else {
-                    useGameStore.setState({ status: 'idle', isDemo: data.is_demo || false, idleSpeed: data.idle_speed || 1.0 });
+                    useGameStore.setState({
+                        status: 'idle',
+                        isDemo: data.is_demo || false,
+                        idleSpeed: data.idle_speed || 1.0,
+                        currentQueueId: data.current_queue_id
+                    });
                 }
             }
         };
@@ -74,9 +84,19 @@ export function useRealtimeGame(screenId: string) {
                     // Sync Status (Trigger Spin) & Speed
                     if (newState.status === 'spinning') {
                         // Directly update store to trigger reaction in components
-                        useGameStore.setState({ status: 'spinning', isDemo: newState.is_demo || false, idleSpeed: newState.idle_speed || 1.0 });
-                    } else if (newState.status === 'idle' || newState.status === 'waiting_for_spin') {
-                        useGameStore.setState({ status: 'idle', isDemo: newState.is_demo || false, idleSpeed: newState.idle_speed || 1.0 });
+                        useGameStore.setState({
+                            status: 'spinning',
+                            isDemo: newState.is_demo || false,
+                            idleSpeed: newState.idle_speed || 1.0,
+                            currentQueueId: newState.current_queue_id
+                        });
+                    } else if (newState.status === 'idle' || newState.status === 'waiting_for_spin' || newState.status === 'showing_result') {
+                        useGameStore.setState({
+                            status: 'idle',
+                            isDemo: newState.is_demo || false,
+                            idleSpeed: newState.idle_speed || 1.0,
+                            currentQueueId: newState.current_queue_id
+                        });
                     }
                 }
             )

@@ -13,6 +13,7 @@
     "@supabase/ssr": "^0.6.0",
     "@supabase/supabase-js": "^2.47.10",
     "dotenv": "^17.2.3",
+    "nanoid": "^5.1.6",
     "next": "^16.1.4",
     "react": "^19.0.0",
     "react-confetti": "^6.4.0",

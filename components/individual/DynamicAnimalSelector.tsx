@@ -20,7 +20,7 @@ interface DynamicSelectorProps {
 
 export default function DynamicAnimalSelector({ wheelId, mode = 'group' }: DynamicSelectorProps) {
     const selectedAnimals = useGameStore((state) => state.selectedAnimals);
-    const toggleAnimal = useGameStore((state) => state.toggleAnimalSelection);
+    const toggleAnimal = useGameStore((state) => state.toggleAnimal);
     const [segments, setSegments] = useState<DynamicSegment[]>([]);
     const [loading, setLoading] = useState(true);
     const supabase = createClient();
@@ -78,7 +78,7 @@ export default function DynamicAnimalSelector({ wheelId, mode = 'group' }: Dynam
     }
 
     return (
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 p-2 overflow-y-auto h-full content-start">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 p-2 overflow-y-auto h-full content-start no-scrollbar">
             {segments.map((segment) => {
                 const isSelected = selectedAnimals.includes(segment.id);
 

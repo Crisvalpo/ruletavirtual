@@ -290,6 +290,18 @@ export default function DisplayScreenPage({
             })
             .eq('screen_number', parseInt(screen));
 
+        // 3. Update Player Queue with specific result (Session Persistence)
+        const currentQueueId = useGameStore.getState().currentQueueId;
+        if (currentQueueId && !isDemo) {
+            console.log("📌 Saving individual result to player queue:", currentQueueId);
+            await supabase
+                .from('player_queue')
+                .update({
+                    spin_result: winnerIndex,
+                    status: 'completed' // Mark as completed so they don't get stuck in 'playing'
+                })
+                .eq('id', currentQueueId);
+        }
 
         // Logic Branch: Demo vs Real
         if (isDemo) {
@@ -302,8 +314,10 @@ export default function DisplayScreenPage({
                     .from('screen_state')
                     .update({
                         status: 'idle',
+                        player_id: null,
                         player_name: null,
                         player_emoji: null,
+                        current_queue_id: null,
                         is_demo: false,
                         updated_at: new Date().toISOString()
                     })
@@ -365,6 +379,37 @@ export default function DisplayScreenPage({
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [status]);
+
+    // 5. Watchdog: Auto-promote if idle and queue is not empty
+    useEffect(() => {
+        const checkPromotion = async () => {
+            // Only check if we are truly idle in DB
+            const { data: screenData } = await supabase
+                .from('screen_state')
+                .select('status')
+                .eq('screen_number', screenIdNum)
+                .single();
+
+            if (screenData?.status === 'idle') {
+                // Check if there is anyone waiting
+                const { count } = await supabase
+                    .from('player_queue')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('screen_number', screenIdNum)
+                    .eq('status', 'waiting');
+
+                if (count && count > 0) {
+                    console.log('🚀 TV Watchdog: Found players waiting! Promoting...');
+                    await supabase.rpc('promote_next_player', {
+                        p_screen_number: screenIdNum
+                    });
+                }
+            }
+        };
+
+        const interval = setInterval(checkPromotion, 5000); // Check every 5s
+        return () => clearInterval(interval);
+    }, [screenIdNum, supabase]);
 
     return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center p-8 overflow-hidden relative">

@@ -118,7 +118,7 @@ export default function QueueList({ screenId, assets: screenAssets }: { screenId
                     <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
                     En Fila ({queue.length})
                 </h3>
-                <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto no-scrollbar">
+                <div className="flex flex-col gap-1.5 max-h-[70vh] overflow-y-auto no-scrollbar">
                     {/* 1. Show Active Selectors (First in line effectively) */}
                     {activeSelectors.map((player) => (
                         <div key={player.id} className="flex flex-col gap-1 border-b border-white/10 pb-2 mb-1">

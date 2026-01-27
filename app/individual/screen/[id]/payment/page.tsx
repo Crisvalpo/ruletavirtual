@@ -31,7 +31,7 @@ export default function PaymentPage({
         // We now wait for the player turn to promote and switch theme.
     }, [searchParams, setGameMode, id]);
 
-    const { nickname, emoji, setQueueId, gameMode, activeWheelId } = useGameStore();
+    const { nickname, emoji, setQueueId } = useGameStore();
 
     // Demo Mode State
     const [demoSpins, setDemoSpins] = React.useState(2);
@@ -100,16 +100,15 @@ export default function PaymentPage({
         }
     };
 
-    const handlePayment = async (method: 'cash' | 'mercadopago') => {
+    const handlePayment = async (method: 'cash' | 'mercadopago', codeUsed?: string) => {
         // En producción aquí iría la integración real
         // Por ahora simulamos pago exitoso
-        setPaymentStatus(true, method);
 
+        // 1. Resolve Wheel ID
         const wheelId = searchParams.get('wheelId');
 
-        // INSERT INTO QUEUE
+        // 2. INSERT INTO QUEUE
         try {
-            const wheelId = searchParams.get('wheelId');
             const { data, error } = await supabase
                 .from('player_queue')
                 .insert({
@@ -118,26 +117,23 @@ export default function PaymentPage({
                     player_emoji: emoji,
                     status: 'selecting',
                     selected_wheel_id: wheelId || null,
+                    package_code: codeUsed || null, // SAVE THE CODE FOR RECOVERY
                     created_at: new Date().toISOString()
                 })
                 .select()
                 .single();
 
             if (data && !error) {
-                console.log("Queue Item Created with Wheel:", wheelId);
+                console.log("✅ Queue Item Created:", data.id);
                 setQueueId(data.id);
+                router.push(`/individual/screen/${id}/select`);
             } else {
-                console.error("Queue Create Error:", error);
+                console.error("❌ Queue Create Error:", error);
+                setRedeemError('Error al crear sesión en la fila');
             }
         } catch (err) {
             console.error("Queue Error:", err);
-        }
-
-        if (wheelId) {
-            // Correct Flow: Payment -> Select Preferences -> Spin
-            router.push(`/individual/screen/${id}/select`);
-        } else {
-            router.push(`/individual/screen/${id}/select`);
+            setRedeemError('Error de red al unirse a la fila');
         }
     };
 
@@ -154,25 +150,52 @@ export default function PaymentPage({
     };
 
     const confirmRedemption = async () => {
-        if (!redeemCode.trim()) return;
+        const cleanCode = redeemCode.trim().toUpperCase();
+        if (!cleanCode) return;
 
         setIsRedeeming(true);
         setRedeemError('');
 
         try {
+            // STEP 1: SESSION RESCUE CHECK
+            // Check if this code already has an active session on this screen
+            const { data: existingSession } = await supabase
+                .from('player_queue')
+                .select('id, status')
+                .eq('screen_number', parseInt(id))
+                .eq('package_code', cleanCode)
+                .neq('status', 'completed') // Assuming completed sessions are done
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (existingSession) {
+                console.log("♻️ Session rescued for code:", cleanCode);
+                setQueueId(existingSession.id);
+
+                // Redirect based on rescued status
+                if (existingSession.status === 'selecting') {
+                    router.push(`/individual/screen/${id}/select`);
+                } else if (existingSession.status === 'completed') {
+                    // Logic for completed session - if it happened recently, maybe show result?
+                    router.push(`/individual/screen/${id}/result`);
+                } else {
+                    router.push(`/individual/screen/${id}/select`);
+                }
+                return;
+            }
+
+            // STEP 2: NORMAL REDEMPTION
             const { data, error } = await supabase.rpc('redeem_game_package', {
-                p_code: redeemCode.trim().toUpperCase(),
+                p_code: cleanCode,
                 p_screen_id: parseInt(id)
             });
 
             if (error) throw error;
 
-            console.log("Redemption Result:", data);
-
             if (data && data.success) {
-                // Success! Proceed to handlePayment logic
-                handlePayment('cash');
-                // You might want to store package info in store?
+                // Success! Create a new session with this code
+                handlePayment('cash', cleanCode);
             } else {
                 setRedeemError(data?.message || 'Error al canjear código');
             }
