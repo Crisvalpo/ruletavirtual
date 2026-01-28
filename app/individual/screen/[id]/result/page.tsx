@@ -157,10 +157,11 @@ export default function ResultPage({
     }, [id, selectedAnimals, queueId, supabase]);
 
     const handlePlayAgain = () => {
-        // Reset local state if needed
-        // Assuming queue logic handles cleanup via "cleanup_screen_session" on TV side
-        // But for user flow, we just go back to start or queue.
-        // Or Payment page if credits needed? Assuming back to start/select for flow.
+        // Clear selected animals for a fresh start
+        useGameStore.getState().setSelectedAnimals([]);
+        // Clear queueId to start a new session
+        useGameStore.getState().setQueueId(null);
+        // Return to entry page
         router.push(`/individual/screen/${id}`);
     };
 
