@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { use } from 'react';
+import { use, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useGameStore } from '@/lib/store/gameStore';
 
 export default function SpinPage({
     params
@@ -11,9 +12,22 @@ export default function SpinPage({
 }) {
     const { id } = use(params);
     const router = useRouter();
+    const { queueId } = useGameStore();
 
-    const supabase = createClient(); // Instantiate outside or getting from import
-    // Better to create inside component or import singleton
+    const supabase = createClient();
+
+    // Redirect if no queueId (no active session)
+    useEffect(() => {
+        if (!queueId) {
+            const timer = setTimeout(() => {
+                if (!queueId) {
+                    console.warn("🚫 No active queue session. Redirecting...");
+                    router.push(`/individual/screen/${id}`);
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [queueId, id, router]);
 
     const handleSpin = async () => {
         // Enviar señal de giro al backend

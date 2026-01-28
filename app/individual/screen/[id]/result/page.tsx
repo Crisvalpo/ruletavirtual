@@ -31,6 +31,19 @@ export default function ResultPage({
     // Check if user is actually identified (has email) vs anonymous
     const isIdentified = !!user?.email;
 
+    // Redirect if no queueId (no active session)
+    useEffect(() => {
+        if (!queueId) {
+            // Give it a moment in case zustand is still hydrating
+            const timer = setTimeout(() => {
+                if (!queueId) {
+                    router.push(`/individual/screen/${id}`);
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [queueId, id, router]);
+
     useEffect(() => {
         // If user just identified themselves while on this page, link the prize
         if (isIdentified && queueId && !isSaved) {
