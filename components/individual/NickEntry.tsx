@@ -57,16 +57,16 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
     return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
             <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl">
-                <h1 className="text-3xl font-bold text-center mb-2 text-gray-800">¡A Jugar! 👋</h1>
+                <h1 className="text-3xl font-bold text-center mb-2 text-gray-800">¡Bienvenido! 👋</h1>
                 <p className="text-center text-gray-500 mb-8 leading-tight">
-                    Elige tu apodo y emoji para salir en la <span className="text-primary font-black uppercase italic">Pantalla Gigante</span>
+                    Personaliza tu perfil para aparecer en la <span className="text-primary font-black uppercase italic tracking-tighter">Gran Pantalla</span>
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Emoji Selector */}
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-3 text-center">
-                            Elige tu Emoji de la Suerte
+                            Elige tu Amuleto de la Suerte
                         </label>
                         <div className="grid grid-cols-6 gap-2">
                             {EMOJI_OPTIONS.map((emoji) => (
@@ -114,7 +114,7 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
                                 : 'bg-green-500 hover:bg-green-600 shadow-lg hover:shadow-xl transform hover:-translate-y-1'}
                         `}
                     >
-                        {isSubmitting ? 'Guardando...' : '¡A Jugar! 🚀'}
+                        {isSubmitting ? 'Guardando...' : '¡Comenzar a Jugar! 🚀'}
                     </button>
 
                     {/* Show Google login only if anonymous */}
@@ -136,7 +136,7 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
                                     <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" fill="#FBBC05" />
                                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                                 </svg>
-                                ENTRAR CON GOOGLE
+                                CONTINUAR CON GOOGLE
                             </button>
                         </>
                     )}

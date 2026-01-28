@@ -33,6 +33,17 @@ export default function PaymentPage({
     const { nickname, emoji, setQueueId } = useGameStore();
     const { user } = useAuth();
 
+    // Redirect to entry if no identity configured
+    useEffect(() => {
+        if (nickname === 'Jugador') {
+            const wheelId = searchParams.get('wheelId');
+            const redirectUrl = wheelId
+                ? `/individual/screen/${id}?returnTo=payment&wheelId=${wheelId}`
+                : `/individual/screen/${id}`;
+            router.push(redirectUrl);
+        }
+    }, [nickname, id, searchParams, router]);
+
     // Demo Mode State
     const [demoSpins, setDemoSpins] = React.useState(2);
     const [canDemo, setCanDemo] = React.useState(false);

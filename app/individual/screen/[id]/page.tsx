@@ -4,7 +4,7 @@ import WheelSelector from '@/components/individual/WheelSelector';
 import NickEntry from '@/components/individual/NickEntry';
 import IdentityBadge from '@/components/individual/IdentityBadge';
 import { useGameStore } from '@/lib/store/gameStore';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, use, useState, useCallback } from 'react';
 
@@ -17,6 +17,7 @@ export default function JoinScreenPage({
     const { nickname, emoji, resetGame, setScreenId, queueId } = useGameStore();
     const [hasIdentity, setHasIdentity] = useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
     const supabase = createClient();
 
     useEffect(() => {
@@ -54,10 +55,23 @@ export default function JoinScreenPage({
         resetGame(); // Clear queueId and everything
     };
 
+
     const handleChangeIdentity = () => {
         resetGame(); // Clear identity and everything
         setHasIdentity(false);
     };
+
+    // Handle redirect after identity setup
+    useEffect(() => {
+        if (hasIdentity && nickname !== 'Jugador') {
+            const returnTo = searchParams.get('returnTo');
+            const wheelId = searchParams.get('wheelId');
+
+            if (returnTo === 'payment' && wheelId) {
+                router.push(`/individual/screen/${id}/payment?wheelId=${wheelId}`);
+            }
+        }
+    }, [hasIdentity, nickname, searchParams, id, router]);
 
     if (!hasIdentity) {
         return <NickEntry screenId={id} onComplete={() => setHasIdentity(true)} />;
@@ -68,14 +82,24 @@ export default function JoinScreenPage({
         <div className="min-h-screen bg-[#050505] flex flex-col">
             {/* Identity Bar */}
             <div className="bg-[#111] border-b border-white/5 px-4 py-2 flex justify-between items-center shadow-2xl z-20 sticky top-0">
-                <div className="flex items-center gap-3">
-                    <div className="relative w-8 h-8 flex items-center justify-center bg-white/5 rounded-xl border border-white/10 text-xl">
+                <button
+                    onClick={handleChangeIdentity}
+                    className="flex items-center gap-3 hover:bg-white/5 p-1 rounded-xl transition-all group pr-4"
+                    title="Cambiar Apodo o Emoji"
+                >
+                    <div className="relative w-8 h-8 flex items-center justify-center bg-white/5 rounded-xl border border-white/10 text-xl group-hover:border-primary/50 transition-colors">
                         {emoji}
+                        <div className="absolute -top-1 -right-1 bg-primary text-[8px] p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                            ✏️
+                        </div>
                     </div>
-                    <div>
-                        <p className="font-black text-white text-md tracking-tight">{nickname}</p>
+                    <div className="text-left">
+                        <p className="font-black text-white text-md tracking-tight flex items-center gap-2">
+                            {nickname}
+                            <span className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase tracking-tighter">Editar Perfil</span>
+                        </p>
                     </div>
-                </div>
+                </button>
 
                 <IdentityBadge />
             </div>

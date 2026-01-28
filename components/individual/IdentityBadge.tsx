@@ -36,9 +36,13 @@ export default function IdentityBadge() {
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest leading-none">
                         {isGuest ? 'Invitado' : 'Jugador'}
                     </p>
-                    <p className="text-[12px] font-black text-white tracking-tight leading-tight">
+                    <button
+                        onClick={() => !isGuest && (window.location.href = '/individual/prizes')}
+                        className={`text-[12px] font-black tracking-tight leading-tight text-left ${!isGuest ? 'hover:text-primary transition-colors' : 'text-white'}`}
+                    >
                         {profile?.display_name || 'Sin Nombre'}
-                    </p>
+                        {!isGuest && <span className="ml-1 text-[8px] opacity-30">🏆</span>}
+                    </button>
                 </div>
             </div>
 
@@ -60,10 +64,12 @@ export default function IdentityBadge() {
             ) : (
                 <button
                     onClick={handleSignOut}
-                    className="p-2 hover:bg-red-500/10 rounded-xl transition-all group"
+                    className="p-2.5 hover:bg-red-500/10 rounded-xl transition-all group"
                     title="Cerrar Sesión"
                 >
-                    <span className="text-xl opacity-50 group-hover:opacity-100 transition-opacity">🚪</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="opacity-40 group-hover:opacity-100 group-hover:text-red-500 transition-all">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                    </svg>
                 </button>
             )}
         </div>
