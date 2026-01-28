@@ -39,38 +39,17 @@ function WinnersBoardContent() {
 
     useEffect(() => {
         fetchRecords();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filter, screenFilter]);
 
     const fetchRecords = async () => {
         setIsLoading(true);
         let query = supabase
             .from('player_queue')
-            .select(`
-                id,
-                created_at,
-                screen_number,
-                player_name,
-                player_emoji,
-                player_id,
-                selected_animals,
-                spin_result,
-                prize_won,
-                prize_payout_status,
-                status,
-                screens!inner(
-                    wheel_id,
-                    individual_wheels(name)
-                )
-            `)
+            .select('*')
             .in('status', ['completed', 'abandoned'])
             .order('created_at', { ascending: false })
             .limit(100);
-
-        if (filter === 'won') {
-            query = query.not('prize_won', 'is', null);
-        } else if (filter === 'lost') {
-            query = query.is('prize_won', null);
-        }
 
         if (screenFilter) {
             query = query.eq('screen_number', screenFilter);
@@ -79,11 +58,31 @@ function WinnersBoardContent() {
         const { data, error } = await query;
 
         if (!error && data) {
-            const formatted = data.map((item: any) => ({
-                ...item,
-                wheel_name: item.screens?.individual_wheels?.name || 'Ruleta General'
-            }));
-            setRecords(formatted);
+            // Calculate if player won and format records
+            const formatted = data.map((item: any) => {
+                const didWin = item.spin_result !== null &&
+                    item.selected_animals?.includes(item.spin_result);
+
+                return {
+                    ...item,
+                    prize_won: didWin ? 'Premio Nivel 1' : null,
+                    wheel_name: 'Ruleta Individual',
+                    selected_animals: item.selected_animals || []
+                };
+            });
+
+            // Apply won/lost filter
+            let filtered = formatted;
+            if (filter === 'won') {
+                filtered = formatted.filter(r => r.prize_won !== null);
+            } else if (filter === 'lost') {
+                filtered = formatted.filter(r => r.prize_won === null);
+            }
+
+            setRecords(filtered);
+        } else {
+            console.error('Error fetching records:', error);
+            setRecords([]);
         }
         setIsLoading(false);
     };
@@ -147,8 +146,8 @@ function WinnersBoardContent() {
                             <button
                                 onClick={() => setFilter('won')}
                                 className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${filter === 'won'
-                                        ? 'bg-green-600 text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
                                 Ganadas
@@ -156,8 +155,8 @@ function WinnersBoardContent() {
                             <button
                                 onClick={() => setFilter('lost')}
                                 className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${filter === 'lost'
-                                        ? 'bg-red-600 text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    ? 'bg-red-600 text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
                                 Perdidas
@@ -165,8 +164,8 @@ function WinnersBoardContent() {
                             <button
                                 onClick={() => setFilter('all')}
                                 className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${filter === 'all'
-                                        ? 'bg-indigo-600 text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
                                 Todas
@@ -292,8 +291,8 @@ function GameRecordCard({ record, onVerify }: GameRecordCardProps) {
                             🏆 {record.prize_won}
                         </p>
                         <span className={`text-xs px-2 py-1 rounded-full font-bold ${record.prize_payout_status === 'paid'
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-yellow-100 text-yellow-700'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-yellow-100 text-yellow-700'
                             }`}>
                             {record.prize_payout_status === 'paid' ? '✅ Pagado' : '⏳ Pendiente'}
                         </span>
