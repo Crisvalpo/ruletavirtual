@@ -11,6 +11,7 @@ import { useVenueSettings } from '@/hooks/useVenueSettings';
 import { useGameStore } from '@/lib/store/gameStore';
 import Confetti from 'react-confetti';
 import QueueList from '@/components/individual/QueueList';
+import { QRCodeCanvas } from 'qrcode.react';
 // Remove useWindowSize if not strictly needed or ensure package is present.
 // The code used window.innerWidth directly inside the check, which is fine.
 
@@ -24,7 +25,7 @@ export default function DisplayScreenPage({
 
     // 1. Hooks
     useRealtimeGame(screen);
-    const { venueMode, centralScreenId } = useVenueSettings();
+    const { venueMode, centralScreenId, baseUrl } = useVenueSettings();
 
     // 2. Read from store (Individual Mode State)
     const mode = useGameStore((state) => state.gameMode);
@@ -565,12 +566,14 @@ export default function DisplayScreenPage({
                         <p className="text-gray-400 mb-6">Solo $1,000 por jugada</p>
 
                         {/* QR Code */}
-                        <div className="bg-white p-3 rounded-2xl shadow-xl mb-8 transform hover:scale-105 transition-all w-full max-w-[240px]">
-                            {/* Placeholder de QR */}
-                            <div className="w-full aspect-square bg-gray-100 flex items-center justify-center text-gray-400 rounded-xl overflow-hidden relative">
-                                {/* You can use a real QR image here if available, or keep placeholder text */}
-                                <span className="text-xs text-gray-400">[QR LINK PANTALLA {screen}]</span>
-                            </div>
+                        <div className="bg-white p-4 rounded-3xl shadow-2xl mb-8 transform hover:scale-105 transition-all w-full max-w-[240px] flex items-center justify-center">
+                            <QRCodeCanvas
+                                value={`${(baseUrl || window.location.origin).trim()}/individual/screen/${screen}`}
+                                size={200}
+                                level="H"
+                                includeMargin={false}
+                                className="rounded-xl"
+                            />
                         </div>
 
                         {/* History Grid */}

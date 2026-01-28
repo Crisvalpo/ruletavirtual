@@ -194,7 +194,7 @@ export default function BatchTicketGenerator({ generateCode }: BatchTicketGenera
 
                         <div className="flex flex-col gap-0 items-center bg-white p-4 rounded-xl print:p-0 print:bg-transparent">
                             {lastBatch.map((code, idx) => {
-                                const origin = settings.base_url || window.location.origin;
+                                const origin = (settings.base_url || window.location.origin).trim();
                                 const clientUrl = `${origin}/ticket/view/${code}`;
                                 return (
                                     <div

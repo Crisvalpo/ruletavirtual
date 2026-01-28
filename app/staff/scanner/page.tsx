@@ -4,7 +4,17 @@ import { useEffect, useState } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useRouter } from 'next/navigation';
 
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+
 export default function StaffScannerPage() {
+    return (
+        <ProtectedRoute allowedRoles={['staff', 'admin']}>
+            <ScannerContent />
+        </ProtectedRoute>
+    );
+}
+
+function ScannerContent() {
     const router = useRouter();
     const [scanResult, setScanResult] = useState<string | null>(null);
 

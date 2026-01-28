@@ -6,6 +6,8 @@ export const metadata: Metadata = {
     description: 'Sistema multi-pantalla de ruleta con modo individual, grupal y sorteos especiales'
 };
 
+import { AuthProvider } from '@/hooks/useAuth';
+
 export default function RootLayout({
     children
 }: Readonly<{
@@ -13,7 +15,11 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="es">
-            <body>{children}</body>
+            <body>
+                <AuthProvider>
+                    {children}
+                </AuthProvider>
+            </body>
         </html>
     );
 }

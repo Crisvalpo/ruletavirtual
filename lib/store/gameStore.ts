@@ -25,6 +25,7 @@ interface GameState {
     setSelectedAnimals: (animals: number[]) => void;
     toggleAnimal: (id: number) => void;
     resetGame: () => void;
+    resetIdentity: () => void;
 }
 
 export const useGameStore = create<GameState>()(
@@ -73,6 +74,10 @@ export const useGameStore = create<GameState>()(
                 activeWheelId: null,
                 queueId: null,
                 currentQueueId: null,
+            }),
+            resetIdentity: () => set({
+                nickname: 'Jugador',
+                emoji: '😎'
             }),
         }),
         {

@@ -4,6 +4,9 @@ import { use, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useGameStore } from '@/lib/store/gameStore';
 import { useRouter } from 'next/navigation';
+import { useVenueSettings } from '@/hooks/useVenueSettings';
+import { useAuth } from '@/hooks/useAuth';
+import { QRCodeCanvas } from 'qrcode.react';
 
 export default function ResultPage({
     params
@@ -20,13 +23,30 @@ export default function ResultPage({
     const [email, setEmail] = useState('');
     const [isSaved, setIsSaved] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [ticketCode, setTicketCode] = useState<string | null>(null);
 
-    const handleSavePrize = async () => {
-        if (!email || !queueId) return;
+    const { baseUrl } = useVenueSettings();
+    const { user, profile, signInWithGoogle } = useAuth();
+
+    // Check if user is actually identified (has email) vs anonymous
+    const isIdentified = !!user?.email;
+
+    useEffect(() => {
+        // If user just identified themselves while on this page, link the prize
+        if (isIdentified && queueId && !isSaved) {
+            handleSavePrize(user.email!);
+        }
+    }, [isIdentified, queueId]);
+
+    const handleSavePrize = async (userEmail: string) => {
+        if (!queueId) return;
         setIsSaving(true);
         const { error } = await supabase
             .from('player_queue')
-            .update({ email: email })
+            .update({
+                email: userEmail,
+                player_id: user?.id
+            })
             .eq('id', queueId);
 
         if (!error) setIsSaved(true);
@@ -43,7 +63,7 @@ export default function ResultPage({
                 // 1. Fetch own queue record first (Session specific result)
                 const { data: queueData, error: queueError } = await supabase
                     .from('player_queue')
-                    .select('selected_animals, spin_result, status')
+                    .select('selected_animals, spin_result, status, package_code')
                     .eq('id', queueId)
                     .maybeSingle();
 
@@ -56,6 +76,9 @@ export default function ResultPage({
                     const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
                     if (effectiveSelections.length > 0 && isMounted) {
                         setDbSelections(effectiveSelections);
+                    }
+                    if (queueData.package_code && isMounted) {
+                        setTicketCode(queueData.package_code);
                     }
 
                     // 2. If we already have a result saved in our own record, show it!
@@ -148,20 +171,22 @@ export default function ResultPage({
                     {!isSaved ? (
                         <div className="bg-gray-800/80 backdrop-blur-md p-6 rounded-2xl border border-yellow-500/30 mb-6 shadow-xl">
                             <h3 className="text-lg font-bold text-yellow-500 mb-2">🎁 Asegura tu Premio</h3>
-                            <p className="text-xs text-gray-400 mb-4">Ingresa tu email para registrar este premio y participar en el ranking semanal.</p>
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="tu@email.com"
-                                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-center mb-4 focus:border-yellow-500 outline-none"
-                            />
+                            <p className="text-xs text-gray-400 mb-6">Inicia sesión para registrar este premio en tu historial y participar en sorteos especiales.</p>
+
                             <button
-                                onClick={handleSavePrize}
-                                disabled={!email || isSaving}
-                                className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-black py-3 rounded-lg transition-all active:scale-95 disabled:opacity-50"
+                                onClick={signInWithGoogle}
+                                disabled={isSaving}
+                                className="w-full bg-white hover:bg-gray-100 text-gray-900 font-black py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg"
                             >
-                                {isSaving ? 'REGISTRANDO...' : 'REGISTRAR PREMIO'}
+                                <span className="text-xl">
+                                    <svg width="24" height="24" viewBox="0 0 24 24">
+                                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                                        <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" fill="#FBBC05" />
+                                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                                    </svg>
+                                </span>
+                                INICIAR CON GOOGLE
                             </button>
                         </div>
                     ) : (
@@ -169,7 +194,7 @@ export default function ResultPage({
                             <span className="text-2xl">✅</span>
                             <div className="text-left">
                                 <p className="font-bold text-green-400 text-sm">¡Premio Registrado!</p>
-                                <p className="text-[10px] text-green-300">Te enviaremos los detalles a {email}</p>
+                                <p className="text-[10px] text-green-300">Vinculado a {user?.email || 'tu cuenta'}</p>
                             </div>
                         </div>
                     )}
@@ -180,10 +205,15 @@ export default function ResultPage({
                         <p className="text-3xl font-black text-green-600 tracking-tighter leading-tight">PREMIO NIVEL 1</p>
                     </div>
 
-                    <div className="bg-white p-4 rounded-lg inline-block shadow-lg">
-                        <div className="w-40 h-40 bg-gray-100 flex items-center justify-center text-gray-400 text-[10px] font-mono border-2 border-dashed border-gray-300 text-center px-4">
-                            [TICKET: {queueId?.slice(0, 8)}] <br /> QR VÁLIDO EN MESÓN
-                        </div>
+                    <div className="bg-white p-4 rounded-3xl inline-block shadow-2xl transform -rotate-1">
+                        <QRCodeCanvas
+                            value={`${(baseUrl || window.location.origin).trim()}/staff/validate/${ticketCode || queueId?.slice(0, 8)}`}
+                            size={180}
+                            level="H"
+                            includeMargin={false}
+                            className="rounded-lg"
+                        />
+                        <p className="mt-2 text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">QR VÁLIDO EN MESÓN</p>
                     </div>
 
                     <div className="mt-8 flex flex-col gap-4">

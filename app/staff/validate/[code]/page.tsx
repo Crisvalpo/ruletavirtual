@@ -24,7 +24,21 @@ interface PrizeData {
     created_at: string;
 }
 
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+
 export default function StaffValidatePage({
+    params
+}: {
+    params: Promise<{ code: string }>
+}) {
+    return (
+        <ProtectedRoute allowedRoles={['staff', 'admin']}>
+            <ValidateContent params={params} />
+        </ProtectedRoute>
+    );
+}
+
+function ValidateContent({
     params
 }: {
     params: Promise<{ code: string }>

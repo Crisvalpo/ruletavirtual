@@ -13,6 +13,7 @@ export default function TicketSettingsManager() {
         ticket_subheader: '',
         ticket_terms_line1: '',
         ticket_terms_line2: '',
+        base_url: '',
         max_failed_attempts: 3,
         cooldown_minutes: 5
     });
@@ -38,6 +39,7 @@ export default function TicketSettingsManager() {
                 ticket_subheader: settings.ticket_subheader,
                 ticket_terms_line1: settings.ticket_terms_line1,
                 ticket_terms_line2: settings.ticket_terms_line2,
+                base_url: settings.base_url,
                 max_failed_attempts: settings.max_failed_attempts,
                 cooldown_minutes: settings.cooldown_minutes
             })
@@ -120,6 +122,18 @@ export default function TicketSettingsManager() {
                                 onChange={handleChange}
                                 className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-slate-900 font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
                             />
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Dominio Base para QR (Opcional)</label>
+                            <input
+                                name="base_url"
+                                value={settings.base_url || ''}
+                                onChange={handleChange}
+                                placeholder="Ej: https://mi-tunel.trycloudflare.com"
+                                className="w-full bg-amber-50 border-2 border-amber-100 rounded-xl p-4 text-amber-900 font-bold focus:border-amber-600 focus:bg-white outline-none transition-all"
+                            />
+                            <p className="text-[9px] text-amber-600 font-bold uppercase mt-2 px-1">Si se deja vacío, se usará la URL actual del navegador. Úselo para túneles temporales.</p>
                         </div>
                     </div>
                 </div>

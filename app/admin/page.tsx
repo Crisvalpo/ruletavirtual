@@ -8,8 +8,17 @@ import TicketSettingsManager from '@/components/admin/TicketSettingsManager';
 import BatchTicketGenerator from '@/components/staff/BatchTicketGenerator';
 import WheelManager from '@/components/admin/WheelManager';
 import WheelUploader from '@/components/admin/WheelUploader';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 export default function AdminDashboardPage() {
+    return (
+        <ProtectedRoute allowedRoles={['admin']}>
+            <AdminContent />
+        </ProtectedRoute>
+    );
+}
+
+function AdminContent() {
     const [activeTab, setActiveTab] = useState<'monitoring' | 'tickets' | 'wheels'>('monitoring');
 
     const generateCode = () => {

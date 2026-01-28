@@ -19,7 +19,17 @@ const PACKAGES: Package[] = [
     { name: '5 Jugadas', plays: 5, price: 4000 },
 ];
 
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+
 export default function KioskPage() {
+    return (
+        <ProtectedRoute allowedRoles={['staff', 'admin']}>
+            <KioskContent />
+        </ProtectedRoute>
+    );
+}
+
+function KioskContent() {
     const supabase = createClient();
     const [generatedCode, setGeneratedCode] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -32,7 +42,8 @@ export default function KioskPage() {
         ticket_header: 'RULETA VIRTUAL',
         ticket_subheader: 'VALDIVIA 2026',
         ticket_terms_line1: 'CANJEA EN TU CELULAR',
-        ticket_terms_line2: 'PRESENTA ESTE TICKET SI GANAS'
+        ticket_terms_line2: 'PRESENTA ESTE TICKET SI GANAS',
+        base_url: ''
     });
 
     useEffect(() => {
@@ -43,7 +54,8 @@ export default function KioskPage() {
                     ticket_header: data.ticket_header,
                     ticket_subheader: data.ticket_subheader,
                     ticket_terms_line1: data.ticket_terms_line1,
-                    ticket_terms_line2: data.ticket_terms_line2
+                    ticket_terms_line2: data.ticket_terms_line2,
+                    base_url: data.base_url || ''
                 });
             }
         };
@@ -166,7 +178,7 @@ export default function KioskPage() {
 
                             <div className="bg-white p-3 rounded-xl mb-6 shadow-inner print:shadow-none print:border print:border-black">
                                 <QRCodeCanvas
-                                    value={`${window.location.origin}/ticket/view/${generatedCode}`}
+                                    value={`${(settings.base_url || window.location.origin).trim()}/ticket/view/${generatedCode}`}
                                     size={150}
                                     level="H"
                                 />

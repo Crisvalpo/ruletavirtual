@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
 import React from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 import VirtualKeyboard from '@/components/individual/VirtualKeyboard';
 
@@ -30,6 +31,7 @@ export default function PaymentPage({
     }, [searchParams, setGameMode, id]);
 
     const { nickname, emoji, setQueueId } = useGameStore();
+    const { user } = useAuth();
 
     // Demo Mode State
     const [demoSpins, setDemoSpins] = React.useState(2);
@@ -103,6 +105,7 @@ export default function PaymentPage({
                     screen_number: parseInt(id),
                     player_name: nickname,
                     player_emoji: emoji,
+                    player_id: user?.id || null,
                     status: 'selecting',
                     selected_wheel_id: wheelId || null,
                     package_code: codeUsed || null,
