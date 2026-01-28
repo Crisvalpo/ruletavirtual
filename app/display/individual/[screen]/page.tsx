@@ -47,6 +47,12 @@ export default function DisplayScreenPage({
     const [result, setResult] = useState<number | null>(null);
     // History State
     const [lastSpins, setLastSpins] = useState<any[]>([]);
+    // Client-side URL (to avoid SSR window error)
+    const [clientUrl, setClientUrl] = useState<string>('');
+
+    useEffect(() => {
+        setClientUrl(window.location.origin);
+    }, []);
 
     // Missing State Definitions
     const [activeWheelAssets, setActiveWheelAssets] = useState<{ background: string; segments: any[] } | null>(null);
@@ -567,13 +573,15 @@ export default function DisplayScreenPage({
 
                         {/* QR Code */}
                         <div className="bg-white p-4 rounded-3xl shadow-2xl mb-8 transform hover:scale-105 transition-all w-full max-w-[240px] flex items-center justify-center">
-                            <QRCodeCanvas
-                                value={`${(baseUrl || window.location.origin).trim()}/individual/screen/${screen}`}
-                                size={200}
-                                level="H"
-                                includeMargin={false}
-                                className="rounded-xl"
-                            />
+                            {clientUrl && (
+                                <QRCodeCanvas
+                                    value={`${(baseUrl || clientUrl).trim()}/individual/screen/${screen}`}
+                                    size={200}
+                                    level="H"
+                                    includeMargin={false}
+                                    className="rounded-xl"
+                                />
+                            )}
                         </div>
 
                         {/* History Grid */}

@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -12,18 +12,24 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
     const { user, profile, isLoading } = useAuth();
     const router = useRouter();
+    const hasRedirected = useRef(false);
+
+    // Stabilize allowedRoles to prevent unnecessary re-renders
+    const rolesKey = useMemo(() => allowedRoles.join(','), [allowedRoles.join(',')]);
 
     useEffect(() => {
-        if (!isLoading) {
+        if (!isLoading && !hasRedirected.current) {
             if (!user) {
                 // No autenticado -> Enviar a Home (o login si fuera necesario)
+                hasRedirected.current = true;
                 router.push('/');
             } else if (profile && !allowedRoles.includes(profile.role)) {
                 // Autenticado pero sin el rol correcto
+                hasRedirected.current = true;
                 router.push('/not-authorized');
             }
         }
-    }, [user, profile, isLoading, allowedRoles, router]);
+    }, [user, profile, isLoading, rolesKey, router, allowedRoles]);
 
     if (isLoading) {
         return (
