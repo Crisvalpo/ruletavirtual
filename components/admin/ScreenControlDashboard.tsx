@@ -81,6 +81,7 @@ export default function ScreenControlDashboard() {
         return () => {
             supabase.removeChannel(channel);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleForceAdvance = async (screenId: number) => {

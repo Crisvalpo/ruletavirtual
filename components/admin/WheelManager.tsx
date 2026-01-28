@@ -39,6 +39,7 @@ export default function WheelManager() {
 
     useEffect(() => {
         fetchWheels();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleToggleActive = async (wheel: Wheel) => {
