@@ -6,6 +6,8 @@ import { use, useEffect, useState } from 'react';
 import React from 'react';
 import { createClient } from '@/lib/supabase/client';
 
+import VirtualKeyboard from '@/components/individual/VirtualKeyboard';
+
 export default function PaymentPage({
     params
 }: {
@@ -15,10 +17,9 @@ export default function PaymentPage({
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    const setPaymentStatus = useGameStore((state) => state.setPaymentStatus);
     const setGameMode = useGameStore((state) => state.setGameMode);
 
-    const supabase = createClient(); // Instantiate here if not present, but better to use import
+    const supabase = createClient();
 
     useEffect(() => {
         const wheelId = searchParams.get('wheelId');
@@ -26,9 +27,6 @@ export default function PaymentPage({
         const mode = (modeParam as 'group' | 'individual') || (wheelId ? 'individual' : 'group');
 
         setGameMode(mode, wheelId || undefined);
-
-        // REMOVED: Immediate screen_state sync. 
-        // We now wait for the player turn to promote and switch theme.
     }, [searchParams, setGameMode, id]);
 
     const { nickname, emoji, setQueueId } = useGameStore();
@@ -47,7 +45,6 @@ export default function PaymentPage({
                 .eq('screen_number', parseInt(id))
                 .in('status', ['waiting', 'playing', 'selecting', 'ready', 'spinning']);
 
-            // Allow demo only if NO ONE is waiting, playing or in selection process
             if (!error && count === 0) {
                 setCanDemo(true);
             } else {
@@ -56,7 +53,6 @@ export default function PaymentPage({
         };
         checkQueue();
 
-        // Optional: Poll every 5s to update availability
         const interval = setInterval(checkQueue, 5000);
         return () => clearInterval(interval);
     }, [id, supabase]);
@@ -64,7 +60,6 @@ export default function PaymentPage({
     const handleDemoSpin = async () => {
         if (demoSpins <= 0) return;
 
-        // Double check queue before firing (Race condition protection)
         const { count } = await supabase
             .from('player_queue')
             .select('*', { count: 'exact', head: true })
@@ -80,11 +75,10 @@ export default function PaymentPage({
         setIsSpinningDemo(true);
         setDemoSpins(prev => prev - 1);
 
-        // Trigger Demo Spin on TV
         const { error } = await supabase
             .from('screen_state')
             .update({
-                status: 'spinning', // Direct Spin
+                status: 'spinning',
                 is_demo: true,
                 player_name: 'Modo Práctica',
                 player_emoji: '🎓'
@@ -95,19 +89,13 @@ export default function PaymentPage({
             console.error("Demo Spin Error:", error);
             setIsSpinningDemo(false);
         } else {
-            // Re-enable button after 5s (approx spin time)
             setTimeout(() => setIsSpinningDemo(false), 5000);
         }
     };
 
     const handlePayment = async (method: 'cash' | 'mercadopago', codeUsed?: string) => {
-        // En producción aquí iría la integración real
-        // Por ahora simulamos pago exitoso
-
-        // 1. Resolve Wheel ID
         const wheelId = searchParams.get('wheelId');
 
-        // 2. INSERT INTO QUEUE
         try {
             const { data, error } = await supabase
                 .from('player_queue')
@@ -117,7 +105,7 @@ export default function PaymentPage({
                     player_emoji: emoji,
                     status: 'selecting',
                     selected_wheel_id: wheelId || null,
-                    package_code: codeUsed || null, // SAVE THE CODE FOR RECOVERY
+                    package_code: codeUsed || null,
                     created_at: new Date().toISOString()
                 })
                 .select()
@@ -150,21 +138,23 @@ export default function PaymentPage({
     };
 
     const confirmRedemption = async () => {
-        const cleanCode = redeemCode.trim().toUpperCase();
-        if (!cleanCode) return;
+        const rawCode = redeemCode.trim().toUpperCase();
+        if (rawCode.length < 5) return;
+
+        // Auto-format for DB Search: XX-NNN
+        const cleanCode = `${rawCode.slice(0, 2)}-${rawCode.slice(2)}`;
 
         setIsRedeeming(true);
         setRedeemError('');
 
         try {
-            // STEP 1: SESSION RESCUE CHECK
-            // Check if this code already has an active session on this screen
+            // STEP 1: CHECK FOR EXISTING SESSION (RESCUE)
             const { data: existingSession } = await supabase
                 .from('player_queue')
                 .select('id, status')
                 .eq('screen_number', parseInt(id))
                 .eq('package_code', cleanCode)
-                .neq('status', 'completed') // Assuming completed sessions are done
+                .neq('status', 'completed')
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
@@ -172,16 +162,7 @@ export default function PaymentPage({
             if (existingSession) {
                 console.log("♻️ Session rescued for code:", cleanCode);
                 setQueueId(existingSession.id);
-
-                // Redirect based on rescued status
-                if (existingSession.status === 'selecting') {
-                    router.push(`/individual/screen/${id}/select`);
-                } else if (existingSession.status === 'completed') {
-                    // Logic for completed session - if it happened recently, maybe show result?
-                    router.push(`/individual/screen/${id}/result`);
-                } else {
-                    router.push(`/individual/screen/${id}/select`);
-                }
+                router.push(`/individual/screen/${id}/select`);
                 return;
             }
 
@@ -194,10 +175,16 @@ export default function PaymentPage({
             if (error) throw error;
 
             if (data && data.success) {
-                // Success! Create a new session with this code
                 handlePayment('cash', cleanCode);
             } else {
+                // Specific error handling for Brute Force or Activation
                 setRedeemError(data?.message || 'Error al canjear código');
+
+                // If blocked, we could show a countdown or similar
+                if (data?.cooldown_until) {
+                    const date = new Date(data.cooldown_until);
+                    setRedeemError(`Demasiados intentos. Bloqueado hasta las ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+                }
             }
         } catch (err: any) {
             console.error("Redemption Error:", err);
@@ -263,41 +250,54 @@ export default function PaymentPage({
                             </button>
                         </div>
 
-                        <p className="text-sm text-gray-500 mb-4">
-                            Ingresa el código impreso en tu ticket del Kiosco.
-                        </p>
-
-                        <input
-                            type="text"
-                            className="w-full border-2 border-gray-200 rounded-lg p-3 text-center text-xl font-mono uppercase mb-4 focus:border-primary focus:outline-none"
-                            placeholder="EJ: KIOSK-1234"
-                            value={redeemCode}
-                            onChange={(e) => setRedeemCode(e.target.value)}
-                        />
+                        <div
+                            onClick={() => setShowCodeInput(true)}
+                            className="w-full border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center cursor-pointer hover:border-yellow-500 hover:bg-yellow-50 transition-all active:scale-95 group mb-6"
+                        >
+                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-widest mb-2 group-hover:text-yellow-600">Código de Ticket</p>
+                            <div className="text-3xl font-black text-gray-300 group-hover:text-yellow-500 font-mono">
+                                {redeemCode ? (
+                                    <>
+                                        {redeemCode.slice(0, 2)}
+                                        <span className="text-yellow-500">-</span>
+                                        {redeemCode.slice(2)}
+                                    </>
+                                ) : (
+                                    'XX-NNN'
+                                )}
+                            </div>
+                        </div>
 
                         {redeemError && (
-                            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4 text-center border border-red-100">
-                                {redeemError}
+                            <div className="bg-red-50 text-red-600 text-sm p-4 rounded-xl mb-6 text-center border border-red-100 flex flex-col gap-1">
+                                <span className="font-black uppercase text-[10px] tracking-widest">⚠️ Error</span>
+                                <span>{redeemError}</span>
                             </div>
                         )}
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowCodeInput(false)}
-                                className="flex-1 py-3 text-gray-600 font-bold bg-gray-100 rounded-lg"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={confirmRedemption}
-                                disabled={isRedeeming || !redeemCode.trim()}
-                                className="flex-1 py-3 bg-green-500 text-white font-bold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-600 transition-colors"
-                            >
-                                {isRedeeming ? 'Validando...' : 'Canjear'}
-                            </button>
-                        </div>
                     </div>
                 </div>
+            )}
+
+            {/* VIRTUAL KEYBOARD OVERLAY */}
+            {showCodeInput && (
+                <VirtualKeyboard
+                    value={redeemCode}
+                    onKeyPress={(key) => {
+                        setRedeemError(''); // Clear error on type
+                        setRedeemCode(prev => prev + key);
+                    }}
+                    onDelete={() => {
+                        setRedeemError('');
+                        setRedeemCode(prev => prev.slice(0, -1));
+                    }}
+                    onClear={() => {
+                        setRedeemError('');
+                        setRedeemCode('');
+                    }}
+                    onClose={() => setShowCodeInput(false)}
+                    onConfirm={confirmRedemption}
+                    errorMessage={redeemError}
+                />
             )}
 
             {/* DEMO MODE Section */}

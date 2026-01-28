@@ -244,118 +244,104 @@ export default function DisplayScreenPage({
     const handleSpinComplete = async (winnerIndex: number) => {
         console.log(`🎰 Spin Complete! isDemo=${isDemo}, Index=${winnerIndex}`);
 
-        // 1. Determine Win/Loss (Fetch active player selection)
-        let playerWon = false;
-
-        // Fetch current active player from queue to check their selection
-        const { data: activePlayer } = await supabase
-            .from('player_queue')
-            .select('selected_animals')
-            .eq('screen_number', screenIdNum)
-            .eq('status', 'playing')
-            .single();
-
-        if (activePlayer && activePlayer.selected_animals) {
-            // Check if winnerIndex is in their selection
-            // Ensure types match (array of numbers)
-            const selection = activePlayer.selected_animals as number[];
-            if (selection.includes(winnerIndex)) {
-                playerWon = true;
-            }
-        } else if (isDemo) {
-            // Demo always wins for satisfaction? Or random? 
-            // Let's make demo random too or just win for testing visuals?
-            // Usually demo is just strictly visual, but let's assume 'win' context for confetti testing if needed.
-            // For now, let's say Demo always wins to show off particles.
-            playerWon = true;
-        }
-
-        setIsWin(playerWon);
-        setStatus('result');
+        // --- 0. IMMEDIATE VISUAL FEEDBACK (Non-blocking) ---
         setResult(winnerIndex);
+        setStatus('result');
+        setShowBigWin(true);
 
-        // Only show confetti / BigWin if Won
-        if (playerWon) {
-            setShowConfetti(true);
-        }
-        setShowBigWin(true); // Show overlay for both (Win or Loss message)
+        // --- 1. Background Logic (Do not block visuals) ---
+        (async () => {
+            try {
+                // 1a. Determine Win/Loss
+                let playerWon = false;
 
-        // 2. Update Screen State (For Mobile Sync)
-        await supabase
-            .from('screen_state')
-            .update({
-                status: 'showing_result',
-                last_spin_result: winnerIndex,
-                updated_at: new Date().toISOString()
-            })
-            .eq('screen_number', parseInt(screen));
+                // Fetch current active player from queue safely
+                const { data: activePlayer, error: fetchError } = await supabase
+                    .from('player_queue')
+                    .select('selected_animals')
+                    .eq('screen_number', screenIdNum)
+                    .eq('status', 'playing')
+                    .maybeSingle();
 
-        // 3. Update Player Queue with specific result (Session Persistence)
-        const currentQueueId = useGameStore.getState().currentQueueId;
-        if (currentQueueId && !isDemo) {
-            console.log("📌 Saving individual result to player queue:", currentQueueId);
-            await supabase
-                .from('player_queue')
-                .update({
-                    spin_result: winnerIndex,
-                    status: 'completed' // Mark as completed so they don't get stuck in 'playing'
-                })
-                .eq('id', currentQueueId);
-        }
+                if (!fetchError && activePlayer && activePlayer.selected_animals) {
+                    const selection = activePlayer.selected_animals as number[];
+                    if (selection.includes(winnerIndex)) {
+                        playerWon = true;
+                    }
+                } else if (isDemo) {
+                    playerWon = true;
+                }
 
-        // Logic Branch: Demo vs Real
-        if (isDemo) {
-            console.log("🎓 Demo Spin Complete. Skipping History.");
+                setIsWin(playerWon);
+                if (playerWon) setShowConfetti(true);
 
-            // Passive Cleanup: Only reset screen state without touching player queue
-            setTimeout(async () => {
-                console.log("🎓 Demo Finished. Passive Reset.");
+                // 1b. Update Screen State (For Mobile Sync)
                 await supabase
                     .from('screen_state')
                     .update({
-                        status: 'idle',
-                        player_id: null,
-                        player_name: null,
-                        player_emoji: null,
-                        current_queue_id: null,
-                        is_demo: false,
+                        status: 'showing_result',
+                        last_spin_result: winnerIndex,
                         updated_at: new Date().toISOString()
                     })
-                    .eq('screen_number', parseInt(screen));
-            }, 5000); // Give them time to see result
+                    .eq('screen_number', screenIdNum);
 
-            return; // EXIT EARLY
-        }
+                // 1c. Update Player Queue (Session Persistence)
+                const currentQueueId = useGameStore.getState().currentQueueId;
+                if (currentQueueId && !isDemo) {
+                    console.log("📌 Saving individual result to player queue:", currentQueueId);
+                    await supabase
+                        .from('player_queue')
+                        .update({
+                            spin_result: winnerIndex,
+                            status: 'completed'
+                        })
+                        .eq('id', currentQueueId);
+                }
 
-        // --- REAL GAME LOGIC ---
+                // 1d. Record History
+                if (!isDemo) {
+                    const historyEntry = {
+                        screen_id: screenIdNum,
+                        wheel_id: effectiveActiveWheelId || null,
+                        result_index: winnerIndex,
+                        player_name: realNickname || 'Anon',
+                        created_at: new Date().toISOString()
+                    };
+                    await supabase.from('game_history').insert([historyEntry]);
+                    setLastSpins(prev => [historyEntry, ...prev].slice(0, 9));
+                } else {
+                    // Demo Cleanup
+                    setTimeout(async () => {
+                        console.log("🎓 Demo Finished. Passive Reset.");
+                        await supabase
+                            .from('screen_state')
+                            .update({
+                                status: 'idle',
+                                player_id: null,
+                                player_name: null,
+                                player_emoji: null,
+                                current_queue_id: null,
+                                is_demo: false,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('screen_number', screenIdNum);
+                    }, 5000);
+                }
 
-        // Record History
-        try {
-            const historyEntry = {
-                screen_id: screenIdNum,
-                wheel_id: effectiveActiveWheelId || null,
-                result_index: winnerIndex,
-                player_name: realNickname || 'Anon',
-                created_at: new Date().toISOString()
-            };
+                // --- 2. FINAL CLEANUP (after result is shown for a while) ---
+                if (!isDemo) {
+                    setTimeout(async () => {
+                        const { error } = await supabase.rpc('force_advance_queue', {
+                            p_screen_number: screenIdNum
+                        });
+                        if (error) console.error('Error cleaning session:', error);
+                    }, 10000);
+                }
 
-            await supabase.from('game_history').insert([historyEntry]);
-
-            // Optimistic Update
-            setLastSpins(prev => [historyEntry, ...prev].slice(0, 9));
-
-        } catch (err) {
-            console.error("Failed to save history:", err);
-        }
-
-        // Hide celebration after 10 seconds (Trigger DB Reset)
-        setTimeout(async () => {
-            // Cleanup Session (Mark queue completed & reset screen & PROMOTE NEXT)
-            const { error } = await supabase.rpc('force_advance_queue', {
-                p_screen_number: parseInt(screen)
-            });
-            if (error) console.error('Error cleaning session:', error);
-        }, 10000);
+            } catch (err) {
+                console.error("Critical error in spin complete logic:", err);
+            }
+        })();
     };
 
     // Move hooks to top level (Done)

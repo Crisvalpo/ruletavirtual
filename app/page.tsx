@@ -53,14 +53,15 @@ export default function HomePage() {
                 </div>
             </div>
 
-            {/* Admin & Tools */}
+            {/* Admin & Tools - Unified Entry */}
             <div className="mt-8 w-full max-w-4xl">
-                <div className="bg-indigo-900/40 backdrop-blur-md rounded-3xl p-6 border border-indigo-500/30 flex gap-4 overflow-x-auto text-nowrap">
-                    <Link href="/admin/wheels" className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-500 transition-colors">
-                        ⚙️ Admin Panel
-                    </Link>
-                    <Link href="/admin" className="bg-indigo-900/50 text-indigo-200 px-6 py-3 rounded-xl font-bold hover:bg-indigo-800 transition-colors">
-                        📊 Dashboard
+                <div className="bg-indigo-900/40 backdrop-blur-md rounded-3xl p-6 border border-indigo-500/30 flex justify-center">
+                    <Link
+                        href="/admin"
+                        className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-4 rounded-2xl font-black uppercase tracking-tighter italic text-xl transition-all hover:scale-[1.02] active:scale-95 shadow-xl flex items-center justify-center gap-3"
+                    >
+                        <span>📊</span>
+                        ADMIN DASHBOARD
                     </Link>
                 </div>
             </div>

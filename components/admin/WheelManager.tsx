@@ -105,55 +105,56 @@ export default function WheelManager() {
 
     if (loading) {
         return (
-            <div className="py-20 text-center">
-                <div className="animate-spin inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
-                <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">Cargando mundos...</p>
+            <div className="py-20 text-center bg-white rounded-3xl border border-slate-100 shadow-sm">
+                <div className="animate-spin inline-block w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full mb-4"></div>
+                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Cargando mundos...</p>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {wheels.map((wheel) => (
-                    <div key={wheel.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden group hover:shadow-xl transition-all duration-300">
-                        <div className="aspect-[16/9] relative bg-gray-100 overflow-hidden">
+                    <div key={wheel.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden group hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300">
+                        <div className="aspect-[16/9] relative bg-slate-100 overflow-hidden">
                             {wheel.image_preview && (
                                 <Image
                                     src={getImageUrl(wheel.image_preview)}
                                     alt={wheel.name}
                                     fill
-                                    className="object-cover group-hover:scale-110 transition-transform duration-500"
+                                    className="object-cover group-hover:scale-105 transition-transform duration-700"
                                 />
                             )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent opacity-60" />
                             <div className="absolute top-4 right-4 flex gap-2">
-                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg backdrop-blur-md border ${wheel.is_active ? 'bg-green-500/90 border-green-400/50 text-white' : 'bg-gray-500/90 border-gray-400/50 text-white'}`}>
+                                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm border backdrop-blur-md ${wheel.is_active ? 'bg-emerald-500/90 border-emerald-400/50 text-white' : 'bg-slate-500/90 border-slate-400/50 text-white'}`}>
                                     {wheel.is_active ? '● Activa' : '○ Pausada'}
                                 </span>
+                            </div>
+                            <div className="absolute bottom-4 left-4">
+                                <h3 className="font-black text-white text-xl tracking-tight uppercase drop-shadow-md">{wheel.name}</h3>
                             </div>
                         </div>
 
                         <div className="p-6">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="font-black text-gray-900 text-xl tracking-tight italic uppercase">{wheel.name}</h3>
-                                    <span className="inline-block px-2 py-0.5 rounded bg-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
-                                        {wheel.theme_category}
-                                    </span>
-                                </div>
+                            <div className="flex justify-between items-center mb-6">
+                                <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    {wheel.theme_category}
+                                </span>
+                                <div className="text-[10px] text-slate-400 font-bold uppercase">12 Segmentos</div>
                             </div>
 
-                            <div className="flex gap-3 mt-6">
+                            <div className="flex gap-3">
                                 <button
                                     onClick={() => setEditingWheel(wheel)}
-                                    className="flex-1 bg-gray-900 hover:bg-black text-white font-black py-3 rounded-xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-black/10 active:scale-95"
+                                    className="flex-1 bg-white hover:bg-slate-50 text-slate-900 border-2 border-slate-100 font-black py-3 rounded-xl text-[10px] uppercase tracking-widest transition-all shadow-sm active:scale-95"
                                 >
                                     Configurar
                                 </button>
                                 <button
                                     onClick={() => handleToggleActive(wheel)}
-                                    className={`px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${wheel.is_active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                                    className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${wheel.is_active ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
                                 >
                                     {wheel.is_active ? 'Pausar' : 'Activar'}
                                 </button>
@@ -165,34 +166,34 @@ export default function WheelManager() {
 
             {/* Edit Modal */}
             {editingWheel && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-300">
-                        <div className="px-10 py-8 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200">
+                        <div className="px-10 py-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                             <div>
-                                <h3 className="text-2xl font-black text-gray-900 italic tracking-tighter uppercase leading-none">Configurar Mundo</h3>
-                                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">{editingWheel.name}</p>
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Configurar Mundo</h3>
+                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">{editingWheel.name}</p>
                             </div>
-                            <button onClick={() => { setEditingWheel(null); setNewPreview(null); }} className="w-10 h-10 flex items-center justify-center bg-white border border-gray-200 text-gray-400 hover:text-gray-600 rounded-full text-xl transition-all active:scale-90">✕</button>
+                            <button onClick={() => { setEditingWheel(null); setNewPreview(null); }} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-slate-600 rounded-full text-xl transition-all active:scale-90">✕</button>
                         </div>
 
                         <div className="p-10 space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2 italic">Nombre Visual</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 px-1">Nombre Visual</label>
                                     <input
                                         type="text"
                                         value={editingWheel.name}
                                         onChange={(e) => setEditingWheel({ ...editingWheel, name: e.target.value })}
-                                        className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl px-5 py-4 font-black text-gray-900 focus:border-primary focus:bg-white outline-none transition-all shadow-inner"
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 focus:border-indigo-600 focus:bg-white outline-none transition-all"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2 italic">Categoría</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 px-1">Categoría</label>
                                     <select
                                         value={editingWheel.theme_category}
                                         onChange={(e) => setEditingWheel({ ...editingWheel, theme_category: e.target.value })}
-                                        className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl px-5 py-4 font-black text-gray-900 focus:border-primary focus:bg-white outline-none transition-all shadow-inner"
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 focus:border-indigo-600 focus:bg-white outline-none transition-all"
                                     >
                                         <option value="General">General</option>
                                         <option value="Infantil">Infantil</option>
@@ -205,9 +206,9 @@ export default function WheelManager() {
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-3 italic">Reemplazar Miniatura (Hero Preview)</label>
-                                <div className="flex flex-col md:flex-row items-center gap-8 bg-gray-50 p-6 rounded-3xl border-2 border-dashed border-gray-200 group-hover:border-primary transition-colors">
-                                    <div className="relative w-40 aspect-[16/9] rounded-2xl overflow-hidden shadow-2xl bg-black">
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 px-1">Reemplazar Miniatura (Hero Preview)</label>
+                                <div className="flex flex-col md:flex-row items-center gap-6 bg-slate-50 p-6 rounded-3xl border-2 border-dashed border-slate-200">
+                                    <div className="relative w-40 aspect-[16/9] rounded-2xl overflow-hidden shadow-lg bg-slate-900">
                                         {newPreview ? (
                                             <img src={URL.createObjectURL(newPreview)} className="object-cover w-full h-full" />
                                         ) : (
@@ -215,14 +216,13 @@ export default function WheelManager() {
                                                 src={getImageUrl(editingWheel.image_preview)}
                                                 alt="Current Preview"
                                                 fill
-                                                className="object-cover"
+                                                className="object-cover opacity-80"
                                             />
                                         )}
-                                        <div className="absolute inset-0 ring-1 ring-inset ring-white/20 rounded-2xl" />
                                     </div>
                                     <div className="flex-1 text-center md:text-left">
-                                        <p className="text-[10px] text-gray-400 font-bold mb-4 px-2">Subir archivo para reemplazar imagen mostrada en el selector móvil.</p>
-                                        <label className="inline-block bg-white hover:bg-primary hover:text-white text-gray-900 border-2 border-gray-200 hover:border-primary px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all shadow-sm active:scale-95">
+                                        <p className="text-[10px] text-slate-400 font-bold mb-4">La imagen se mostrará en el selector de mundos del jugador.</p>
+                                        <label className="inline-block bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-200 px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all shadow-sm active:scale-95">
                                             Seleccionar JPG
                                             <input
                                                 type="file"
@@ -231,25 +231,22 @@ export default function WheelManager() {
                                                 className="hidden"
                                             />
                                         </label>
-                                        {newPreview && (
-                                            <p className="mt-2 text-[10px] text-primary font-black uppercase">Pronto para subir: {newPreview.name}</p>
-                                        )}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="px-10 py-8 bg-gray-50 border-t border-gray-100 flex flex-col md:flex-row gap-4">
+                        <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 flex flex-col md:flex-row gap-4">
                             <button
                                 onClick={() => { setEditingWheel(null); setNewPreview(null); }}
-                                className="flex-1 py-4 bg-white border border-gray-200 rounded-2xl font-black text-xs uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all active:scale-98"
+                                className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-slate-100 transition-all active:scale-95"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleSaveEdit}
                                 disabled={saving}
-                                className="flex-[2] py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:bg-primary-dark active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                                className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
                             >
                                 {saving ? (
                                     <>

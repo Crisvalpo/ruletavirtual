@@ -37,46 +37,56 @@ export default function ResultPage({
         let isMounted = true;
 
         const checkResult = async () => {
-            if (!queueId) return;
+            try {
+                if (!queueId) return;
 
-            // 1. Fetch own queue record first (Session specific result)
-            const { data: queueData, error: queueError } = await supabase
-                .from('player_queue')
-                .select('selected_animals, spin_result, status')
-                .eq('id', queueId)
-                .single();
+                // 1. Fetch own queue record first (Session specific result)
+                const { data: queueData, error: queueError } = await supabase
+                    .from('player_queue')
+                    .select('selected_animals, spin_result, status')
+                    .eq('id', queueId)
+                    .maybeSingle();
 
-            if (queueError || !queueData) {
-                console.error("Error fetching session result:", queueError);
-                return;
-            }
+                if (queueError) {
+                    console.error("Error fetching session result:", queueError);
+                    return;
+                }
 
-            const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
-            if (effectiveSelections.length > 0 && isMounted) {
-                setDbSelections(effectiveSelections);
-            }
+                if (queueData) {
+                    const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
+                    if (effectiveSelections.length > 0 && isMounted) {
+                        setDbSelections(effectiveSelections);
+                    }
 
-            // 2. If we already have a result saved in our own record, show it!
-            if (queueData.spin_result !== null) {
-                const isWin = effectiveSelections.includes(queueData.spin_result);
-                if (isMounted) setStatus(isWin ? 'winning' : 'losing');
-                return;
-            }
+                    // 2. If we already have a result saved in our own record, show it!
+                    if (queueData.spin_result !== null) {
+                        const isWin = effectiveSelections.includes(queueData.spin_result);
+                        if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+                        return;
+                    }
+                }
 
-            // 3. If no result yet, maybe we are still spinning?
-            // Fallback to check global screen state ONLY for transition
-            const { data: screenData } = await supabase
-                .from('screen_state')
-                .select('last_spin_result, status')
-                .eq('screen_number', parseInt(id))
-                .single();
+                // 3. Fallback to check global screen state ONLY for transition
+                const { data: screenData } = await supabase
+                    .from('screen_state')
+                    .select('last_spin_result, status')
+                    .eq('screen_number', parseInt(id))
+                    .maybeSingle();
 
-            if (screenData?.status === 'spinning') {
-                if (isMounted) setStatus('loading');
-            } else if (screenData?.last_spin_result && queueData.status === 'playing') {
-                // If it just stopped and hasn't saved to queue yet (race condition)
-                const isWin = effectiveSelections.includes(screenData.last_spin_result);
-                if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+                if (screenData) {
+                    if (screenData.status === 'spinning') {
+                        if (isMounted) setStatus('loading');
+                    } else if (screenData.last_spin_result !== null) {
+                        // Use local selectedAnimals if DB selections haven't loaded yet
+                        const selections = dbSelections.length > 0 ? dbSelections : selectedAnimals;
+                        if (selections.length > 0) {
+                            const isWin = selections.includes(screenData.last_spin_result);
+                            if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Unexpected error in checkResult:", err);
             }
         };
 

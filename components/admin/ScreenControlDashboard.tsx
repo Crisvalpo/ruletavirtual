@@ -120,74 +120,103 @@ export default function ScreenControlDashboard() {
         if (error) alert(error.message);
     };
 
-    if (loading) return <div className="p-4">Cargando monitores...</div>;
+    if (loading) return (
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 animate-pulse">
+            <div className="h-6 w-48 bg-slate-100 rounded mb-6"></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(i => <div key={i} className="h-64 bg-slate-50 rounded-xl"></div>)}
+            </div>
+        </div>
+    );
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow mb-8">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2 uppercase tracking-tight">
                 📺 Monitoreo de Pantallas (En Vivo)
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {screens.map((screen) => {
                     const nextPlayer = queues[screen.screen_number];
+                    const isActive = screen.status !== 'idle';
+
+                    let statusColor = 'bg-slate-50 text-slate-400 border-slate-100';
+                    let statusLabelColor = 'bg-slate-200 text-slate-600';
+
+                    if (screen.status === 'spinning') {
+                        statusColor = 'bg-indigo-50 border-indigo-100';
+                        statusLabelColor = 'bg-indigo-600 text-white';
+                    } else if (screen.status === 'showing_result') {
+                        statusColor = 'bg-emerald-50 border-emerald-100';
+                        statusLabelColor = 'bg-emerald-600 text-white';
+                    } else if (screen.status === 'waiting_for_spin') {
+                        statusColor = 'bg-amber-50 border-amber-100';
+                        statusLabelColor = 'bg-amber-600 text-white';
+                    }
 
                     return (
                         <div
                             key={screen.screen_number}
                             className={`
-                                border rounded-lg p-4 flex flex-col justify-between
-                                ${screen.status === 'idle' ? 'bg-gray-50 border-gray-200' : ''}
-                                ${screen.status === 'spinning' ? 'bg-purple-50 border-purple-200' : ''}
-                                ${screen.status === 'showing_result' ? 'bg-green-50 border-green-200' : ''}
-                                ${screen.status === 'waiting_for_spin' ? 'bg-blue-50 border-blue-200' : ''}
+                                flex flex-col justify-between border-2 rounded-2xl p-5 transition-all
+                                ${statusColor}
                             `}
                         >
                             <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="font-bold text-lg">Pantalla {screen.screen_number}</h3>
-                                    <span className={`text-xs uppercase px-2 py-0.5 rounded font-bold
-                                        ${screen.status === 'idle' ? 'bg-gray-200 text-gray-600' : 'bg-primary text-white'}
-                                    `}>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-black text-slate-900 tracking-tight">Pantalla {screen.screen_number}</h3>
+                                    <span className={`text-[9px] uppercase px-2 py-0.5 rounded-full font-black tracking-widest ${statusLabelColor}`}>
                                         {screen.status}
                                     </span>
                                 </div>
 
-                                <div className="mb-4 min-h-[3rem]">
-                                    <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Actual:</p>
+                                <div className="mb-6 min-h-[4rem] flex flex-col justify-center">
+                                    <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest mb-1.5">En Pantalla:</p>
                                     {screen.player_name ? (
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="text-2xl">{screen.player_emoji}</span>
-                                            <span className="font-semibold text-lg leading-tight">{screen.player_name}</span>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-xl">
+                                                {screen.player_emoji}
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="font-black text-slate-900 leading-none">{screen.player_name}</span>
+                                                <span className="text-[10px] text-slate-500 font-bold uppercase mt-1">Jugando ahora</span>
+                                            </div>
                                         </div>
                                     ) : (
-                                        <span className="text-gray-400 italic text-sm block mb-2">-- Libre --</span>
+                                        <div className="py-2 px-3 rounded-lg bg-slate-100/50 border border-slate-100 text-slate-400 italic text-xs flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-slate-300" />
+                                            Sin actividad
+                                        </div>
                                     )}
+                                </div>
 
-                                    {/* Next Player Preview */}
-                                    {nextPlayer && (
-                                        <div className="bg-blue-50 rounded p-2 mt-2 border border-blue-100">
-                                            <p className="text-[10px] text-blue-500 uppercase font-bold mb-1">En Fila (Siguiente):</p>
+                                {/* Next Player Preview */}
+                                <div className={`mt-4 pt-4 border-t ${isActive ? 'border-black/5' : 'border-slate-100'}`}>
+                                    {nextPlayer ? (
+                                        <div className="bg-white/60 rounded-xl p-3 border border-indigo-100 shadow-sm">
+                                            <p className="text-[9px] text-indigo-500 uppercase font-black tracking-widest mb-2">Siguiente en Fila:</p>
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm">{nextPlayer.player_emoji}</span>
-                                                <span className="text-sm font-medium text-blue-900 leading-tight">
+                                                <span className="text-xs font-black text-slate-900 uppercase">
                                                     {nextPlayer.player_name}
                                                 </span>
                                             </div>
-                                            <p className="text-[10px] text-blue-400 italic mt-0.5">
-                                                "¡{nextPlayer.player_name}, estás listo para jugar!"
-                                            </p>
                                         </div>
+                                    ) : (
+                                        <p className="text-[9px] text-slate-300 font-black uppercase tracking-widest text-center py-2">Fila Vacía</p>
                                     )}
                                 </div>
                             </div>
 
                             {/* ACCIONES */}
-                            <div className="pt-3 border-t border-black/5 flex flex-col gap-2">
-                                <div className="px-1 mb-2">
-                                    <label className="text-[10px] uppercase text-gray-500 font-bold block mb-1">
-                                        Velocidad ({screen.idle_speed?.toFixed(1) || '1.0'}x)
-                                    </label>
+                            <div className="mt-6 pt-4 border-t border-black/5 flex flex-col gap-2">
+                                <div className="px-1 mb-3">
+                                    <div className="flex justify-between items-center mb-1.5">
+                                        <label className="text-[9px] uppercase text-slate-400 font-black tracking-widest">
+                                            Velocidad
+                                        </label>
+                                        <span className="text-[10px] font-black text-indigo-600">{screen.idle_speed?.toFixed(1) || '1.0'}x</span>
+                                    </div>
                                     <input
                                         type="range"
                                         min="0.1"
@@ -201,26 +230,28 @@ export default function ScreenControlDashboard() {
                                                 .update({ idle_speed: val })
                                                 .eq('screen_number', screen.screen_number);
                                         }}
-                                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                        className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                     />
                                 </div>
 
-                                {screen.status === 'idle' && !nextPlayer && (
-                                    <button
-                                        onClick={() => handleDemoSpin(screen.screen_number)}
-                                        className="w-full bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
-                                    >
-                                        🎲 Giro Publicidad
-                                    </button>
-                                )}
+                                <div className="grid grid-cols-1 gap-2">
+                                    {screen.status === 'idle' && !nextPlayer && (
+                                        <button
+                                            onClick={() => handleDemoSpin(screen.screen_number)}
+                                            className="w-full bg-slate-900 border border-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
+                                        >
+                                            🎭 Giro Show
+                                        </button>
+                                    )}
 
-                                <button
-                                    onClick={() => handleForceAdvance(screen.screen_number)}
-                                    className="w-full bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
-                                    title="Forzar limpieza de pantalla y avance de fila"
-                                >
-                                    ⚠️ Forzar Avance
-                                </button>
+                                    <button
+                                        onClick={() => handleForceAdvance(screen.screen_number)}
+                                        className="w-full bg-white border border-rose-100 hover:border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
+                                        title="Forzar limpieza de pantalla y avance de fila"
+                                    >
+                                        🧹 Limpiar
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     );

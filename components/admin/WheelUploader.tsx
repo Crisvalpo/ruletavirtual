@@ -121,17 +121,16 @@ export default function WheelUploader() {
     };
 
     return (
-        <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-lg border border-gray-100">
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <span className="text-3xl">📤</span>
-                Subir Nueva Ruleta Individual
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-black text-slate-900 mb-8 flex items-center gap-2 uppercase tracking-tight">
+                📤 Subir Nueva Ruleta
             </h2>
 
             <div className="space-y-6">
                 {/* Wheel Name & Category */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                        <label htmlFor="wheelName" className="block text-sm font-bold text-gray-700 mb-2">
+                <div className="grid grid-cols-1 gap-6">
+                    <div className="space-y-1">
+                        <label htmlFor="wheelName" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                             1. Nombre del Tema
                         </label>
                         <input
@@ -139,20 +138,20 @@ export default function WheelUploader() {
                             type="text"
                             value={wheelName}
                             onChange={(e) => setWheelName(e.target.value)}
-                            placeholder="ej: Batman, Frozen..."
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-black"
+                            placeholder="ej: Super Heroes, Jungla..."
+                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-5 py-3.5 font-bold text-slate-900 focus:border-indigo-600 focus:bg-white outline-none transition-all"
                         />
                     </div>
 
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                        <label htmlFor="themeCategory" className="block text-sm font-bold text-gray-700 mb-2">
+                    <div className="space-y-1">
+                        <label htmlFor="themeCategory" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
                             Categoría / Etiqueta
                         </label>
                         <select
                             id="themeCategory"
                             value={themeCategory}
                             onChange={(e) => setThemeCategory(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-black"
+                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-5 py-3.5 font-bold text-slate-900 focus:border-indigo-600 focus:bg-white outline-none transition-all"
                         >
                             <option value="General">General</option>
                             <option value="Infantil">Infantil</option>
@@ -164,122 +163,91 @@ export default function WheelUploader() {
                     </div>
                 </div>
 
-                {/* Segment PNGs */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                    <label htmlFor="segments" className="block text-sm font-bold text-gray-700 mb-2">
-                        2. Imágenes de la Ruleta (12 archivos .png)
-                    </label>
-                    <input
-                        id="segments"
-                        type="file"
-                        accept=".png"
-                        multiple
-                        onChange={(e) => {
-                            const files = Array.from(e.target.files || []);
-                            console.log('Segments selected:', files.length);
-                            setSegmentPngs(files);
-                        }}
-                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-dark"
-                    />
-                    <div className="mt-2 flex items-center gap-2">
-                        <span className={segmentPngs.length === 12 ? "text-green-600 font-bold" : "text-gray-500"}>
-                            {segmentPngs.length === 12 ? '✅' : '⚪'} {segmentPngs.length}/12 seleccionados
-                        </span>
+                {/* Upload Fields */}
+                <div className="space-y-4">
+                    <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2">
+                        <label htmlFor="segments" className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                            2. Imágenes de la Ruleta (12 .png)
+                        </label>
+                        <input
+                            id="segments"
+                            type="file"
+                            accept=".png"
+                            multiple
+                            onChange={(e) => setSegmentPngs(Array.from(e.target.files || []))}
+                            className="w-full text-[10px] text-slate-400 font-bold file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-slate-200 file:text-slate-600 hover:file:bg-slate-300"
+                        />
+                        <p className={`text-[9px] font-black uppercase tracking-tight ${segmentPngs.length === 12 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            {segmentPngs.length === 12 ? '✅ Completo' : `○ ${segmentPngs.length}/12 cargados`}
+                        </p>
                     </div>
-                </div>
 
-                {/* Selector JPGs */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                    <label htmlFor="selectors" className="block text-sm font-bold text-gray-700 mb-2">
-                        3. Íconos del Celular (12 archivos .jpg)
-                    </label>
-                    <input
-                        id="selectors"
-                        type="file"
-                        accept=".jpg,.jpeg"
-                        multiple
-                        onChange={(e) => {
-                            const files = Array.from(e.target.files || []);
-                            console.log('Selectors selected:', files.length);
-                            setSelectorJpgs(files);
-                        }}
-                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-dark"
-                    />
-                    <div className="mt-2 flex items-center gap-2">
-                        <span className={selectorJpgs.length === 12 ? "text-green-600 font-bold" : "text-gray-500"}>
-                            {selectorJpgs.length === 12 ? '✅' : '⚪'} {selectorJpgs.length}/12 seleccionados
-                        </span>
+                    <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2">
+                        <label htmlFor="selectors" className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                            3. Íconos del Celular (12 .jpg)
+                        </label>
+                        <input
+                            id="selectors"
+                            type="file"
+                            accept=".jpg,.jpeg"
+                            multiple
+                            onChange={(e) => setSelectorJpgs(Array.from(e.target.files || []))}
+                            className="w-full text-[10px] text-slate-400 font-bold file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-slate-200 file:text-slate-600 hover:file:bg-slate-300"
+                        />
+                        <p className={`text-[9px] font-black uppercase tracking-tight ${selectorJpgs.length === 12 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            {selectorJpgs.length === 12 ? '✅ Completo' : `○ ${selectorJpgs.length}/12 cargados`}
+                        </p>
                     </div>
-                </div>
 
-                {/* Preview Image */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                    <label htmlFor="preview" className="block text-sm font-bold text-gray-700 mb-2">
-                        4. Miniatura del Menú (1 archivo .jpg)
-                    </label>
-                    <input
-                        id="preview"
-                        type="file"
-                        accept=".jpg,.jpeg,.png"
-                        onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            console.log('Preview selected:', file?.name);
-                            setPreviewImage(file);
-                        }}
-                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-dark"
-                    />
-                    <p className="mt-2 text-sm">
-                        {previewImage ? (
-                            <span className="text-green-600 font-bold">✅ Seleccionado: {previewImage.name}</span>
-                        ) : (
-                            <span className="text-gray-400 font-medium">⚪ Sin seleccionar</span>
-                        )}
-                    </p>
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2">
+                            <label htmlFor="preview" className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                4. Póster / Miniatura
+                            </label>
+                            <input
+                                id="preview"
+                                type="file"
+                                accept=".jpg,.jpeg,.png"
+                                onChange={(e) => setPreviewImage(e.target.files?.[0] || null)}
+                                className="w-full text-[10px] text-slate-400 font-bold file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-slate-200 file:text-slate-600 hover:file:bg-slate-300"
+                            />
+                            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tight">
+                                {previewImage ? '✅ Listado' : ''}
+                            </p>
+                        </div>
 
-                {/* Background */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                    <label htmlFor="background" className="block text-sm font-bold text-gray-700 mb-2">
-                        5. Fondo del Juego (1 archivo .jpg)
-                    </label>
-                    <input
-                        id="background"
-                        type="file"
-                        accept=".jpg,.jpeg"
-                        onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            console.log('Background selected:', file?.name);
-                            setBackground(file);
-                        }}
-                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-dark"
-                    />
-                    <p className="mt-2 text-sm">
-                        {background ? (
-                            <span className="text-green-600 font-bold">✅ Seleccionado: {background.name}</span>
-                        ) : (
-                            <span className="text-gray-400 font-medium">⚪ Sin seleccionar</span>
-                        )}
-                    </p>
+                        <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2">
+                            <label htmlFor="background" className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                5. Fondo del Juego
+                            </label>
+                            <input
+                                id="background"
+                                type="file"
+                                accept=".jpg,.jpeg"
+                                onChange={(e) => setBackground(e.target.files?.[0] || null)}
+                                className="w-full text-[10px] text-slate-400 font-bold file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-slate-200 file:text-slate-600 hover:file:bg-slate-300"
+                            />
+                            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tight">
+                                {background ? '✅ Listado' : ''}
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Upload Button */}
                 <button
                     onClick={handleUpload}
                     disabled={uploading}
-                    className={`
-                        w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all
-                        ${uploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'}
-                    `}
+                    className="w-full mt-4 bg-slate-900 border border-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-xl transition-all shadow-xl shadow-slate-200 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-[0.2em] text-[10px]"
                 >
                     {uploading ? (
-                        <span className="flex items-center justify-center gap-2">
-                            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Subiendo assets...
-                        </span>
-                    ) : '🚀 Subir Ruleta'}
+                        <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Subiendo activos...
+                        </>
+                    ) : (
+                        <>🚀 Publicar Ruleta</>
+                    )}
                 </button>
             </div>
         </div>
