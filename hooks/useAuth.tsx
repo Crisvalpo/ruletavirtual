@@ -94,7 +94,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/auth/callback`
+                redirectTo: `${window.location.origin}/auth/callback`,
+                queryParams: {
+                    access_type: 'offline',
+                    prompt: 'select_account',
+                    // This helps Google show a more friendly flow
+                    login_hint: 'Inicia sesión para guardar tus premios'
+                }
             }
         });
     };
