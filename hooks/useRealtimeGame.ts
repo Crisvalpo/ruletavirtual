@@ -90,7 +90,7 @@ export function useRealtimeGame(screenId: string) {
                             idleSpeed: newState.idle_speed || 1.0,
                             currentQueueId: newState.current_queue_id
                         });
-                    } else if (newState.status === 'idle' || newState.status === 'waiting_for_spin' || newState.status === 'showing_result') {
+                    } else if (newState.status === 'idle' || newState.status === 'waiting_for_spin' || newState.status === 'result') {
                         useGameStore.setState({
                             status: 'idle',
                             isDemo: newState.is_demo || false,

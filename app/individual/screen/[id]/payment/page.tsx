@@ -109,35 +109,13 @@ export default function PaymentPage({
 
     const handlePayment = async (method: 'cash' | 'mercadopago', codeUsed?: string) => {
         const wheelId = searchParams.get('wheelId');
-
-        try {
-            const { data, error } = await supabase
-                .from('player_queue')
-                .insert({
-                    screen_number: parseInt(id),
-                    player_name: nickname,
-                    player_emoji: emoji,
-                    player_id: user?.id || null,
-                    status: 'selecting',
-                    selected_wheel_id: wheelId || null,
-                    package_code: codeUsed || null,
-                    created_at: new Date().toISOString()
-                })
-                .select()
-                .single();
-
-            if (data && !error) {
-                console.log("✅ Queue Item Created:", data.id);
-                setQueueId(data.id);
-                router.push(`/individual/screen/${id}/select`);
-            } else {
-                console.error("❌ Queue Create Error:", error);
-                setRedeemError('Error al crear sesión en la fila');
-            }
-        } catch (err) {
-            console.error("Queue Error:", err);
-            setRedeemError('Error de red al unirse a la fila');
+        // Clear previous package info to distinguish Cash play
+        if (method === 'cash' || method === 'mercadopago') {
+            localStorage.removeItem('current_package');
         }
+
+        // Redirect to Pre-Select directly
+        router.push(`/individual/screen/${id}/pre-select?wheelId=${wheelId || ''}`);
     };
 
     // Payment / Code Redemption State
@@ -151,6 +129,25 @@ export default function PaymentPage({
         setRedeemError('');
         setRedeemCode('');
     };
+
+    // Auto-Open Redemption if Code Pending/Passed
+    useEffect(() => {
+        const urlCode = searchParams.get('redeemCode');
+        const pendingCode = localStorage.getItem('pending_ticket_code');
+        const codeToUse = urlCode || pendingCode;
+
+        if (codeToUse) {
+            console.log("🎟️ Pending Ticket Found:", codeToUse);
+            // FIX: Remove hyphens if present to avoid double-dash in VirtualKeyboard
+            const cleanCode = codeToUse.replace(/-/g, '');
+            setRedeemCode(cleanCode);
+            setShowCodeInput(true);
+
+            // Optional: Auto-submit if needed, or just prep population
+            // Clean up storage to avoid loop
+            if (pendingCode) localStorage.removeItem('pending_ticket_code');
+        }
+    }, [searchParams]);
 
     const confirmRedemption = async () => {
         const rawCode = redeemCode.trim().toUpperCase();
@@ -189,33 +186,11 @@ export default function PaymentPage({
                     code: cleanCode
                 }));
 
-                // Create queue entry with package tracking
+                // REDIRECT TO PRE-SELECTION
+                console.log("✅ Code Validated. Redirecting to Pre-Selection.");
                 const wheelId = searchParams.get('wheelId');
-                const { data: queueData, error: queueError } = await supabase
-                    .from('player_queue')
-                    .insert({
-                        screen_number: parseInt(id),
-                        player_name: nickname,
-                        player_emoji: emoji,
-                        player_id: user?.id || null,
-                        status: 'selecting',
-                        selected_wheel_id: wheelId || null,
-                        package_code: cleanCode,
-                        package_tracking_id: data.package_id,
-                        spin_number: data.spin_number,
-                        created_at: new Date().toISOString()
-                    })
-                    .select()
-                    .single();
+                router.push(`/individual/screen/${id}/pre-select?wheelId=${wheelId || ''}`);
 
-                if (queueData && !queueError) {
-                    console.log("✅ Queue Item Created:", queueData.id);
-                    setQueueId(queueData.id);
-                    router.push(`/individual/screen/${id}/select`);
-                } else {
-                    console.error("❌ Queue Create Error:", queueError);
-                    setRedeemError('Error al crear sesión en la fila');
-                }
             } else {
                 // Show specific error message from RPC
                 setRedeemError(data?.message || 'Error al canjear código');

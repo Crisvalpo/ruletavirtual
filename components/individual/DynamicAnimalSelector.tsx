@@ -16,9 +16,10 @@ interface DynamicSegment {
 interface DynamicSelectorProps {
     wheelId?: string | null; // If provided, load from storage
     mode?: 'group' | 'individual';
+    disabled?: boolean;
 }
 
-export default function DynamicAnimalSelector({ wheelId, mode = 'group' }: DynamicSelectorProps) {
+export default function DynamicAnimalSelector({ wheelId, mode = 'group', disabled = false }: DynamicSelectorProps) {
     const selectedAnimals = useGameStore((state) => state.selectedAnimals);
     const toggleAnimal = useGameStore((state) => state.toggleAnimal);
     const [segments, setSegments] = useState<DynamicSegment[]>([]);
@@ -85,6 +86,7 @@ export default function DynamicAnimalSelector({ wheelId, mode = 'group' }: Dynam
                 return (
                     <button
                         key={segment.id}
+                        disabled={disabled}
                         onClick={() => toggleAnimal(segment.id)}
                         className={`
               relative aspect-square rounded-2xl flex flex-col items-center justify-center p-1.5 transition-all duration-300

@@ -147,7 +147,7 @@ export default function ScreenControlDashboard() {
                     if (screen.status === 'spinning') {
                         statusColor = 'bg-indigo-50 border-indigo-100';
                         statusLabelColor = 'bg-indigo-600 text-white';
-                    } else if (screen.status === 'showing_result') {
+                    } else if (screen.status === 'result') {
                         statusColor = 'bg-emerald-50 border-emerald-100';
                         statusLabelColor = 'bg-emerald-600 text-white';
                     } else if (screen.status === 'waiting_for_spin') {

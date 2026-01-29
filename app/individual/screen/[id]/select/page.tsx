@@ -188,7 +188,7 @@ export default function SelectionPage({
                 });
             }
             // C. Failsafe: Stuck on Result (> 12s)
-            else if (screenData?.status === 'showing_result') {
+            else if (screenData?.status === 'result') {
                 const lastUpdate = new Date(screenData.updated_at).getTime();
                 const now = new Date().getTime();
                 const diffSeconds = (now - lastUpdate) / 1000;
@@ -234,16 +234,21 @@ export default function SelectionPage({
     };
 
     const handleSpin = async () => {
-        // Enviar señal de giro al backend
-        await supabase
-            .from('screen_state')
-            .update({
-                status: 'spinning',
-                updated_at: new Date().toISOString()
-            })
-            .eq('screen_number', parseInt(id));
+        if (!queueId) return;
 
-        // Navegar a resultado (feedback visual para el usuario móvil)
+        // 1. Call RPC to Process Spin (Randomness + Deduction + State Update)
+        const { data, error } = await supabase.rpc('play_spin', {
+            p_queue_id: queueId,
+            p_screen_number: parseInt(id)
+        });
+
+        if (error) {
+            console.error("Spin Error:", error);
+            // Optional: Show error to user
+            return;
+        }
+
+        // 2. Navegar a resultado (feedback visual para el usuario móvil)
         router.push(`/individual/screen/${id}/result`);
     };
 
@@ -314,7 +319,11 @@ export default function SelectionPage({
 
             {/* Grid Interactivo Real (Disabled if not selecting) */}
             <div className={`flex-1 overflow-hidden relative ${uiStatus !== 'selecting' ? 'opacity-50 pointer-events-none grayscale-[0.5]' : ''}`}>
-                <DynamicAnimalSelector wheelId={currentLocalWheelId} mode={mode} />
+                <DynamicAnimalSelector
+                    wheelId={currentLocalWheelId}
+                    mode={mode}
+                    disabled={uiStatus !== 'selecting'} // Enforce logic disable
+                />
             </div>
 
             <div className="flex-none p-4 bg-gray-900/95 backdrop-blur-md border-t border-gray-800">

@@ -57,7 +57,7 @@ export default function TicketClientViewPage({
         </div>
     );
 
-    const remaining = ticket.total_plays - ticket.used_plays;
+    const remaining = ticket.total_plays - (ticket.plays_used || 0);
     const pendingPrizes = prizes.filter(p => p.prize_payout_status === 'pending');
 
     return (
@@ -80,7 +80,7 @@ export default function TicketClientViewPage({
                             {[...Array(ticket.total_plays)].map((_, i) => (
                                 <div
                                     key={i}
-                                    className={`w-3 h-3 rounded-full ${i < ticket.used_plays ? 'bg-white/10' : 'bg-yellow-500 shadow-[0_0_10px_rgba(250,204,21,0.5)]'}`}
+                                    className={`w-3 h-3 rounded-full ${i < (ticket.plays_used || 0) ? 'bg-white/10' : 'bg-yellow-500 shadow-[0_0_10px_rgba(250,204,21,0.5)]'}`}
                                 />
                             ))}
                         </div>
@@ -140,7 +140,20 @@ export default function TicketClientViewPage({
                     )}
                 </main>
 
-                <footer className="mt-12 text-center pb-12">
+                {/* ACTION BUTTON - PLAY NOW */}
+                {!loading && ticket && ticket.is_activated && remaining > 0 && (
+                    <div className="fixed bottom-6 left-0 right-0 px-6 z-50 animate-in slide-in-from-bottom-4 duration-700 delay-500">
+                        <button
+                            onClick={() => router.push(`/?redeemCode=${ticket.code}`)}
+                            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black text-xl font-black py-5 rounded-2xl shadow-2xl shadow-yellow-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 border-2 border-black/10"
+                        >
+                            <span className="text-2xl">🎮</span>
+                            JUGAR AHORA
+                        </button>
+                    </div>
+                )}
+
+                <footer className="mt-24 text-center pb-12">
                     <p className="text-[10px] text-gray-600 uppercase font-bold tracking-[0.2em] mb-4">Ruleta Virtual 2026</p>
                     <button
                         onClick={() => router.push('/')}

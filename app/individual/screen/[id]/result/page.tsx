@@ -151,15 +151,22 @@ export default function ResultPage({
                     filter: `id=eq.${queueId}`
                 },
                 (payload) => {
-                    if (isMounted && payload.new.spin_result !== null) {
-                        console.log("🎯 Personal Result Received:", payload.new.spin_result);
-                        const selections = (payload.new.selected_animals as number[]) || selectedAnimals;
-                        const isWin = selections.includes(payload.new.spin_result);
-                        setStatus(isWin ? 'winning' : 'losing');
+                    console.log("📨 Realtime Packet:", payload);
+                    if (isMounted) {
+                        const newResult = payload.new.spin_result;
+                        const newStatus = payload.new.status;
+                        console.log(`Checking update: Result=${newResult}, Status=${newStatus}`);
+
+                        if (newResult !== null) {
+                            console.log("🎯 Personal Result Received:", newResult);
+                            const selections = (payload.new.selected_animals as number[]) || selectedAnimals;
+                            const isWin = selections.includes(newResult);
+                            setStatus(isWin ? 'winning' : 'losing');
+                        }
                     }
                 }
             )
-            .subscribe();
+            .subscribe((status) => console.log("📡 Subscription Status:", status));
 
         return () => {
             isMounted = false;

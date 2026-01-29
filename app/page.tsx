@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import IdentityBadge from '@/components/individual/IdentityBadge';
@@ -10,12 +11,38 @@ export default function HomePage() {
     const isAdmin = profile?.role === 'admin';
     const isStaff = profile?.role === 'staff' || isAdmin;
 
+    // Ticket Redemption Logic
+    const [scannedCode, setScannedCode] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        // Check URL for redeemCode (from QR scan)
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('redeemCode');
+        if (code) {
+            setScannedCode(code);
+            localStorage.setItem('pending_ticket_code', code);
+            // Clean URL gracefully
+            window.history.replaceState({}, '', '/');
+        }
+    }, []);
+
     return (
         <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary to-primary-light p-4 relative">
             {/* Header / Auth Status */}
             <div className="absolute top-4 right-4 z-50">
                 <IdentityBadge />
             </div>
+
+            {/* TICKET DETECTED BANNER */}
+            {scannedCode && (
+                <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-black font-black p-4 text-center z-50 animate-in slide-in-from-top duration-500 shadow-xl flex items-center justify-center gap-2">
+                    <span className="text-2xl">🎫</span>
+                    <div>
+                        <p className="text-sm uppercase tracking-widest">TICKET DETECTADO: {scannedCode}</p>
+                        <p className="text-xs">Elige una pantalla abajo para canjear tus jugadas automáticamente</p>
+                    </div>
+                </div>
+            )}
 
             <div className="text-center text-white mb-8 mt-12">
                 <h1 className="text-5xl md:text-7xl font-black mb-2 drop-shadow-lg tracking-tighter">
@@ -36,7 +63,7 @@ export default function HomePage() {
                         {[1, 2, 3, 4].map((id) => (
                             <Link
                                 key={id}
-                                href={`/individual/screen/${id}`}
+                                href={`/individual/screen/${id}${scannedCode ? '?redeemCode=' + scannedCode : ''}`}
                                 className="block w-full bg-white text-primary font-bold py-3 px-4 rounded-xl hover:bg-gray-100 hover:scale-[1.02] transition-all flex justify-between items-center group shadow-xl"
                             >
                                 <span>Pantalla #{id}</span>

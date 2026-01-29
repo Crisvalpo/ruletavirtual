@@ -179,7 +179,7 @@ export default function WaitingPage({
             }
             // FAILSAFE: If screen is stuck on result for > 12 seconds (reduced from 20), force cleanup
             // Normal result time is 10s. giving 2s buffer.
-            else if (screenData?.status === 'showing_result') {
+            else if (screenData?.status === 'result') {
                 const lastUpdate = new Date(screenData.updated_at).getTime();
                 const now = new Date().getTime();
                 const diffSeconds = (now - lastUpdate) / 1000;
