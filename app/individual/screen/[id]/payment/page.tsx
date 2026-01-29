@@ -89,22 +89,20 @@ export default function PaymentPage({
         setIsSpinningDemo(true);
         setDemoSpins(prev => prev - 1);
 
-        const { error } = await supabase
-            .from('screen_state')
-            .update({
-                status: 'spinning',
-                is_demo: true,
-                player_name: 'Modo Práctica',
-                player_emoji: '🎓'
-            })
-            .eq('screen_number', parseInt(id));
+        const { data, error } = await supabase.rpc('play_demo_spin', {
+            p_screen_number: parseInt(id)
+        });
 
-        if (error) {
-            console.error("Demo Spin Error:", error);
+        if (error || (data && !data.success)) {
+            console.error("Demo Spin Error:", error || data?.message);
             setIsSpinningDemo(false);
+            if (data?.message) alert(data.message);
         } else {
+            // Success
             setTimeout(() => setIsSpinningDemo(false), 5000);
         }
+
+
     };
 
     const handlePayment = async (method: 'cash' | 'mercadopago', codeUsed?: string) => {

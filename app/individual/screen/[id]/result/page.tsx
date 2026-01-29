@@ -104,27 +104,40 @@ export default function ResultPage({
                     if (queueData.package_code && isMounted) {
                         setTicketCode(queueData.package_code);
                     }
-
-                    // 2. If we already have a result saved in our own record, show it!
-                    if (queueData.spin_result !== null) {
-                        const isWin = effectiveSelections.includes(queueData.spin_result);
-                        if (isMounted) setStatus(isWin ? 'winning' : 'losing');
-                        return;
-                    }
                 }
 
-                // 3. Fallback to check global screen state ONLY for transition
+                // 2. Fetch global screen state (REQUIRED for sync)
                 const { data: screenData } = await supabase
                     .from('screen_state')
                     .select('last_spin_result, status')
                     .eq('screen_number', parseInt(id))
                     .maybeSingle();
 
+                // 3. PRIORITY CHECK: If screen is spinning OR player status is playing, WAIT.
+                // We only show result if status is 'completed' (from player) or 'showing_result' (from screen)
+
+                const isSpinning = screenData?.status === 'spinning' || queueData?.status === 'playing';
+                const isCompleted = queueData?.status === 'completed' || screenData?.status === 'showing_result';
+
+                if (isSpinning && !isCompleted) {
+                    if (isMounted) setStatus('loading');
+                    return;
+                }
+
+                if (queueData) {
+                    const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
+
+                    // 4. Strict Completion Check
+                    if (queueData.spin_result !== null && isCompleted) {
+                        const isWin = effectiveSelections.includes(queueData.spin_result);
+                        if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+                        return;
+                    }
+                }
+
+                // 5. Fallback for idle/result transition
                 if (screenData) {
-                    if (screenData.status === 'spinning') {
-                        if (isMounted) setStatus('loading');
-                    } else if (screenData.last_spin_result !== null) {
-                        // Use local selectedAnimals if DB selections haven't loaded yet
+                    if (screenData.last_spin_result !== null && screenData.status === 'showing_result') {
                         const selections = dbSelections.length > 0 ? dbSelections : selectedAnimals;
                         if (selections.length > 0) {
                             const isWin = selections.includes(screenData.last_spin_result);
@@ -157,11 +170,18 @@ export default function ResultPage({
                         const newStatus = payload.new.status;
                         console.log(`Checking update: Result=${newResult}, Status=${newStatus}`);
 
-                        if (newResult !== null) {
-                            console.log("🎯 Personal Result Received:", newResult);
+                        // STRICT CHECK: Only show if status is explicitly COMPLETED
+                        if (newResult !== null && newStatus === 'completed') {
+                            console.log("🎯 Personal Result Received (COMPLETED):", newResult);
                             const selections = (payload.new.selected_animals as number[]) || selectedAnimals;
                             const isWin = selections.includes(newResult);
                             setStatus(isWin ? 'winning' : 'losing');
+                        } else {
+                            console.log("⏳ Result received but waiting for completion (Status is " + newStatus + ")");
+                            // Optional: Force loading if status is playing
+                            if (newStatus === 'playing') {
+                                setStatus('loading');
+                            }
                         }
                     }
                 }

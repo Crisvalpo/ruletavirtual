@@ -10,7 +10,8 @@ interface GameState {
     currentQueueId: string | null; // Sync for TV
 
     // Game State
-    status: 'idle' | 'spinning';
+    status: 'idle' | 'spinning' | 'result';
+    lastSpinResult: number | null;
     isDemo: boolean;
     idleSpeed: number;
     gameMode: 'individual' | 'group';
@@ -38,6 +39,7 @@ export const useGameStore = create<GameState>()(
             currentQueueId: null,
 
             status: 'idle',
+            lastSpinResult: null,
             isDemo: false,
             idleSpeed: 1.0,
             gameMode: 'group',

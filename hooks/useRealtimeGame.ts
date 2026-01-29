@@ -37,7 +37,8 @@ export function useRealtimeGame(screenId: string) {
                         status: 'spinning',
                         isDemo: data.is_demo || false,
                         idleSpeed: data.idle_speed || 1.0,
-                        currentQueueId: data.current_queue_id
+                        currentQueueId: data.current_queue_id,
+                        lastSpinResult: data.last_spin_result // Sync on Load
                     });
                 } else {
                     useGameStore.setState({
@@ -88,14 +89,24 @@ export function useRealtimeGame(screenId: string) {
                             status: 'spinning',
                             isDemo: newState.is_demo || false,
                             idleSpeed: newState.idle_speed || 1.0,
-                            currentQueueId: newState.current_queue_id
+                            currentQueueId: newState.current_queue_id,
+                            lastSpinResult: newState.last_spin_result // Sync Result Immediately
                         });
-                    } else if (newState.status === 'idle' || newState.status === 'waiting_for_spin' || newState.status === 'result') {
+                    } else if (newState.status === 'result') {
+                        useGameStore.setState({
+                            status: 'result',
+                            isDemo: newState.is_demo || false,
+                            idleSpeed: newState.idle_speed || 1.0,
+                            currentQueueId: newState.current_queue_id,
+                            lastSpinResult: newState.last_spin_result // Keep result available
+                        });
+                    } else if (newState.status === 'idle' || newState.status === 'waiting_for_spin') {
                         useGameStore.setState({
                             status: 'idle',
                             isDemo: newState.is_demo || false,
                             idleSpeed: newState.idle_speed || 1.0,
-                            currentQueueId: newState.current_queue_id
+                            currentQueueId: newState.current_queue_id,
+                            lastSpinResult: null // Clear result
                         });
                     }
                 }
