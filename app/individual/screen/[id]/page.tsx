@@ -50,6 +50,45 @@ export default function JoinScreenPage({
         }
     }, [id, setScreenId, nickname, queueId, supabase, router]);
 
+    // Check for active package on device
+    useEffect(() => {
+        const checkActivePackage = async () => {
+            const stored = localStorage.getItem('current_package');
+            if (!stored || !hasIdentity) return;
+
+            try {
+                const packageData = JSON.parse(stored);
+
+                // Verify package still has spins
+                const { data, error } = await supabase
+                    .from('package_tracking')
+                    .select('total_spins, spins_consumed')
+                    .eq('id', packageData.packageId)
+                    .single();
+
+                if (!error && data) {
+                    const spinsRemaining = data.total_spins - data.spins_consumed;
+
+                    if (spinsRemaining > 0) {
+                        console.log('📦 Active package found, skipping payment');
+                        // Auto-redirect to payment which will handle the redemption
+                        const wheelId = searchParams.get('wheelId');
+                        if (wheelId) {
+                            router.push(`/individual/screen/${id}/payment?wheelId=${wheelId}`);
+                        }
+                    } else {
+                        // Package exhausted, clear it
+                        localStorage.removeItem('current_package');
+                    }
+                }
+            } catch (e) {
+                console.error('Error checking package:', e);
+            }
+        };
+
+        checkActivePackage();
+    }, [hasIdentity, id, router, searchParams, supabase]);
+
 
     const handleStartFresh = () => {
         resetGame(); // Clear queueId and everything

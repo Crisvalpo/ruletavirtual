@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useGameStore } from '@/lib/store/gameStore';
+import ScreenSwitchNotification from '@/components/individual/ScreenSwitchNotification';
 
 export default function WaitingPage({
     params
@@ -15,6 +16,14 @@ export default function WaitingPage({
 
     const supabase = createClient();
     const { queueId } = useGameStore();
+
+    // Screen switch offer state
+    const [currentOffer, setCurrentOffer] = useState<{
+        id: string;
+        targetScreen: number;
+        expiresAt: string;
+    } | null>(null);
+    const [showSwitchNotification, setShowSwitchNotification] = useState(false);
 
     // 1. Poll Queue Status (Are we Playing yet?) AND Realtime Subscription (Primary)
     useEffect(() => {
@@ -61,6 +70,90 @@ export default function WaitingPage({
             supabase.removeChannel(channel);
         };
     }, [queueId, id, router, supabase]);
+
+    // 1.5. Subscribe to Screen Switch Offers
+    useEffect(() => {
+        if (!queueId) return;
+
+        const channel = supabase
+            .channel('screen-switch-offers')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'screen_switch_offers',
+                    filter: `offered_to_queue_id=eq.${queueId}`
+                },
+                (payload) => {
+                    const offer = payload.new as any;
+                    if (offer.status === 'pending') {
+                        console.log('🎯 Screen switch offer received:', offer);
+                        setCurrentOffer({
+                            id: offer.id,
+                            targetScreen: offer.target_screen_number,
+                            expiresAt: offer.offer_expires_at
+                        });
+                        setShowSwitchNotification(true);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [queueId, supabase]);
+
+    // Handle screen switch acceptance
+    const handleSwitchScreen = async () => {
+        if (!currentOffer || !queueId) return;
+
+        console.log('✅ Accepting screen switch to:', currentOffer.targetScreen);
+
+        // Mark offer as accepted
+        const { error: offerError } = await supabase
+            .from('screen_switch_offers')
+            .update({ status: 'accepted' })
+            .eq('id', currentOffer.id);
+
+        if (offerError) {
+            console.error('Error accepting offer:', offerError);
+            return;
+        }
+
+        // Call RPC for atomic switch
+        const { data, error } = await supabase.rpc('switch_player_screen', {
+            p_queue_id: queueId,
+            p_new_screen_number: currentOffer.targetScreen
+        });
+
+        if (!error && data) {
+            // Redirect to new screen's waiting page
+            router.push(`/individual/screen/${currentOffer.targetScreen}/waiting`);
+        } else {
+            console.error('Error switching screen:', error);
+        }
+    };
+
+    // Handle screen switch dismissal
+    const handleDismissOffer = async () => {
+        if (!currentOffer) return;
+
+        console.log('❌ Declining screen switch offer');
+
+        // Mark offer as declined
+        await supabase
+            .from('screen_switch_offers')
+            .update({ status: 'declined' })
+            .eq('id', currentOffer.id);
+
+        setShowSwitchNotification(false);
+        setCurrentOffer(null);
+
+        // Trigger processing of next offer
+        await supabase.rpc('process_expired_offers');
+    };
 
     // 2. Poll Screen & Try to Promote (If we are waiting)
     useEffect(() => {
@@ -165,6 +258,18 @@ export default function WaitingPage({
                     {position ? `Aprox. ${position * 2} minutos de espera` : 'Calculando...'}
                 </p>
             </div>
+
+            {/* Screen Switch Notification */}
+            {showSwitchNotification && currentOffer && (
+                <ScreenSwitchNotification
+                    currentScreen={parseInt(id)}
+                    availableScreen={currentOffer.targetScreen}
+                    offerId={currentOffer.id}
+                    expiresAt={currentOffer.expiresAt}
+                    onSwitch={handleSwitchScreen}
+                    onDismiss={handleDismissOffer}
+                />
+            )}
         </div>
     );
 }

@@ -2,6 +2,7 @@
 
 import { useGameStore } from '@/lib/store/gameStore';
 import DynamicAnimalSelector from '@/components/individual/DynamicAnimalSelector';
+import SpinCounter from '@/components/individual/SpinCounter';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import React from 'react';
@@ -41,6 +42,28 @@ export default function SelectionPage({
     const [isInitializing, setIsInitializing] = React.useState(true);
     const [queuePosition, setQueuePosition] = React.useState<number | null>(null);
     const [currentLocalWheelId, setCurrentLocalWheelId] = React.useState<string | null>(activeWheelId);
+
+    // Package tracking state
+    const [packageInfo, setPackageInfo] = React.useState<{
+        spinNumber: number;
+        totalSpins: number;
+    } | null>(null);
+
+    // Load package info from localStorage
+    React.useEffect(() => {
+        const stored = localStorage.getItem('current_package');
+        if (stored) {
+            try {
+                const data = JSON.parse(stored);
+                setPackageInfo({
+                    spinNumber: data.spinNumber,
+                    totalSpins: data.totalSpins
+                });
+            } catch (e) {
+                console.error('Error parsing package info:', e);
+            }
+        }
+    }, []);
 
     // Initial check on mount
     React.useEffect(() => {
@@ -272,9 +295,19 @@ export default function SelectionPage({
                             {selectedAnimals.length}/3 SELECCIONADOS
                         </p>
                     </div>
-                    <div className="bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-full shadow-inner">
-                        <span className="text-[10px] text-gray-400 uppercase font-bold mr-1">PANTALLA</span>
-                        <span className="text-sm font-bold text-white">{id}</span>
+                    <div className="flex items-center gap-2">
+                        {/* Package Progress - Inline */}
+                        {packageInfo && (
+                            <div className="bg-purple-600/20 border border-purple-500/30 px-3 py-1.5 rounded-full shadow-inner flex items-center gap-2">
+                                <span className="text-[10px] text-purple-300 uppercase font-bold">GIRO</span>
+                                <span className="text-sm font-bold text-purple-200">{packageInfo.spinNumber}/{packageInfo.totalSpins}</span>
+                            </div>
+                        )}
+
+                        <div className="bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-full shadow-inner">
+                            <span className="text-[10px] text-gray-400 uppercase font-bold mr-1">PANTALLA</span>
+                            <span className="text-sm font-bold text-white">{id}</span>
+                        </div>
                     </div>
                 </div>
             </header>

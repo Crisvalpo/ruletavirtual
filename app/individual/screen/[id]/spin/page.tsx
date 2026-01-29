@@ -30,17 +30,35 @@ export default function SpinPage({
     }, [queueId, id, router]);
 
     const handleSpin = async () => {
-        // Enviar señal de giro al backend
-        await supabase
-            .from('screen_state')
-            .update({
-                status: 'spinning',
-                updated_at: new Date().toISOString()
-            })
-            .eq('screen_number', parseInt(id));
+        if (!queueId) return;
 
-        // Navegar a resultado (feedback visual para el usuario móvil)
-        router.push(`/individual/screen/${id}/result`);
+        console.log("🚀 Requesting Server Authority Spin...");
+
+        // 1. CALL SERVER AUTHORITY RPC
+        // The server decides the result, deducts the credit, and updates game state atomically.
+        const { data, error } = await supabase.rpc('play_spin', {
+            p_queue_id: queueId,
+            p_screen_number: parseInt(id)
+        });
+
+        if (error) {
+            console.error("❌ Spin Error:", error);
+            alert("Error al girar: " + error.message);
+            return;
+        }
+
+        if (data && !data.success) {
+            console.error("❌ Spin Failed:", data.message);
+            alert("No se pudo girar: " + data.message);
+            return;
+        }
+
+        console.log("✅ Spin Authorized! Result:", data.result_index);
+
+        // 2. Navigate to Result (passing result via query param for speed, or let it fetch)
+        // For now, let's just go to result page. It should read from DB or we can pass state.
+        // To be safe and "dumb", we just navigate.
+        router.push(`/individual/screen/${id}/result?res=${data.result_index}`);
     };
 
     return (

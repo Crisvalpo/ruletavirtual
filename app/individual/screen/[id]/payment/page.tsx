@@ -6,6 +6,7 @@ import { use, useEffect, useState } from 'react';
 import React from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { getDeviceFingerprint } from '@/lib/deviceFingerprint';
 
 import VirtualKeyboard from '@/components/individual/VirtualKeyboard';
 
@@ -162,43 +163,62 @@ export default function PaymentPage({
         setRedeemError('');
 
         try {
-            // STEP 1: CHECK FOR EXISTING SESSION (RESCUE)
-            const { data: existingSession } = await supabase
-                .from('player_queue')
-                .select('id, status')
-                .eq('screen_number', parseInt(id))
-                .eq('package_code', cleanCode)
-                .neq('status', 'completed')
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+            // Get device fingerprint
+            const deviceFingerprint = getDeviceFingerprint();
 
-            if (existingSession) {
-                console.log("♻️ Session rescued for code:", cleanCode);
-                setQueueId(existingSession.id);
-                router.push(`/individual/screen/${id}/select`);
-                return;
-            }
-
-            // STEP 2: NORMAL REDEMPTION
-            const { data, error } = await supabase.rpc('redeem_game_package', {
+            // Call new RPC for package redemption/continuation
+            const { data, error } = await supabase.rpc('redeem_or_continue_package', {
                 p_code: cleanCode,
-                p_screen_id: parseInt(id)
+                p_device_fingerprint: deviceFingerprint,
+                p_screen_number: parseInt(id),
+                p_player_name: nickname,
+                p_player_emoji: emoji,
+                p_player_id: user?.id || null
             });
 
             if (error) throw error;
 
             if (data && data.success) {
-                handlePayment('cash', cleanCode);
-            } else {
-                // Specific error handling for Brute Force or Activation
-                setRedeemError(data?.message || 'Error al canjear código');
+                console.log("✅ Package redeemed/continued:", data);
 
-                // If blocked, we could show a countdown or similar
-                if (data?.cooldown_until) {
-                    const date = new Date(data.cooldown_until);
-                    setRedeemError(`Demasiados intentos. Bloqueado hasta las ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+                // Store package info in localStorage for later use
+                localStorage.setItem('current_package', JSON.stringify({
+                    packageId: data.package_id,
+                    spinNumber: data.spin_number,
+                    totalSpins: data.total_spins,
+                    code: cleanCode
+                }));
+
+                // Create queue entry with package tracking
+                const wheelId = searchParams.get('wheelId');
+                const { data: queueData, error: queueError } = await supabase
+                    .from('player_queue')
+                    .insert({
+                        screen_number: parseInt(id),
+                        player_name: nickname,
+                        player_emoji: emoji,
+                        player_id: user?.id || null,
+                        status: 'selecting',
+                        selected_wheel_id: wheelId || null,
+                        package_code: cleanCode,
+                        package_tracking_id: data.package_id,
+                        spin_number: data.spin_number,
+                        created_at: new Date().toISOString()
+                    })
+                    .select()
+                    .single();
+
+                if (queueData && !queueError) {
+                    console.log("✅ Queue Item Created:", queueData.id);
+                    setQueueId(queueData.id);
+                    router.push(`/individual/screen/${id}/select`);
+                } else {
+                    console.error("❌ Queue Create Error:", queueError);
+                    setRedeemError('Error al crear sesión en la fila');
                 }
+            } else {
+                // Show specific error message from RPC
+                setRedeemError(data?.message || 'Error al canjear código');
             }
         } catch (err: any) {
             console.error("Redemption Error:", err);

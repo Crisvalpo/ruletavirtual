@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useVenueSettings } from '@/hooks/useVenueSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { QRCodeCanvas } from 'qrcode.react';
+import { getDeviceFingerprint } from '@/lib/deviceFingerprint';
 
 export default function ResultPage({
     params
@@ -18,12 +19,22 @@ export default function ResultPage({
     const supabase = createClient();
     const { selectedAnimals, nickname, queueId } = useGameStore();
 
-    const [status, setStatus] = useState<'loading' | 'winning' | 'losing'>('loading');
+    const [status, setStatus] = useState<'loading' | 'winning' | 'losing' | 'auto_rejoin'>('loading');
     const [dbSelections, setDbSelections] = useState<number[]>([]);
     const [email, setEmail] = useState('');
     const [isSaved, setIsSaved] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [ticketCode, setTicketCode] = useState<string | null>(null);
+
+    // Package tracking state
+    const [packageInfo, setPackageInfo] = useState<{
+        packageId: string;
+        spinNumber: number;
+        totalSpins: number;
+        spinsRemaining: number;
+        code: string;
+    } | null>(null);
+    const [autoRejoinCountdown, setAutoRejoinCountdown] = useState(5);
 
     const { baseUrl } = useVenueSettings();
     const { user, profile, signInWithGoogle } = useAuth();
@@ -156,6 +167,138 @@ export default function ResultPage({
         };
     }, [id, selectedAnimals, queueId, supabase]);
 
+    // Check for package tracking and auto-rejoin
+    useEffect(() => {
+        if (status !== 'winning' && status !== 'losing') return;
+
+        const checkPackageStatus = async () => {
+            // Load package info from localStorage
+            const stored = localStorage.getItem('current_package');
+            if (!stored) return;
+
+            try {
+                const data = JSON.parse(stored);
+
+                // Query package_tracking to get current status
+                const { data: packageData, error } = await supabase
+                    .from('package_tracking')
+                    .select('total_spins, spins_consumed')
+                    .eq('id', data.packageId)
+                    .single();
+
+                if (error || !packageData) {
+                    console.error('Error fetching package:', error);
+                    return;
+                }
+
+                const spinsRemaining = packageData.total_spins - packageData.spins_consumed;
+
+                if (spinsRemaining > 0) {
+                    console.log(`📦 Package has ${spinsRemaining} spins remaining`);
+
+                    setPackageInfo({
+                        packageId: data.packageId,
+                        spinNumber: packageData.spins_consumed + 1,
+                        totalSpins: packageData.total_spins,
+                        spinsRemaining,
+                        code: data.code
+                    });
+
+                    // Show auto-rejoin screen
+                    setStatus('auto_rejoin');
+                } else {
+                    // Package complete, clear localStorage
+                    localStorage.removeItem('current_package');
+                }
+            } catch (e) {
+                console.error('Error parsing package info:', e);
+            }
+        };
+
+        // Wait 3 seconds before checking (let user see result)
+        const timer = setTimeout(checkPackageStatus, 3000);
+        return () => clearTimeout(timer);
+    }, [status, supabase]);
+
+    // Auto-rejoin countdown
+    useEffect(() => {
+        if (status !== 'auto_rejoin') return;
+
+        if (autoRejoinCountdown === 0) {
+            handleAutoRejoin();
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            setAutoRejoinCountdown(prev => prev - 1);
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [status, autoRejoinCountdown]);
+
+    const handleAutoRejoin = async () => {
+        if (!packageInfo) return;
+
+        console.log('🔄 Auto-rejoining queue...');
+
+        try {
+            const deviceFingerprint = getDeviceFingerprint();
+
+            // Call RPC to continue package
+            const { data, error } = await supabase.rpc('redeem_or_continue_package', {
+                p_code: packageInfo.code,
+                p_device_fingerprint: deviceFingerprint,
+                p_screen_number: parseInt(id),
+                p_player_name: nickname,
+                p_player_emoji: useGameStore.getState().emoji,
+                p_player_id: user?.id || null
+            });
+
+            if (error || !data?.success) {
+                console.error('Error continuing package:', error);
+                return;
+            }
+
+            // Update package info in localStorage
+            localStorage.setItem('current_package', JSON.stringify({
+                packageId: data.package_id,
+                spinNumber: data.spin_number,
+                totalSpins: data.total_spins,
+                code: packageInfo.code
+            }));
+
+            // Create new queue entry
+            const wheelId = useGameStore.getState().activeWheelId;
+            const { data: queueData, error: queueError } = await supabase
+                .from('player_queue')
+                .insert({
+                    screen_number: parseInt(id),
+                    player_name: nickname,
+                    player_emoji: useGameStore.getState().emoji,
+                    player_id: user?.id || null,
+                    status: 'selecting',
+                    selected_wheel_id: wheelId || null,
+                    package_code: packageInfo.code,
+                    package_tracking_id: data.package_id,
+                    spin_number: data.spin_number,
+                    created_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+
+            if (queueData && !queueError) {
+                console.log('✅ Auto-rejoin successful:', queueData.id);
+                useGameStore.getState().setQueueId(queueData.id);
+                useGameStore.getState().setSelectedAnimals([]);
+                router.push(`/individual/screen/${id}/select`);
+            } else {
+                console.error('❌ Queue create error:', queueError);
+            }
+        } catch (err) {
+            console.error('Auto-rejoin error:', err);
+        }
+    };
+
     const handlePlayAgain = () => {
         // Clear selected animals for a fresh start
         useGameStore.getState().setSelectedAnimals([]);
@@ -257,6 +400,39 @@ export default function ResultPage({
                         className="w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95"
                     >
                         Intentar de Nuevo
+                    </button>
+                </div>
+            )}
+
+            {status === 'auto_rejoin' && packageInfo && (
+                <div className="text-center animate-in fade-in zoom-in duration-500 max-w-sm w-full">
+                    <div className="text-6xl mb-4">🎯</div>
+                    <h1 className="text-3xl font-bold text-purple-400 mb-2">¡Tienes más giros!</h1>
+                    <p className="text-xl mb-4 text-gray-300">
+                        Te quedan <span className="text-yellow-400 font-bold">{packageInfo.spinsRemaining}</span> giros
+                    </p>
+
+                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 rounded-2xl mb-6 shadow-2xl">
+                        <p className="text-white/80 text-sm mb-2">Próximo giro</p>
+                        <p className="text-white text-3xl font-bold">
+                            {packageInfo.spinNumber} de {packageInfo.totalSpins}
+                        </p>
+                    </div>
+
+                    <div className="bg-gray-800/80 backdrop-blur-md p-6 rounded-2xl border border-purple-500/30 mb-6">
+                        <p className="text-gray-300 mb-4">
+                            Preparando tu siguiente giro...
+                        </p>
+                        <div className="text-5xl font-bold text-purple-400">
+                            {autoRejoinCountdown}
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={handleAutoRejoin}
+                        className="w-full bg-purple-500 hover:bg-purple-600 text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95"
+                    >
+                        Continuar Ahora
                     </button>
                 </div>
             )}
