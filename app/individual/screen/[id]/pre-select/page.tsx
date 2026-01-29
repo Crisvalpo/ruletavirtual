@@ -130,8 +130,14 @@ export default function PreSelectPage({
                 // Así que redirigimos a `select` que actuará como Waiting Room.
                 router.push(`/individual/screen/${id}/select`);
             } else {
-                console.error("❌ Link Error:", error);
-                alert("Error al unirse a la fila. Intenta nuevamente.");
+                console.error("❌ Queue Insert Failed:");
+                console.error("Error object:", JSON.stringify(error, null, 2));
+                console.error("Error message:", error?.message);
+                console.error("Error code:", error?.code);
+                console.error("Error details:", error?.details);
+                console.error("Error hint:", error?.hint);
+                console.error("Payload attempted:", JSON.stringify(insertPayload, null, 2));
+                alert(`Error al unirse a la fila: ${error?.message || 'Error desconocido'}. Por favor intenta nuevamente.`);
                 setIsSubmitting(false);
             }
 

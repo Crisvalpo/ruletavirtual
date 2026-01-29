@@ -8,6 +8,7 @@ import { useVenueSettings } from '@/hooks/useVenueSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getDeviceFingerprint } from '@/lib/deviceFingerprint';
+import { useRealtimeGame } from '@/hooks/useRealtimeGame';
 
 export default function ResultPage({
     params
@@ -17,7 +18,10 @@ export default function ResultPage({
     const { id } = use(params);
     const router = useRouter();
     const supabase = createClient();
-    const { selectedAnimals, nickname, queueId } = useGameStore();
+    const { selectedAnimals, nickname, queueId, status: globalStatus } = useGameStore();
+
+    // Sync with global screen state to know when it's safe to play again
+    useRealtimeGame(id);
 
     const [status, setStatus] = useState<'loading' | 'winning' | 'losing' | 'auto_rejoin'>('loading');
     const [dbSelections, setDbSelections] = useState<number[]>([]);
@@ -38,6 +42,12 @@ export default function ResultPage({
 
     const { baseUrl } = useVenueSettings();
     const { user, profile, signInWithGoogle } = useAuth();
+
+    // Is the Big Screen ready for a new player?
+    // We disable buttons if the screen is still showing a result or spinning (not idle)
+    // NOTE: globalStatus might take a second to sync, so we default to false (enabled) if undefined, 
+    // but 'waiting' is safer. However, since we are ON the result page, the screen is likely 'result'.
+    const isScreenBusy = globalStatus !== 'idle';
 
     // Check if user is actually identified (has email) vs anonymous
     const isIdentified = !!user?.email;
@@ -196,6 +206,7 @@ export default function ResultPage({
 
     // Check for package tracking and auto-rejoin
     useEffect(() => {
+        // Fix: Do NOT auto-rejoin if winning. Winning = Stops flow to claim prize.
         if (status !== 'winning' && status !== 'losing') return;
 
         const checkPackageStatus = async () => {
@@ -231,8 +242,10 @@ export default function ResultPage({
                         code: data.code
                     });
 
-                    // Show auto-rejoin screen
-                    setStatus('auto_rejoin');
+                    // Only auto-rejoin on LOSS. On WIN, we stay to claim prize.
+                    if (status === 'losing') {
+                        setStatus('auto_rejoin');
+                    }
                 } else {
                     // Package complete, clear localStorage
                     localStorage.removeItem('current_package');
@@ -251,6 +264,9 @@ export default function ResultPage({
     useEffect(() => {
         if (status !== 'auto_rejoin') return;
 
+        // PAUSE COUNTDOWN if screen is busy
+        if (isScreenBusy) return;
+
         if (autoRejoinCountdown === 0) {
             handleAutoRejoin();
             return;
@@ -261,10 +277,10 @@ export default function ResultPage({
         }, 1000);
 
         return () => clearTimeout(timer);
-    }, [status, autoRejoinCountdown]);
+    }, [status, autoRejoinCountdown, isScreenBusy]);
 
     const handleAutoRejoin = async () => {
-        if (!packageInfo) return;
+        if (!packageInfo || isScreenBusy) return;
 
         console.log('🔄 Auto-rejoining queue...');
 
@@ -276,7 +292,7 @@ export default function ResultPage({
                 p_code: packageInfo.code,
                 p_device_fingerprint: deviceFingerprint,
                 p_screen_number: parseInt(id),
-                p_player_name: nickname,
+                p_player_name: useGameStore.getState().nickname,
                 p_player_emoji: useGameStore.getState().emoji,
                 p_player_id: user?.id || null
             });
@@ -295,16 +311,16 @@ export default function ResultPage({
             }));
 
             // Create new queue entry
-            const wheelId = useGameStore.getState().activeWheelId;
+            const activeWheelId = useGameStore.getState().activeWheelId;
             const { data: queueData, error: queueError } = await supabase
                 .from('player_queue')
                 .insert({
                     screen_number: parseInt(id),
-                    player_name: nickname,
+                    player_name: useGameStore.getState().nickname,
                     player_emoji: useGameStore.getState().emoji,
                     player_id: user?.id || null,
                     status: 'selecting',
-                    selected_wheel_id: wheelId || null,
+                    selected_wheel_id: activeWheelId || null,
                     package_code: packageInfo.code,
                     package_tracking_id: data.package_id,
                     spin_number: data.spin_number,
@@ -327,6 +343,8 @@ export default function ResultPage({
     };
 
     const handlePlayAgain = () => {
+        if (isScreenBusy) return;
+
         // Clear selected animals for a fresh start
         useGameStore.getState().setSelectedAnimals([]);
         // Clear queueId to start a new session
@@ -401,12 +419,23 @@ export default function ResultPage({
                     </div>
 
                     <div className="mt-8 flex flex-col gap-4">
-                        <button
-                            onClick={handlePlayAgain}
-                            className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95"
-                        >
-                            Jugar de Nuevo
-                        </button>
+                        {packageInfo && packageInfo.spinsRemaining > 0 ? (
+                            <button
+                                onClick={handleAutoRejoin}
+                                disabled={isScreenBusy}
+                                className={`bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 animate-pulse disabled:opacity-50 disabled:grayscale disabled:animate-none`}
+                            >
+                                {isScreenBusy ? 'Esperando ruleta...' : `Sig. Giro (${packageInfo.spinsRemaining})`}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handlePlayAgain}
+                                disabled={isScreenBusy}
+                                className={`bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
+                            >
+                                {isScreenBusy ? 'Esperando ruleta...' : 'Jugar de Nuevo'}
+                            </button>
+                        )}
                         <p className="text-xs text-gray-500">Muestra esta pantalla al staff para cobrar</p>
                     </div>
                 </div>
@@ -424,9 +453,10 @@ export default function ResultPage({
 
                     <button
                         onClick={handlePlayAgain}
-                        className="w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95"
+                        disabled={isScreenBusy}
+                        className={`w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
                     >
-                        Intentar de Nuevo
+                        {isScreenBusy ? 'Esperando ruleta...' : 'Intentar de Nuevo'}
                     </button>
                 </div>
             )}
@@ -448,18 +478,26 @@ export default function ResultPage({
 
                     <div className="bg-gray-800/80 backdrop-blur-md p-6 rounded-2xl border border-purple-500/30 mb-6">
                         <p className="text-gray-300 mb-4">
-                            Preparando tu siguiente giro...
+                            {isScreenBusy ? 'Esperando a que la ruleta se libere...' : 'Preparando tu siguiente giro...'}
                         </p>
-                        <div className="text-5xl font-bold text-purple-400">
-                            {autoRejoinCountdown}
-                        </div>
+                        {!isScreenBusy && (
+                            <div className="text-5xl font-bold text-purple-400">
+                                {autoRejoinCountdown}
+                            </div>
+                        )}
+                        {isScreenBusy && (
+                            <div className="text-xl font-bold text-yellow-400 animate-pulse">
+                                ⏳
+                            </div>
+                        )}
                     </div>
 
                     <button
                         onClick={handleAutoRejoin}
-                        className="w-full bg-purple-500 hover:bg-purple-600 text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95"
+                        disabled={isScreenBusy}
+                        className={`w-full bg-purple-500 hover:bg-purple-600 text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
                     >
-                        Continuar Ahora
+                        {isScreenBusy ? 'Esperando...' : 'Continuar Ahora'}
                     </button>
                 </div>
             )}
