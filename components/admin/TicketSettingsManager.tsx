@@ -19,16 +19,26 @@ export default function TicketSettingsManager() {
     });
 
     useEffect(() => {
-        fetchSettings();
+        let isMounted = true;
+        fetchSettings(isMounted);
+        return () => { isMounted = false; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    async function fetchSettings() {
-        const { data, error } = await supabase.from('venue_settings').select('*').single();
-        if (data) {
-            setSettings(data);
+    async function fetchSettings(isMounted: boolean) {
+        try {
+            const { data, error } = await supabase.from('venue_settings').select('*').single();
+            if (error) throw error;
+            if (data && isMounted) {
+                setSettings(data);
+            }
+        } catch (err: any) {
+            if (err.name !== 'AbortError') {
+                console.error("Error fetching ticket settings:", err);
+            }
+        } finally {
+            if (isMounted) setLoading(false);
         }
-        setLoading(false);
     }
 
     async function handleSave() {
@@ -69,72 +79,67 @@ export default function TicketSettingsManager() {
     );
 
     return (
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-            <h2 className="text-lg font-black text-slate-900 mb-8 flex items-center gap-2 uppercase tracking-tight">
-                🎫 Configuración de Tickets & Seguridad
-            </h2>
-
-            <div className="space-y-10">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+            <div className="space-y-4">
                 {/* Text Customization */}
-                <div className="space-y-6">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-xs">
                             ✍️
                         </div>
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Personalización de Texto</h3>
+                        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Personalización</h3>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Encabezado Principal</label>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Encabezado</label>
                             <input
                                 name="ticket_header"
                                 value={settings.ticket_header}
                                 onChange={handleChange}
-                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-slate-900 font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Sub-encabezado</label>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Sub-encabezado</label>
                             <input
                                 name="ticket_subheader"
                                 value={settings.ticket_subheader}
                                 onChange={handleChange}
-                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-slate-900 font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Términos Línea 1</label>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Términos 1</label>
                             <input
                                 name="ticket_terms_line1"
                                 value={settings.ticket_terms_line1}
                                 onChange={handleChange}
-                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-slate-900 font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Términos Línea 2</label>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Términos 2</label>
                             <input
                                 name="ticket_terms_line2"
                                 value={settings.ticket_terms_line2}
                                 onChange={handleChange}
-                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-slate-900 font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
                             />
                         </div>
 
-                        <div className="md:col-span-2">
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Dominio Base para QR (Opcional)</label>
+                        <div className="col-span-2 md:col-span-4">
+                            <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Dominio Base QR</label>
                             <input
                                 name="base_url"
                                 value={settings.base_url || ''}
                                 onChange={handleChange}
-                                placeholder="Ej: https://mi-tunel.trycloudflare.com"
-                                className="w-full bg-amber-50 border-2 border-amber-100 rounded-xl p-4 text-amber-900 font-bold focus:border-amber-600 focus:bg-white outline-none transition-all"
+                                placeholder="Ej: https://ruleta.lukeapp.me"
+                                className="w-full bg-amber-50/50 border border-amber-100 rounded-lg p-2 text-xs font-bold focus:border-amber-600 focus:bg-white outline-none transition-all"
                             />
-                            <p className="text-[9px] text-amber-600 font-bold uppercase mt-2 px-1">Si se deja vacío, se usará la URL actual del navegador. Úselo para túneles temporales.</p>
                         </div>
                     </div>
                 </div>
@@ -142,45 +147,36 @@ export default function TicketSettingsManager() {
                 <div className="w-full h-px bg-slate-100" />
 
                 {/* Security Settings */}
-                <div className="space-y-6">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-rose-50 flex items-center justify-center text-xs">
                             🛡️
                         </div>
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Seguridad Antifraude</h3>
+                        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Seguridad</h3>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Max. Intentos Fallidos</label>
                             <input
                                 type="number"
                                 name="max_failed_attempts"
                                 value={settings.max_failed_attempts}
                                 onChange={handleChange}
-                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-slate-900 font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
                             />
-                            <p className="text-[9px] text-slate-400 font-bold uppercase mt-2 px-1">Bloqueo tras N intentos por pantalla.</p>
+                            <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 px-1">Intentos máximos</p>
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Minutos de Enfriamiento</label>
                             <input
                                 type="number"
                                 name="cooldown_minutes"
                                 value={settings.cooldown_minutes}
                                 onChange={handleChange}
-                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 text-slate-900 font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
                             />
-                            <p className="text-[9px] text-slate-400 font-bold uppercase mt-2 px-1">Duración del bloqueo temporal.</p>
+                            <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 px-1">Minutos enfriamiento</p>
                         </div>
-                    </div>
-
-                    <div className="bg-amber-50 border border-amber-100 p-5 rounded-2xl flex gap-4">
-                        <span className="text-xl">⚠️</span>
-                        <p className="text-xs text-amber-800 font-medium leading-relaxed">
-                            <span className="font-black uppercase tracking-tight">Nota de Seguridad:</span> Los tickets generados en lote se crean <span className="font-black underline">desactivados</span> por defecto. Deberá activarlos manualmente tras la impresión desde el escáner de staff.
-                        </p>
                     </div>
                 </div>
             </div>
@@ -188,15 +184,15 @@ export default function TicketSettingsManager() {
             <button
                 onClick={handleSave}
                 disabled={saving}
-                className="mt-10 w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-5 rounded-2xl transition-all shadow-xl shadow-slate-200 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
+                className="mt-6 w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px]"
             >
                 {saving ? (
                     <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         Guardando...
                     </>
                 ) : (
-                    <>💾 Guardar Configuración</>
+                    <>💾 Guardar</>
                 )}
             </button>
         </div>

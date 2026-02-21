@@ -20,7 +20,7 @@ export default function PreSelectPage({
     const { user } = useAuth(); // Identidad del usuario autenticado (si hay)
 
     const mode = useGameStore((state) => state.gameMode);
-    const { selectedAnimals, activeWheelId, nickname, emoji, setQueueId } = useGameStore();
+    const { selectedAnimals, activeWheelId, nickname, emoji, setQueueId, queueId } = useGameStore();
 
     // Estado local para wheelId
     const [currentLocalWheelId, setCurrentLocalWheelId] = useState<string | null>(activeWheelId);
@@ -93,6 +93,38 @@ export default function PreSelectPage({
         setIsSubmitting(true);
 
         try {
+            // NUEVO: Verificar si ya existe una entrada activa
+            if (queueId) {
+                const { data: existingQueue } = await supabase
+                    .from('player_queue')
+                    .select('id, status')
+                    .eq('id', queueId)
+                    .eq('screen_number', parseInt(id))
+                    .in('status', ['selecting', 'waiting', 'playing'])
+                    .maybeSingle();
+
+                if (existingQueue) {
+                    console.log("✅ Actualizando entrada existente en lugar de duplicar:", queueId);
+                    // Actualizar en lugar de insertar
+                    const { error } = await supabase
+                        .from('player_queue')
+                        .update({
+                            selected_animals: selectedAnimals,
+                            status: 'waiting'
+                        })
+                        .eq('id', queueId);
+
+                    if (!error) {
+                        router.push(`/individual/screen/${id}/select`);
+                        return;
+                    } else {
+                        console.error("Error actualizando entrada existente:", error);
+                        setIsSubmitting(false);
+                        return;
+                    }
+                }
+            }
+
             // Preparar objeto de inseción
             const insertPayload: any = {
                 screen_number: parseInt(id),

@@ -38,35 +38,26 @@ function AdminContent() {
     ] as const;
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
+        <div className="min-h-screen bg-slate-50 text-slate-900 p-4 select-text overflow-y-auto">
             <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <span className="text-3xl">📊</span>
-                            <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">Panel de Administración</h1>
-                        </div>
-                        <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Sistema de Control Centralizado • Hub 2026</p>
-                    </div>
-                    <div className="flex gap-4">
-                        <button
-                            onClick={() => window.location.href = '/staff/scanner'}
-                            className="bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-bold px-6 py-3 rounded-xl transition-all active:scale-95 text-xs uppercase tracking-widest flex items-center gap-2 shadow-sm"
-                        >
-                            📷 ESCÁNER
-                        </button>
-                        <button
-                            onClick={() => window.location.href = '/staff/kiosk'}
-                            className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-3 rounded-xl transition-all active:scale-95 text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-slate-200"
-                        >
-                            🎫 Abrir Kiosko
-                        </button>
-                    </div>
-                </header>
+                {/* Header - Minimalist row for buttons only */}
+                <div className="flex justify-end mb-4 gap-3">
+                    <button
+                        onClick={() => window.location.href = '/staff/scanner'}
+                        className="bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-bold px-4 py-2 rounded-xl transition-all active:scale-95 text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm"
+                    >
+                        📷 ESCÁNER
+                    </button>
+                    <button
+                        onClick={() => window.location.href = '/staff/kiosk'}
+                        className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl transition-all active:scale-95 text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm"
+                    >
+                        🎫 Kiosko
+                    </button>
+                </div>
 
-                {/* Tabs Navigation */}
-                <nav className="flex flex-wrap bg-white p-1.5 rounded-2xl border border-slate-200 mb-10 shadow-sm relative overflow-hidden">
+                {/* Tabs Navigation - Compacted */}
+                <nav className="flex flex-wrap bg-white p-1 rounded-2xl border border-slate-200 mb-6 shadow-sm relative overflow-hidden">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
@@ -84,23 +75,11 @@ function AdminContent() {
                     ))}
                 </nav>
 
-                {/* Tab Context Info */}
-                <div className="mb-8 px-2 flex items-center gap-4 animate-in fade-in slide-in-from-left-4 duration-500">
-                    <div className="w-1 h-8 bg-indigo-500 rounded-full" />
-                    <div>
-                        <h2 className="text-xl font-black uppercase tracking-tight text-slate-800">
-                            {tabs.find(t => t.id === activeTab)?.label}
-                        </h2>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                            {tabs.find(t => t.id === activeTab)?.description}
-                        </p>
-                    </div>
-                </div>
 
                 {/* Tab Content */}
                 <main className="animate-in fade-in zoom-in-95 duration-500">
                     {activeTab === 'monitoring' && (
-                        <div className="grid gap-8">
+                        <div className="grid gap-4">
                             <GlobalControlPanel />
                             <ScreenControlDashboard />
                         </div>

@@ -35,7 +35,8 @@ BEGIN
     status = 'waiting_for_spin', -- Ready to spin
     player_id = v_next_player.player_id, -- Can be NULL for guests
     player_name = v_next_player.player_name, 
-    player_emoji = v_next_player.player_emoji
+    player_emoji = v_next_player.player_emoji,
+    current_queue_id = v_next_player.id -- VITAL: Links mobile client to screen
     -- We keep the current_wheel_id (Attract Mode theme) OR we could update it if the queue item had a specific wheel preference
     -- For now, let's assume the flow sets the wheel ID in the queue?
     -- The schema has `package_id` but maybe not `wheel_id`. 

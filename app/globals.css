@@ -29,7 +29,20 @@
 html,
 body {
   max-width: 100vw;
+  /* Allow scroll by default */
   overflow-x: hidden;
+}
+
+/* Premium App Experience (for Player/Individual screens) */
+.pwa-mode {
+  /* Disable pull-to-refresh and system navigation gestures */
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: none;
+  /* Prevent text selection to feel more like a native app */
+  user-select: none;
+  -webkit-user-select: none;
+  /* Remove tap highlight on mobile */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {

@@ -42,7 +42,7 @@ export const useGameStore = create<GameState>()(
             lastSpinResult: null,
             isDemo: false,
             idleSpeed: 1.0,
-            gameMode: 'group',
+            gameMode: 'individual',
             activeWheelId: null,
             selectedAnimals: [],
 
@@ -87,10 +87,9 @@ export const useGameStore = create<GameState>()(
             partialize: (state) => ({
                 nickname: state.nickname,
                 emoji: state.emoji,
-                queueId: state.queueId,
-                activeWheelId: state.activeWheelId,
-                gameMode: state.gameMode,
-                screenId: state.screenId,
+                // Do NOT persist screenId, activeWheelId, or gameMode
+                // because multiple screens in different tabs/windows on the SAME machine
+                // share localStorage. Persisting these would cause Tab 1 to overwrite Tab 2.
             }),
         }
     )

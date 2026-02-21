@@ -38,10 +38,16 @@ export default function SelectionPage({
         syncSelection();
     }, [selectedAnimals, queueId, supabase]);
 
+
     const [uiStatus, setUiStatus] = React.useState<'selecting' | 'waiting' | 'ready'>('selecting');
     const [isInitializing, setIsInitializing] = React.useState(true);
     const [queuePosition, setQueuePosition] = React.useState<number | null>(null);
     const [currentLocalWheelId, setCurrentLocalWheelId] = React.useState<string | null>(activeWheelId);
+
+    // Timeout states
+    const [spinTimeout, setSpinTimeout] = React.useState(30); // Fase 1: 30s
+    const [spinCountdown, setSpinCountdown] = React.useState<number | null>(null); // Fase 2: 10s
+    const [selectingTimeout, setSelectingTimeout] = React.useState(120); // 120s para selecting
 
     // Package tracking state
     const [packageInfo, setPackageInfo] = React.useState<{
@@ -187,14 +193,14 @@ export default function SelectionPage({
                     p_screen_number: parseInt(id)
                 });
             }
-            // C. Failsafe: Stuck on Result (> 12s)
-            else if (screenData?.status === 'result') {
+            // C. Failsafe: Stuck on Result or Showing Result (> 12s)
+            else if (screenData?.status === 'result' || screenData?.status === 'showing_result') {
                 const lastUpdate = new Date(screenData.updated_at).getTime();
                 const now = new Date().getTime();
                 const diffSeconds = (now - lastUpdate) / 1000;
 
                 if (diffSeconds > 12) {
-                    console.warn("⚠️ Failsafe: Screen stuck on result! Forcing advance...");
+                    console.warn(`⚠️ Failsafe: Screen stuck on ${screenData.status}! Forcing advance...`);
                     await supabase.rpc('force_advance_queue', {
                         p_screen_number: parseInt(id)
                     });
@@ -205,6 +211,70 @@ export default function SelectionPage({
         return () => clearInterval(interval);
     }, [uiStatus, queueId, id, supabase]);
 
+    // Timer for waiting_for_spin: 30s bar + 10s countdown
+    React.useEffect(() => {
+        if (uiStatus !== 'ready') {
+            // Reset timers cuando no estamos ready
+            setSpinTimeout(30);
+            setSpinCountdown(null);
+            return;
+        }
+
+        // Fase 1: Barra de 30 segundos
+        if (spinTimeout > 0 && spinCountdown === null) {
+            const timer = setTimeout(() => {
+                setSpinTimeout(prev => prev - 1);
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+
+        // Fase 2: Iniciar countdown de 10s
+        if (spinTimeout === 0 && spinCountdown === null) {
+            setSpinCountdown(10);
+        }
+
+        // Countdown de 10 a 0
+        if (spinCountdown !== null && spinCountdown > 0) {
+            const timer = setTimeout(() => {
+                setSpinCountdown(prev => prev! - 1);
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+
+        // Giro automático
+        if (spinCountdown === 0) {
+            console.log("⏰ Timeout alcanzado - Girando automáticamente");
+            handleSpin();
+        }
+    }, [uiStatus, spinTimeout, spinCountdown]);
+
+    // Timer for selecting: 120s timeout
+    React.useEffect(() => {
+        if (uiStatus !== 'selecting') {
+            // Reset timer cuando no estamos selecting
+            setSelectingTimeout(120);
+            return;
+        }
+
+        if (selectingTimeout > 0) {
+            const timer = setTimeout(() => {
+                setSelectingTimeout(prev => prev - 1);
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+
+        // Expulsar al jugador
+        if (selectingTimeout === 0 && queueId) {
+            console.warn("⏰ Timeout de selección - Expulsando jugador");
+            supabase
+                .from('player_queue')
+                .update({ status: 'abandoned' })
+                .eq('id', queueId)
+                .then(() => {
+                    router.push(`/individual/screen/${id}`);
+                });
+        }
+    }, [uiStatus, selectingTimeout, queueId, router, id, supabase]);
 
     const handleConfirm = async () => {
         if (selectedAnimals.length === 3 && queueId) {
@@ -216,7 +286,8 @@ export default function SelectionPage({
                     status: 'waiting',
                     selected_animals: selectedAnimals,
                 })
-                .eq('id', queueId);
+                .eq('id', queueId)
+                .eq('status', 'selecting'); // Only if still selecting (prevents overwriting 'playing' if TV promoted us fast)
 
             if (!error) {
                 setUiStatus('waiting');
@@ -248,7 +319,19 @@ export default function SelectionPage({
             return;
         }
 
-        // 2. Navegar a resultado (feedback visual para el usuario móvil)
+        // 2. Persistir en localStorage para recuperación si cierra ventana
+        try {
+            localStorage.setItem(`spin_${id}_active`, JSON.stringify({
+                queueId: queueId,
+                timestamp: Date.now(),
+                screenNumber: parseInt(id)
+            }));
+            console.log("💾 Spin info saved to localStorage");
+        } catch (e) {
+            console.warn("Could not save to localStorage:", e);
+        }
+
+        // 3. Navegar a resultado (feedback visual para el usuario móvil)
         router.push(`/individual/screen/${id}/result`);
     };
 
@@ -281,6 +364,24 @@ export default function SelectionPage({
                     </div>
                 </button>
 
+                {/* Countdown de 10 segundos */}
+                {spinCountdown !== null && (
+                    <div className="mt-8 bg-yellow-400 text-black px-6 py-3 rounded-full animate-pulse">
+                        <p className="text-sm font-bold">Giro automático en</p>
+                        <p className="text-4xl font-black">{spinCountdown}</p>
+                    </div>
+                )}
+
+                {/* Barra de progreso de 30s */}
+                {spinCountdown === null && (
+                    <div className="fixed bottom-0 left-0 right-0 h-2 bg-white/20">
+                        <div
+                            className="h-full bg-yellow-400 transition-all duration-1000"
+                            style={{ width: `${(spinTimeout / 30) * 100}%` }}
+                        />
+                    </div>
+                )}
+
                 <p className="text-white/80 mt-8 text-sm text-center">
                     Presiona el botón rojo para lanzar la ruleta en la pantalla {id}
                 </p>
@@ -288,17 +389,33 @@ export default function SelectionPage({
         );
     }
 
+    const handleChangeWheel = () => {
+        useGameStore.getState().setGameMode('individual', undefined); // Clear wheel selection to prevent auto-redirect
+        router.push(`/individual/screen/${id}`);
+    };
+
     return (
         <div className="h-[100dvh] bg-gray-900 text-white flex flex-col overflow-hidden">
             <header className="px-4 py-3 bg-gray-900/90 backdrop-blur-sm z-10 flex-none border-b border-gray-800">
                 <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-                            Elige 3 {mode === 'group' ? 'Animales' : 'Opciones'}
-                        </h1>
-                        <p className="text-xs text-green-400 font-medium tracking-wide">
-                            {selectedAnimals.length}/3 SELECCIONADOS
-                        </p>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleChangeWheel}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 transition-colors"
+                            aria-label="Cambiar Ruleta"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M19 12H5M12 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <div>
+                            <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+                                Elige 3 {mode === 'group' ? 'Animales' : 'Opciones'}
+                            </h1>
+                            <p className="text-xs text-green-400 font-medium tracking-wide">
+                                {selectedAnimals.length}/3 SELECCIONADOS
+                            </p>
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         {/* Package Progress - Inline */}
@@ -361,7 +478,16 @@ export default function SelectionPage({
                     </button>
                 )}
             </div>
+
+            {/* Barra de timeout para selecting */}
+            {uiStatus === 'selecting' && (
+                <div className="fixed bottom-0 left-0 right-0 h-2 bg-gray-800 z-50">
+                    <div
+                        className="h-full bg-gradient-to-r from-green-500 to-yellow-500 transition-all duration-1000"
+                        style={{ width: `${(selectingTimeout / 120) * 100}%` }}
+                    />
+                </div>
+            )}
         </div>
     );
 }
-

@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, useRef } from 'react';
 import WheelCanvas from '@/components/individual/WheelCanvas';
 import { ANIMAL_LIST } from '@/lib/constants/animals';
 import Image from 'next/image';
@@ -38,12 +38,20 @@ export default function DisplayScreenPage({
     const isCentralScreen = isGroupEvent && screenIdNum === centralScreenId;
     const isBillboardScreen = isGroupEvent && !isCentralScreen;
 
+    useEffect(() => {
+        console.log(`📡 [Mode Sync] venueMode: ${venueMode}, storeMode: ${mode}, isGroupEvent: ${isGroupEvent}`);
+    }, [venueMode, mode, isGroupEvent]);
+
     // Effective Wheel ID for Individual Play (ignored if Group Event)
-    const effectiveActiveWheelId = isGroupEvent ? null : activeWheelId;
-    const effectiveMode = isGroupEvent ? 'group' : mode; // Force group visual in event mode (or specific event visual)
+    const MARIO_WHEEL_ID = 'a4b68bf3-78e6-4a16-9957-5d357dbd1d8a';
+
+    // CRITICAL: If venueMode is individual, we MUST use the activeWheelId from store (synced via current_wheel_id)
+    // or fallback to Mario. If it's group_event, we use null (for 36 animals).
+    const effectiveActiveWheelId = isGroupEvent ? null : (activeWheelId || MARIO_WHEEL_ID);
+    const effectiveMode = isGroupEvent ? 'group' : 'individual';
 
     // Celebration State
-    const [status, setStatus] = useState<'idle' | 'spinning' | 'result'>('idle');
+    const [status, setStatus] = useState<'idle' | 'spinning' | 'result' | 'duplicate'>('idle');
     const [result, setResult] = useState<number | null>(null);
     // History State
     const [lastSpins, setLastSpins] = useState<any[]>([]);
@@ -55,90 +63,219 @@ export default function DisplayScreenPage({
     }, []);
 
     // Missing State Definitions
-    const [activeWheelAssets, setActiveWheelAssets] = useState<{ background: string; segments: any[] } | null>(null);
+    const [activeWheelAssets, setActiveWheelAssets] = useState<any>(null);
+    const [assetsLoading, setAssetsLoading] = useState<boolean>(false);
     const [showConfetti, setShowConfetti] = useState(false);
     const [showBigWin, setShowBigWin] = useState(false);
     const [currentSelections, setCurrentSelections] = useState<number[]>([]);
-
     const supabase = createClient();
+    const instanceId = useRef(Math.random().toString(36).substring(7));
+    const joinedAt = useRef(Date.now());
 
-    // 3. Effect: When activeWheelId changes (via Realtime), fetch assets
+    // 2.5 Supabase Presence: Prevent Duplicate Screens (First One Wins)
     useEffect(() => {
-        async function loadWheelAssets() {
-            // FORCE DEBUG: Override with local Mario assets
-            const FORCE_DEBUG = false; // Set to false to enable Real Database Fetching
+        if (!screenIdNum) return;
 
-            if (FORCE_DEBUG) {
-                // Base URL for Supabase Storage (Public Bucket: individual-wheels)
-                // Corrected path based on Storage structure: mario/mario/segments/X.png
-                // Project ID: umimqlybmqivowsshtkt
-                const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+        const channel = supabase.channel('global_presence_monitor');
 
-                const segments = Array.from({ length: 12 }, (_, i) => ({
-                    id: i + 1,
-                    label: `Seg ${i + 1}`,
-                    color: 'transparent',
-                    imageWheel: `${STORAGE_BASE}/mario/segments/${i + 1}.png`,
-                    imageResult: `${STORAGE_BASE}/mario/selector/${i + 1}.jpg`
-                }));
+        channel
+            .on('presence', { event: 'sync' }, () => {
+                const state = channel.presenceState();
 
-                setActiveWheelAssets({
-                    background: `${STORAGE_BASE}/mario/background.jpg`,
-                    segments: segments
+                // Find all display instances for THIS screen
+                const otherInstances: any[] = [];
+                Object.values(state).forEach((presences: any) => {
+                    presences.forEach((p: any) => {
+                        if (p.type === 'display' && p.screen === screenIdNum) {
+                            otherInstances.push(p);
+                        }
+                    });
                 });
-                return;
-            } else if (effectiveMode === 'group' && !effectiveActiveWheelId) {
-                setActiveWheelAssets(null); // Default 36 animals
-            } else if (effectiveActiveWheelId) {
-                // REAL LOGIC: Fetch Dynamic Wheel Data
-                try {
-                    const { data: wheel, error: wheelError } = await supabase
-                        .from('individual_wheels')
-                        .select('storage_path, segment_count, background_image')
-                        .eq('id', effectiveActiveWheelId)
-                        .single();
 
-                    if (wheelError) throw wheelError;
-
-                    const { data: dbSegments, error: segmentError } = await supabase
-                        .from('individual_wheel_segments')
-                        .select('position, name, segment_image, selector_image, color')
-                        .eq('wheel_id', effectiveActiveWheelId)
-                        .order('position', { ascending: true });
-
-                    if (segmentError) throw segmentError;
-
-                    if (wheel) {
-                        const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
-
-                        // Handle both relative and absolute paths
-                        const getFullUrl = (path: string | null) => {
-                            if (!path) return null;
-                            return path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`;
-                        };
-
-                        const segments = dbSegments.map(s => ({
-                            id: s.position,
-                            label: s.name,
-                            color: s.color || 'transparent',
-                            imageWheel: getFullUrl(s.segment_image),
-                            imageResult: getFullUrl(s.selector_image)
-                        }));
-
-                        setActiveWheelAssets({
-                            background: getFullUrl(wheel.background_image) || '',
-                            segments: segments
-                        });
-                    }
-                } catch (err) {
-                    console.error("Failed to load wheel assets:", err);
-                    // If not found or error, we could reset to null (group mode)
-                    // but for now we log it.
+                // NO DUPLICATE DETECTED? Stay in current state (reset duplicate if it was there)
+                if (otherInstances.length <= 1) {
+                    if (status === 'duplicate') setStatus('idle');
+                    return;
                 }
+
+                // ARBITRATION: First one to join wins.
+                // Sort by timestamp. 
+                otherInstances.sort((a, b) => a.joined_at - b.joined_at);
+
+                // If the first instance ID is NOT ours, then we are a duplicate.
+                const firstInstance = otherInstances[0];
+                if (firstInstance.id !== instanceId.current) {
+                    console.warn(`🚫 OTRA PESTAÑA DETECTADA (ID: ${instanceId.current}): Bloqueando esta instancia secundaria.`);
+                    setStatus('duplicate');
+                } else {
+                    // We are the master. If we were in duplicate mode, clear it.
+                    if (status === 'duplicate') setStatus('idle');
+                }
+            })
+            .subscribe(async (subStatus) => {
+                if (subStatus === 'SUBSCRIBED') {
+                    await channel.track({
+                        id: instanceId.current,
+                        screen: screenIdNum,
+                        type: 'display',
+                        joined_at: joinedAt.current
+                    });
+                }
+            });
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [screenIdNum, supabase]);
+
+    // 2.7 Supabase Broadcast: Remote Reload
+    useEffect(() => {
+        if (!screenIdNum) return;
+
+        const channel = supabase.channel(`screen_commands_${screenIdNum}`);
+        channel
+            .on('broadcast', { event: 'force_reload' }, () => {
+                console.log('🔄 RECARGA REMOTA RECIBIDA: Reiniciando pantalla...');
+                window.location.reload();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [screenIdNum, supabase]);
+
+    // 3. Effect: When activeWheelId or Mode changes, fetch assets
+    useEffect(() => {
+        console.log(`🎨 [Assets] Status check:
+            - venueMode: ${venueMode}
+            - isGroupEvent: ${isGroupEvent}
+            - storeMode: ${mode}
+            - activeWheelId (store): ${activeWheelId}
+            - effectiveActiveWheelId: ${effectiveActiveWheelId}
+            - effectiveMode: ${effectiveMode}
+        `);
+
+        async function loadWheelAssets() {
+            setAssetsLoading(true);
+            const loadStartTime = Date.now();
+
+            // FAILSAFE: Ensure we don't stay stuck in loading more than 10s
+            const loadingFailsafe = setTimeout(() => {
+                setAssetsLoading(prev => {
+                    if (prev) {
+                        console.warn(`⏳ [Assets] Failsafe triggered for Screen ${screenIdNum} after 10s`);
+                        return false;
+                    }
+                    return prev;
+                });
+            }, 10000);
+
+            try {
+                // If in group event mode, we use the default 36 animals, so no specific wheel assets are needed.
+                // effectiveActiveWheelId will be null in this case.
+                if (venueMode === 'group_event') {
+                    console.log("🎨 [Assets] Group Mode detected, clearing specific wheel assets (using default 36 animals)");
+                    setActiveWheelAssets(null);
+                    return;
+                }
+
+                // If not in group event mode, we must have an effectiveActiveWheelId.
+                // If it's null here, it means individual mode but no wheel ID (shouldn't happen with MARIO_WHEEL_ID fallback).
+                if (!effectiveActiveWheelId) {
+                    console.warn("🎨 [Assets] Individual Mode but no effectiveActiveWheelId. This should not happen.");
+                    setActiveWheelAssets(null);
+                    return;
+                }
+
+                console.log(`🎨 [Assets] Fetching for ID: ${effectiveActiveWheelId}`);
+                // ... fetch logic ...
+                const FORCE_DEBUG = false; // Set to false to enable Real Database Fetching
+
+                if (FORCE_DEBUG) {
+                    // Base URL for Supabase Storage (Public Bucket: individual-wheels)
+                    // Corrected path based on Storage structure: mario/mario/segments/X.png
+                    // Project ID: umimqlybmqivowsshtkt
+                    const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+
+                    const segments = Array.from({ length: 12 }, (_, i) => ({
+                        id: i + 1,
+                        label: `Seg ${i + 1}`,
+                        color: 'transparent',
+                        imageWheel: `${STORAGE_BASE}/mario/segments/${i + 1}.png`,
+                        imageResult: `${STORAGE_BASE}/mario/selector/${i + 1}.jpg`
+                    }));
+
+                    setActiveWheelAssets({
+                        background: `${STORAGE_BASE}/mario/background.jpg`,
+                        segments: segments
+                    });
+                    return;
+                } else {
+                    // REAL LOGIC: Fetch Dynamic Wheel Data
+                    try {
+                        const { data: wheel, error: wheelError } = await supabase
+                            .from('individual_wheels')
+                            .select('storage_path, segment_count, background_image')
+                            .eq('id', effectiveActiveWheelId)
+                            .single();
+
+                        if (wheelError) throw wheelError;
+
+                        const { data: dbSegments, error: segmentError } = await supabase
+                            .from('individual_wheel_segments')
+                            .select('position, name, segment_image, selector_image, color')
+                            .eq('wheel_id', effectiveActiveWheelId)
+                            .order('position', { ascending: true });
+
+                        if (segmentError) throw segmentError;
+
+                        if (wheel) {
+                            const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+
+                            // Handle both relative and absolute paths
+                            const getFullUrl = (path: string | null) => {
+                                if (!path) return null;
+                                return path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`;
+                            };
+
+                            const segments = dbSegments.map(s => ({
+                                id: s.position,
+                                label: s.name,
+                                color: s.color || 'transparent',
+                                imageWheel: getFullUrl(s.segment_image),
+                                imageResult: getFullUrl(s.selector_image)
+                            }));
+
+                            setActiveWheelAssets({
+                                background: getFullUrl(wheel.background_image) || '',
+                                segments: segments
+                            });
+                        }
+                    } catch (err: any) {
+                        console.error("❌ Failed to load wheel assets:", {
+                            message: err.message,
+                            details: err.details,
+                            hint: err.hint,
+                            code: err.code,
+                            full: err
+                        });
+                        // If not found or error, we could reset to null (group mode)
+                        // but for now we log it.
+                        setActiveWheelAssets(null); // Fallback to default if error
+                    }
+                }
+            } catch (err: any) {
+                console.error("❌ Failed to load wheel assets:", err);
+                setActiveWheelAssets(null); // Ensure assets are cleared on any top-level error
+            } finally {
+                clearTimeout(loadingFailsafe);
+                setAssetsLoading(false);
+                console.log(`🎨 [Assets] Load finished for Screen ${screenIdNum} in ${Date.now() - loadStartTime}ms`);
             }
         }
         loadWheelAssets();
-    }, [effectiveMode, effectiveActiveWheelId]);
+    }, [venueMode, effectiveActiveWheelId]);
 
     // 4. Listen to Store Status (Triggered by Realtime from Mobile)
     const storeStatus = useGameStore(s => s.status);
@@ -171,7 +308,12 @@ export default function DisplayScreenPage({
                         .single();
 
                     if (error) {
-                        console.error("❌ Error fetching result:", error);
+                        if (error.message?.includes('aborted') || error.code === 'ABORTED') return;
+                        console.error("❌ Error fetching result:", {
+                            code: error.code,
+                            message: error.message,
+                            screenId: screenIdNum
+                        });
                     }
 
                     if (data && data.last_spin_result !== null) {
@@ -179,21 +321,33 @@ export default function DisplayScreenPage({
                         setResult(data.last_spin_result); // Triggers animation
                     } else {
                         console.warn("⚠️ Spin triggered but no result in DB (or null). Waiting generic time...");
-                        // Retry once after 500ms?
-                        setTimeout(async () => {
-                            const { data: retryData } = await supabase
-                                .from('screen_state')
-                                .select('last_spin_result')
-                                .eq('screen_number', screenIdNum)
-                                .single();
-                            if (retryData?.last_spin_result) {
-                                console.log("📥 Retry Result:", retryData.last_spin_result);
-                                setResult(retryData.last_spin_result);
-                            } else {
-                                console.error("❌ Still no result. Failing safe to 1.");
-                                setResult(1);
+
+                        // WATCHDOG: Force a reset if no result arrives in 15 seconds
+                        const watchdog = setTimeout(() => {
+                            const currentStatus = useGameStore.getState().status;
+                            if (currentStatus === 'spinning') {
+                                console.error("🚨 TV WATCHDOG: Result timeout! Forcing fallback reset.");
+                                setStatus('idle');
                             }
+                        }, 15000);
+
+                        // Retry once after 1s
+                        setTimeout(async () => {
+                            try {
+                                const { data: retryData } = await supabase
+                                    .from('screen_state')
+                                    .select('last_spin_result')
+                                    .eq('screen_number', screenIdNum)
+                                    .single();
+
+                                if (retryData && retryData.last_spin_result !== null) {
+                                    console.log("📥 Retry Result Check Success:", retryData.last_spin_result);
+                                    setResult(retryData.last_spin_result);
+                                }
+                            } catch (e) { }
                         }, 1000);
+
+                        return () => clearTimeout(watchdog);
                     }
                 };
 
@@ -246,62 +400,81 @@ export default function DisplayScreenPage({
     }, [screenIdNum]);
 
     // Fetch Active Player Selections (OR USE PREVIEW)
-    // Fetch Active Player Selections (OR USE PREVIEW)
     useEffect(() => {
         // Priority: 1. Active Playing (DB) 2. Preview (Broadcast)
-        if (status === 'idle' && !realNickname && previewPlayer) {
+        if (status === 'idle' && (!realNickname || realNickname === 'Jugador') && previewPlayer) {
             console.log("👀 Using Preview Selections");
             setCurrentSelections(previewPlayer.selections);
             return;
         }
 
-        if (status === 'idle' && !realNickname) {
+        if (status === 'idle' && (!realNickname || realNickname === 'Jugador')) {
             console.log("🤷 No Active Player, clearing selections");
             setCurrentSelections([]);
             return;
         }
 
+        if (isNaN(screenIdNum)) {
+            console.error("❌ Invalid screenIdNum:", screen);
+            return;
+        }
+
         async function fetchSelections() {
-            console.log("🔎 Fetching selections for Active Player:", realNickname);
-            // Only fetch if we have a player name but no selections yet, or if status changed
-            const { data, error } = await supabase
-                .from('player_queue')
-                .select('selected_animals')
-                .eq('screen_number', screenIdNum)
-                .eq('status', 'playing')
-                .maybeSingle();
+            // Only fetch if we are NOT idle and have a real nickname
+            if (status === 'idle') return;
 
-            if (error) {
-                console.error("❌ Error fetching selections:", error);
-            }
+            console.log("🔎 Fetching selections for Active Player:", realNickname, "on Screen:", screenIdNum);
 
-            if (data?.selected_animals) {
-                console.log("✅ Selections Found:", data.selected_animals);
-                setCurrentSelections(data.selected_animals as number[]);
-            } else {
-                console.warn("⚠️ No selections found for active player in 'playing' status.");
-                setCurrentSelections([]);
+            try {
+                const { data, error } = await supabase
+                    .from('player_queue')
+                    .select('selected_animals')
+                    .eq('screen_number', screenIdNum)
+                    .eq('status', 'playing')
+                    .maybeSingle();
 
-                // Retry in case of replication lag
-                if (realNickname) {
-                    setTimeout(async () => {
-                        const { data: retry } = await supabase
-                            .from('player_queue')
-                            .select('selected_animals')
-                            .eq('screen_number', screenIdNum)
-                            .eq('status', 'playing')
-                            .maybeSingle();
-                        if (retry?.selected_animals) {
-                            console.log("✅ Retry Selections Found:", retry.selected_animals);
-                            setCurrentSelections(retry.selected_animals as number[]);
-                        }
-                    }, 1000);
+                if (error) {
+                    if (error.message?.includes('aborted') || error.code === 'ABORTED') return;
+                    console.error("❌ Error fetching selections:", {
+                        message: error.message,
+                        details: error.details,
+                        hint: error.hint,
+                        code: error.code,
+                        full: error
+                    });
+                    return;
                 }
+
+                if (data?.selected_animals) {
+                    console.log("✅ Selections Found:", data.selected_animals);
+                    setCurrentSelections(data.selected_animals as number[]);
+                } else {
+                    console.warn("⚠️ No selections found for active player in 'playing' status.");
+                    setCurrentSelections([]);
+
+                    // Optional Retry for lag
+                    if (realNickname && realNickname !== 'Jugador') {
+                        setTimeout(async () => {
+                            const { data: retry } = await supabase
+                                .from('player_queue')
+                                .select('selected_animals')
+                                .eq('screen_number', screenIdNum)
+                                .eq('status', 'playing')
+                                .maybeSingle();
+                            if (retry?.selected_animals) {
+                                console.log("✅ Retry Selections Found:", retry.selected_animals);
+                                setCurrentSelections(retry.selected_animals as number[]);
+                            }
+                        }, 2000);
+                    }
+                }
+            } catch (err: any) {
+                console.error("❌ Exception in fetchSelections:", err);
             }
         }
 
         fetchSelections();
-    }, [screenIdNum, status, realNickname, previewPlayer]);
+    }, [screenIdNum, status, realNickname, previewPlayer, screen]);
 
     // Fetch History Effect
     useEffect(() => {
@@ -365,11 +538,18 @@ export default function DisplayScreenPage({
                 }
 
                 setIsWin(playerWon);
-                if (playerWon) setShowConfetti(true);
+
+                // ✅ SOLO activar confetti si GANÓ
+                if (playerWon) {
+                    setShowConfetti(true);
+                }
 
                 // 1b. Update Screen State AND Complete Queue Item (Server Authority)
-                const { error: finishError } = await supabase.rpc('finish_active_spin', {
-                    p_screen_number: screenIdNum
+                // 1b. Update Screen State AND Complete Queue Item (Server Authority)
+                // We use the existing RPC that handles package deduction + state update
+                const { error: finishError } = await supabase.rpc('complete_spin_and_check_package', {
+                    p_screen_number: screenIdNum,
+                    p_result_index: winnerIndex
                 });
 
                 if (finishError) console.error("Error finishing spin cycle:", finishError);
@@ -442,13 +622,13 @@ export default function DisplayScreenPage({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [status]);
 
-    // 5. Watchdog: Auto-promote if idle and queue is not empty
+    // 5. Watchdog: Auto-promote if idle or STUCK
     useEffect(() => {
         const checkPromotion = async () => {
             // Only check if we are truly idle in DB
             const { data: screenData } = await supabase
                 .from('screen_state')
-                .select('status')
+                .select('status, updated_at')
                 .eq('screen_number', screenIdNum)
                 .single();
 
@@ -463,6 +643,19 @@ export default function DisplayScreenPage({
                 if (count && count > 0) {
                     console.log('🚀 TV Watchdog: Found players waiting! Promoting...');
                     await supabase.rpc('promote_next_player', {
+                        p_screen_number: screenIdNum
+                    });
+                }
+            }
+            // NEW CASE: Stuck on waiting_for_spin (Player AWOL)
+            else if (screenData?.status === 'waiting_for_spin') {
+                const lastUpdate = new Date(screenData.updated_at).getTime();
+                const now = new Date().getTime();
+                const diffSeconds = (now - lastUpdate) / 1000;
+
+                if (diffSeconds > 60) { // 60s timeout
+                    console.warn('⚠️ TV Watchdog: Player inactive too long! Advancing...');
+                    await supabase.rpc('force_advance_queue', {
                         p_screen_number: screenIdNum
                     });
                 }
@@ -546,46 +739,94 @@ export default function DisplayScreenPage({
             </div >
 
             {/* --- VISUALIZACIÓN SEGÚN MODO --- */}
-
-            {/* CASO 1: MODO EVENTO - PANTALLA LATERAL (CARTELERA) */}
+            {/* CASO 1: MODO EVENTO - PANTALLA LATERAL (CARTELERA / ESTADÍSTICAS) */}
             {
                 isBillboardScreen && (
-                    <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center text-center p-12">
-                        <h1 className="text-6xl font-bold text-yellow-400 mb-8 animate-pulse">¡GRAN SORTEO EN CURSO!</h1>
-                        <div className="text-4xl text-white mb-12">Mira la Pantalla Central #{centralScreenId}</div>
+                    <div className="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-start text-center p-0 overflow-hidden font-sans">
+                        {/* Header Publicitario */}
+                        <div className="w-full bg-indigo-600 py-8 shadow-2xl z-20">
+                            <h1 className="text-6xl font-black text-white uppercase tracking-tighter animate-pulse">
+                                🔥 ¡Gran Sorteo en Vivo! 🔥
+                            </h1>
+                            <p className="text-indigo-200 text-xl font-bold mt-2 uppercase tracking-widest">
+                                Atentos a la Pantalla Principal
+                            </p>
+                        </div>
 
-                        <div className="bg-white/10 p-8 rounded-3xl backdrop-blur-md border border-white/20 w-full max-w-2xl">
-                            <h3 className="text-2xl text-blue-300 mb-4">Últimos Ganadores</h3>
-                            <div className="space-y-4 text-xl text-white">
-                                <div className="flex justify-between border-b border-white/10 pb-2">
-                                    <span>🎟️ Ticket #4592</span>
-                                    <span className="text-green-400">$50,000</span>
+                        <div className="flex-1 w-full grid grid-cols-2 gap-8 p-12 bg-gradient-to-br from-slate-900 to-indigo-950">
+                            {/* Estadísticas / Últimos Resultados */}
+                            <div className="bg-white/5 backdrop-blur-xl rounded-[3rem] border border-white/10 p-10 flex flex-col shadow-inner">
+                                <h3 className="text-3xl font-black text-indigo-400 mb-8 uppercase tracking-widest text-left flex items-center gap-4">
+                                    <span className="w-3 h-3 rounded-full bg-indigo-500 animate-ping" />
+                                    Últimos Ganadores
+                                </h3>
+                                <div className="space-y-4 flex-1">
+                                    {[1, 2, 3, 4, 5].map((i) => (
+                                        <div key={i} className="flex justify-between items-center bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center text-2xl">🎟️</div>
+                                                <span className="text-2xl font-black text-white uppercase">Ticket #{4592 - i * 4}</span>
+                                            </div>
+                                            <span className="text-3xl font-black text-emerald-400 font-mono tracking-tighter">${(10000 * (6 - i)).toLocaleString()}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div className="flex justify-between border-b border-white/10 pb-2">
-                                    <span>🎟️ Ticket #4588</span>
-                                    <span className="text-green-400">$10,000</span>
+                            </div>
+
+                            {/* Espacio Publicitario / Promo */}
+                            <div className="flex flex-col gap-8">
+                                <div className="flex-1 bg-gradient-to-tr from-amber-500 to-orange-600 rounded-[3rem] p-10 flex flex-col items-center justify-center text-white shadow-2xl relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 rounded-full -mr-32 -mt-32 blur-3xl transition-transform group-hover:scale-110" />
+                                    <span className="text-8xl mb-6 transform group-hover:scale-110 transition-transform">🍿</span>
+                                    <h2 className="text-5xl font-black uppercase italic tracking-tighter leading-none mb-4">¡Combo Ruleta!</h2>
+                                    <p className="text-2xl font-bold opacity-90 max-w-xs uppercase leading-tight">
+                                        Pide tu combo y recibe <span className="text-yellow-300 font-black">2 TIROS GRATIS</span>
+                                    </p>
                                 </div>
+                                <div className="h-1/3 bg-white/5 backdrop-blur-md rounded-[3rem] border border-white/10 p-8 flex items-center justify-center gap-6">
+                                    <div className="text-left flex-1">
+                                        <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">Próximo Sorteo</p>
+                                        <p className="text-3xl font-black text-white uppercase italic">En Instantes</p>
+                                    </div>
+                                    <div className="w-20 h-20 rounded-full border-4 border-indigo-500/30 flex items-center justify-center text-2xl font-black text-indigo-400">
+                                        VS
+                                    </div>
+                                    <div className="text-right flex-1">
+                                        <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">Premio Mayor</p>
+                                        <p className="text-3xl font-black text-emerald-400 uppercase italic">$1.000.000</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer con QR */}
+                        <div className="w-full bg-white/5 border-t border-white/10 py-6 px-12 flex justify-between items-center">
+                            <div className="flex items-center gap-6">
+                                <span className="text-slate-400 font-bold uppercase tracking-widest">Sigue participando:</span>
+                                <span className="text-2xl font-black text-white tracking-widest">RULETA.LUKEAPP.ME</span>
+                            </div>
+                            <div className="flex gap-4">
+                                <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                                <div className="w-3 h-3 rounded-full bg-emerald-500 opacity-50" />
+                                <div className="w-3 h-3 rounded-full bg-emerald-500 opacity-20" />
                             </div>
                         </div>
                     </div>
                 )
             }
 
-            {/* CASO 2: MODO EVENTO - PANTALLA CENTRAL (RULETA DEDICADA) */}
-            {/* ... (Unchanged) ... */}
-
-
-
-            {/* Background Image if Dynamic Wheel (Solo si NO es Billboard) */}
+            {/* CASO 2: PANTALLA DE JUEGO (CENTRAL O INDIVIDUAL) */}
             {
-                activeWheelAssets?.background && !isBillboardScreen && (
+                !isBillboardScreen && (
                     <div className="absolute inset-0 z-0">
-                        <Image
-                            src={activeWheelAssets.background}
-                            alt="Background"
-                            fill
-                            className="object-cover opacity-100"
-                        />
+                        {activeWheelAssets?.background && (
+                            <Image
+                                src={activeWheelAssets.background}
+                                alt="Background"
+                                fill
+                                className="object-cover opacity-100"
+                            />
+                        )}
                         <div className="absolute inset-0 bg-black/40" />
                     </div>
                 )
@@ -599,14 +840,17 @@ export default function DisplayScreenPage({
 
                         {/* Ruleta Wrapper */}
                         {(() => {
-                            const segmentCount = activeWheelAssets?.segments?.length || 12;
-                            const isFanMode = segmentCount <= 20;
+                            const segmentCount = activeWheelAssets?.segments?.length;
+                            // Fan Mode strictly for Individual Play (Parque)
+                            // If it's Group Event (Sorteo), it's ALWAYS full circle.
+                            // While loading assets in Parque, assume it's a Fan (to avoid circle flicker)
+                            const isFanMode = !isGroupEvent && (assetsLoading || (segmentCount ? segmentCount <= 20 : true));
 
                             return (
                                 // Fan Mode: Limit height to avoid scroll. 2:1 aspect ratio roughly crops the empty bottom half.
-                                // We use aspect-[2/1] and overflow-hidden to show only the top half of the square canvas.
                                 <div className={`relative w-full transition-all duration-500 flex items-start justify-center 
                                 ${isFanMode ? 'aspect-[2/1] overflow-hidden' : 'aspect-square items-center'}
+                                ${assetsLoading ? 'opacity-0' : 'opacity-100'}
                             `}>
                                     {/* Canvas: Always square intrinsic matching width. 
                                     In Fan Mode, it overflows the container (bottom cropped). */}
@@ -707,6 +951,27 @@ export default function DisplayScreenPage({
                     </div>
                 )
             }
+
+            {/* DUPLICATE BLOCKER OVERLAY */}
+            {status === 'duplicate' && (
+                <div className="fixed inset-0 z-[999] bg-slate-900 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
+                    <div className="w-24 h-24 bg-rose-500/20 rounded-full flex items-center justify-center text-5xl mb-6 border border-rose-500/30 animate-pulse text-rose-500">
+                        ⚠️
+                    </div>
+                    <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tighter">Pantalla Duplicada</h2>
+                    <p className="text-slate-400 max-w-md font-medium text-lg leading-relaxed">
+                        Esta pantalla (<span className="text-rose-400">#{screenIdNum}</span>) ya se encuentra abierta en otra pestaña o dispositivo.
+                    </p>
+                    <div className="mt-8 flex flex-col gap-4 w-full max-w-xs transition-all">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="bg-white hover:bg-slate-100 text-slate-900 font-black py-4 rounded-2xl uppercase tracking-widest text-xs active:scale-95 shadow-xl transition-all"
+                        >
+                            🔄 Reintentar
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* --- WINNER REACTIONS --- */}
             <BigWinOverlay

@@ -96,8 +96,7 @@ export default function WheelCanvas({
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const wheelSegments = segments || ANIMAL_LIST;
-        const totalSegments = wheelSegments.length;
+        const totalSegments = items.length;
         const segmentAngle = (2 * Math.PI) / totalSegments;
         const isFanMode = totalSegments <= 20;
 
@@ -109,7 +108,7 @@ export default function WheelCanvas({
 
         // On Target Received Logic
         if (isSpinning && targetIndex !== null && !stoppingRef.current) {
-            const targetIdx = wheelSegments.findIndex(s => s.id === targetIndex);
+            const targetIdx = items.findIndex((s: any) => s.id === targetIndex);
             if (targetIdx !== -1) {
                 // Calculate stopping distance
                 // We want to land such that (Rotation + segmentCenter) aligns with Pointer (Angle 0 or PI depending on implementation)

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 
 interface BigWinOverlayProps {
@@ -10,21 +10,58 @@ interface BigWinOverlayProps {
 }
 
 export default function BigWinOverlay({ isVisible, resultIndex, assets, playerName, type = 'win' }: BigWinOverlayProps) {
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [winnerImage, setWinnerImage] = useState<string | null>(null);
+
+    // Find and preload the winning segment image
+    useEffect(() => {
+        if (!isVisible || resultIndex === null) {
+            setImageLoaded(false);
+            return;
+        }
+
+        let imgSrc: string | null = null;
+
+        if (assets?.segments) {
+            const segment = assets.segments.find((s: any) => s.id === resultIndex);
+            if (segment) {
+                imgSrc = segment.imageResult || segment.imageWheel;
+            }
+        }
+
+        if (imgSrc) {
+            setImageLoaded(false);
+            setWinnerImage(imgSrc);
+
+            // Preload image
+            const img = new window.Image();
+            img.onload = () => {
+                console.log("✅ Result image preloaded:", imgSrc);
+                setImageLoaded(true);
+            };
+            img.onerror = () => {
+                console.error("❌ Failed to load result image:", imgSrc);
+                setImageLoaded(true); // Show anyway to not block UI
+            };
+            img.src = imgSrc;
+        } else {
+            // No image, just show number
+            setWinnerImage(null);
+            setImageLoaded(true);
+        }
+    }, [isVisible, resultIndex, assets]);
+
     if (!isVisible || resultIndex === null) return null;
 
-    // Find the winning segment image/label
-    let winnerImage = null;
+    // Find label
     let winnerLabel = `#${resultIndex}`;
-
     if (assets?.segments) {
         const segment = assets.segments.find((s: any) => s.id === resultIndex);
         if (segment) {
-            winnerImage = segment.imageResult || segment.imageWheel;
             winnerLabel = segment.label || winnerLabel;
         }
     }
 
-    // Use player name if available, otherwise fallback to winnerLabel
     const displayLabel = playerName || winnerLabel;
 
     // Loss Configuration
@@ -45,7 +82,7 @@ export default function BigWinOverlay({ isVisible, resultIndex, assets, playerNa
                 {/* Main Card */}
                 <div className={`bg-black/80 backdrop-blur-xl p-12 rounded-[3rem] border-4 ${borderColor} ${shadowColor} flex flex-col items-center text-center transform hover:scale-105 transition-transform duration-500 relative overflow-hidden min-w-[500px]`}>
 
-                    {/* Shimmer Effect (Only for Win?) Let's keep for both for premium look */}
+                    {/* Shimmer Effect */}
                     <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
 
                     <h2 className={`text-5xl md:text-6xl font-bold ${titleColor} mb-6 drop-shadow-lg tracking-wider uppercase whitespace-nowrap`}>
@@ -53,12 +90,16 @@ export default function BigWinOverlay({ isVisible, resultIndex, assets, playerNa
                     </h2>
 
                     <div className="w-64 h-64 relative mb-6 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-center p-4">
-                        {winnerImage ? (
+                        {!imageLoaded && winnerImage ? (
+                            // Loading spinner while image loads
+                            <div className="animate-spin rounded-full h-16 w-16 border-4 border-white/20 border-t-white"></div>
+                        ) : winnerImage ? (
                             <Image
                                 src={winnerImage}
                                 alt="Result"
                                 fill
                                 className="object-contain drop-shadow-2xl"
+                                priority
                             />
                         ) : (
                             <span className="text-8xl font-bold text-white">{resultIndex}</span>

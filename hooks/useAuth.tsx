@@ -18,6 +18,7 @@ interface AuthContextType {
     session: Session | null;
     isLoading: boolean;
     signInWithGoogle: () => Promise<void>;
+    signInWithEmail: (email: string) => Promise<{ error: any }>;
     signOut: () => Promise<void>;
     refreshProfile: () => Promise<void>;
 }
@@ -31,45 +32,114 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const fetchProfile = async (userId: string) => {
-        const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
-        if (profileData) setProfile(profileData);
+    const fetchProfile = async (userId: string, mounted = true) => {
+        try {
+            const { data: profileData, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            if (error) {
+                if (error.message?.includes('aborted')) return;
+
+                // SELF-HEALING: If profile is missing (PGRST116), create it
+                if (error.code === 'PGRST116') {
+                    console.log('Perfil no encontrado. Auto-generando...');
+                    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+                    if (currentUser) {
+                        const { error: insertError } = await supabase
+                            .from('profiles')
+                            .insert({
+                                id: currentUser.id,
+                                email: currentUser.email,
+                                display_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || 'Jugador',
+                                avatar_url: currentUser.user_metadata?.avatar_url,
+                                role: currentUser.email === 'cristianluke@gmail.com' ? 'admin' : 'player'
+                            });
+
+                        if (!insertError) {
+                            // Retry fetch
+                            return fetchProfile(userId, mounted);
+                        } else {
+                            console.error('Error al auto-generar perfil:', insertError);
+                        }
+                    }
+                }
+
+                console.error('Error fetching profile:', error);
+                return;
+            }
+
+            if (profileData && mounted) {
+                // FORCE ADMIN for specific user
+                if (user?.email === 'cristianluke@gmail.com') {
+                    profileData.role = 'admin';
+                }
+                setProfile(profileData);
+            }
+        } catch (err: any) {
+            if (err.name === 'AbortError' || err.message?.includes('aborted')) return;
+            console.error('Profile fetch failed:', err);
+        }
     };
 
     useEffect(() => {
+        let isMounted = true;
+        let authSubscription: { unsubscribe: () => void } | null = null;
+
         const initializeAuth = async () => {
-            setIsLoading(true);
+            try {
+                setIsLoading(true);
 
-            // 1. Get current session
-            const { data: { session: currentSession } } = await supabase.auth.getSession();
+                // 1. Get current session
+                const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
 
-            // 2. If no session, sign in anonymously
-            if (!currentSession) {
-                console.log("👤 Signing in anonymously...");
-                await supabase.auth.signInAnonymously();
-            }
-
-            // 3. Listen for changes
-            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-                setSession(newSession);
-                setUser(newSession?.user ?? null);
-
-                if (newSession?.user) {
-                    await fetchProfile(newSession.user.id);
-                } else {
-                    setProfile(null);
+                if (sessionError && !sessionError.message?.includes('aborted')) {
+                    console.error('Session fetch error:', sessionError);
                 }
-                setIsLoading(false);
-            });
 
-            return () => subscription.unsubscribe();
+                if (!isMounted) return;
+
+                // 2. If no session, just stop loading
+                if (!currentSession) {
+                    setIsLoading(false);
+                }
+
+                // 3. Listen for changes
+                const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+                    if (!isMounted) return;
+
+                    setSession(newSession);
+                    setUser(newSession?.user ?? null);
+
+                    if (newSession?.user) {
+                        await fetchProfile(newSession.user.id, isMounted);
+                    } else {
+                        setProfile(null);
+                    }
+                    setIsLoading(false);
+                });
+
+                if (!isMounted) {
+                    subscription.unsubscribe();
+                } else {
+                    authSubscription = subscription;
+                }
+
+            } catch (err: any) {
+                if (err.name !== 'AbortError' && !err.message?.includes('aborted')) {
+                    console.error('Auth initialization failed:', err);
+                }
+            }
         };
 
         initializeAuth();
+        return () => {
+            isMounted = false;
+            if (authSubscription) authSubscription.unsubscribe();
+        };
     }, []);
 
     // Realtime subscription for profile changes
@@ -91,16 +161,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [user?.id]);
 
     const signInWithGoogle = async () => {
+        const origin = window.location.origin;
+        const currentPath = window.location.pathname + window.location.search;
+
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
+                redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(currentPath)}`,
                 queryParams: {
                     access_type: 'offline',
-                    prompt: 'select_account',
-                    // This helps Google show a more friendly flow
-                    login_hint: 'Inicia sesión para guardar tus premios'
+                    prompt: 'consent'
                 }
+            }
+        });
+    };
+
+    const signInWithEmail = async (email: string) => {
+        const origin = window.location.origin;
+        const currentPath = window.location.pathname + window.location.search;
+
+        return await supabase.auth.signInWithOtp({
+            email,
+            options: {
+                emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(currentPath)}`,
             }
         });
     };
@@ -114,7 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, profile, session, isLoading, signInWithGoogle, signOut, refreshProfile }}>
+        <AuthContext.Provider value={{ user, profile, session, isLoading, signInWithGoogle, signInWithEmail, signOut, refreshProfile }}>
             {children}
         </AuthContext.Provider>
     );

@@ -121,37 +121,32 @@ export default function WheelUploader() {
     };
 
     return (
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-black text-slate-900 mb-8 flex items-center gap-2 uppercase tracking-tight">
-                📤 Subir Nueva Ruleta
-            </h2>
-
-            <div className="space-y-6">
-                {/* Wheel Name & Category */}
-                <div className="grid grid-cols-1 gap-6">
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                        <label htmlFor="wheelName" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                            1. Nombre del Tema
+                        <label htmlFor="wheelName" className="block text-[8px] font-black text-slate-400 uppercase tracking-widest px-1">
+                            1. Nombre Tema
                         </label>
                         <input
                             id="wheelName"
                             type="text"
                             value={wheelName}
                             onChange={(e) => setWheelName(e.target.value)}
-                            placeholder="ej: Super Heroes, Jungla..."
-                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-5 py-3.5 font-bold text-slate-900 focus:border-indigo-600 focus:bg-white outline-none transition-all"
+                            placeholder="ej: Barbie"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
                         />
                     </div>
 
                     <div className="space-y-1">
-                        <label htmlFor="themeCategory" className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                            Categoría / Etiqueta
+                        <label htmlFor="themeCategory" className="block text-[8px] font-black text-slate-400 uppercase tracking-widest px-1">
+                            Categoría
                         </label>
                         <select
                             id="themeCategory"
                             value={themeCategory}
                             onChange={(e) => setThemeCategory(e.target.value)}
-                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-5 py-3.5 font-bold text-slate-900 focus:border-indigo-600 focus:bg-white outline-none transition-all"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold focus:border-indigo-600 focus:bg-white outline-none transition-all"
                         >
                             <option value="General">General</option>
                             <option value="Infantil">Infantil</option>
@@ -163,11 +158,10 @@ export default function WheelUploader() {
                     </div>
                 </div>
 
-                {/* Upload Fields */}
-                <div className="space-y-4">
-                    <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2">
-                        <label htmlFor="segments" className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                            2. Imágenes de la Ruleta (12 .png)
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
+                        <label htmlFor="segments" className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                            2. Ruleta (12 .png)
                         </label>
                         <input
                             id="segments"
@@ -175,16 +169,18 @@ export default function WheelUploader() {
                             accept=".png"
                             multiple
                             onChange={(e) => setSegmentPngs(Array.from(e.target.files || []))}
-                            className="w-full text-[10px] text-slate-400 font-bold file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-slate-200 file:text-slate-600 hover:file:bg-slate-300"
+                            className="w-full text-[8px] text-slate-400 font-bold"
                         />
-                        <p className={`text-[9px] font-black uppercase tracking-tight ${segmentPngs.length === 12 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                            {segmentPngs.length === 12 ? '✅ Completo' : `○ ${segmentPngs.length}/12 cargados`}
-                        </p>
+                        {segmentPngs.length > 0 && (
+                            <p className={`text-[7px] font-black uppercase mt-1 ${segmentPngs.length === 12 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                {segmentPngs.length}/12
+                            </p>
+                        )}
                     </div>
 
-                    <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2">
-                        <label htmlFor="selectors" className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                            3. Íconos del Celular (12 .jpg)
+                    <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
+                        <label htmlFor="selectors" className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                            3. Íconos (12 .jpg)
                         </label>
                         <input
                             id="selectors"
@@ -192,62 +188,48 @@ export default function WheelUploader() {
                             accept=".jpg,.jpeg"
                             multiple
                             onChange={(e) => setSelectorJpgs(Array.from(e.target.files || []))}
-                            className="w-full text-[10px] text-slate-400 font-bold file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-slate-200 file:text-slate-600 hover:file:bg-slate-300"
+                            className="w-full text-[8px] text-slate-400 font-bold"
                         />
-                        <p className={`text-[9px] font-black uppercase tracking-tight ${selectorJpgs.length === 12 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                            {selectorJpgs.length === 12 ? '✅ Completo' : `○ ${selectorJpgs.length}/12 cargados`}
-                        </p>
+                        {selectorJpgs.length > 0 && (
+                            <p className={`text-[7px] font-black uppercase mt-1 ${selectorJpgs.length === 12 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                {selectorJpgs.length}/12
+                            </p>
+                        )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2">
-                            <label htmlFor="preview" className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                4. Póster / Miniatura
-                            </label>
-                            <input
-                                id="preview"
-                                type="file"
-                                accept=".jpg,.jpeg,.png"
-                                onChange={(e) => setPreviewImage(e.target.files?.[0] || null)}
-                                className="w-full text-[10px] text-slate-400 font-bold file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-slate-200 file:text-slate-600 hover:file:bg-slate-300"
-                            />
-                            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tight">
-                                {previewImage ? '✅ Listado' : ''}
-                            </p>
-                        </div>
+                    <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
+                        <label htmlFor="preview" className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                            4. Miniatura
+                        </label>
+                        <input
+                            id="preview"
+                            type="file"
+                            accept=".jpg,.jpeg,.png"
+                            onChange={(e) => setPreviewImage(e.target.files?.[0] || null)}
+                            className="w-full text-[8px] text-slate-400 font-bold"
+                        />
+                    </div>
 
-                        <div className="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-2">
-                            <label htmlFor="background" className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                5. Fondo del Juego
-                            </label>
-                            <input
-                                id="background"
-                                type="file"
-                                accept=".jpg,.jpeg"
-                                onChange={(e) => setBackground(e.target.files?.[0] || null)}
-                                className="w-full text-[10px] text-slate-400 font-bold file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-slate-200 file:text-slate-600 hover:file:bg-slate-300"
-                            />
-                            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tight">
-                                {background ? '✅ Listado' : ''}
-                            </p>
-                        </div>
+                    <div className="p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
+                        <label htmlFor="background" className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                            5. Fondo
+                        </label>
+                        <input
+                            id="background"
+                            type="file"
+                            accept=".jpg,.jpeg"
+                            onChange={(e) => setBackground(e.target.files?.[0] || null)}
+                            className="w-full text-[8px] text-slate-400 font-bold"
+                        />
                     </div>
                 </div>
 
-                {/* Upload Button */}
                 <button
                     onClick={handleUpload}
                     disabled={uploading}
-                    className="w-full mt-4 bg-slate-900 border border-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-xl transition-all shadow-xl shadow-slate-200 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-[0.2em] text-[10px]"
+                    className="w-full bg-slate-900 text-white font-black py-3 rounded-lg transition-all active:scale-95 disabled:opacity-50 text-[10px] uppercase tracking-widest"
                 >
-                    {uploading ? (
-                        <>
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Subiendo activos...
-                        </>
-                    ) : (
-                        <>🚀 Publicar Ruleta</>
-                    )}
+                    {uploading ? 'Subiendo...' : '🚀 Publicar'}
                 </button>
             </div>
         </div>

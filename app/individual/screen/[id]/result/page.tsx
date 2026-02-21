@@ -92,12 +92,37 @@ export default function ResultPage({
 
         const checkResult = async () => {
             try {
+                // 0. RECUPERAR DESDE LOCALSTORAGE si no hay queueId
+                if (!queueId) {
+                    try {
+                        const savedSpin = localStorage.getItem(`spin_${id}_active`);
+                        if (savedSpin) {
+                            const { queueId: savedQueueId, timestamp, screenNumber } = JSON.parse(savedSpin);
+
+                            // Validar que sea reciente (< 10 minutos)
+                            const ageMinutes = (Date.now() - timestamp) / 1000 / 60;
+                            if (ageMinutes < 10 && screenNumber === parseInt(id)) {
+                                console.log("💾 Recovered queueId from localStorage:", savedQueueId);
+                                useGameStore.getState().setQueueId(savedQueueId);
+                                // Re-run check with recovered queueId
+                                setTimeout(() => checkResult(), 100);
+                                return;
+                            } else {
+                                // Expirado, limpiar
+                                localStorage.removeItem(`spin_${id}_active`);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Could not recover from localStorage:", e);
+                    }
+                }
+
                 if (!queueId) return;
 
                 // 1. Fetch own queue record first (Session specific result)
                 const { data: queueData, error: queueError } = await supabase
                     .from('player_queue')
-                    .select('selected_animals, spin_result, status, package_code')
+                    .select('selected_animals, spin_result, status, package_code, player_name, player_emoji')
                     .eq('id', queueId)
                     .maybeSingle();
 
@@ -107,6 +132,11 @@ export default function ResultPage({
                 }
 
                 if (queueData) {
+                    // RESTORE IDENTITY: Critical for anonymous users after reload
+                    if (queueData.player_name) {
+                        useGameStore.getState().setIdentity(queueData.player_name, queueData.player_emoji || '😎');
+                    }
+
                     const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
                     if (effectiveSelections.length > 0 && isMounted) {
                         setDbSelections(effectiveSelections);
@@ -137,10 +167,63 @@ export default function ResultPage({
                 if (queueData) {
                     const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
 
-                    // 4. Strict Completion Check
+                    // 4. Strict Completion Check with Retry Logic
                     if (queueData.spin_result !== null && isCompleted) {
                         const isWin = effectiveSelections.includes(queueData.spin_result);
                         if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+
+                        // Limpiar localStorage ya que tenemos el resultado
+                        try {
+                            localStorage.removeItem(`spin_${id}_active`);
+                            console.log("🧹 Cleaned localStorage after successful result");
+                        } catch (e) {
+                            console.warn("Could not clean localStorage:", e);
+                        }
+
+                        return;
+                    }
+
+                    // 4b. If spinning but no result yet, retry up to 5 times
+                    if (queueData.spin_result === null && isSpinning) {
+                        console.log("⏳ Spinning in progress, result not ready yet. Will retry...");
+                        let retryCount = 0;
+                        const maxRetries = 5;
+
+                        const retryFetch = async () => {
+                            while (retryCount < maxRetries && isMounted) {
+                                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
+                                retryCount++;
+
+                                const { data: retryData } = await supabase
+                                    .from('player_queue')
+                                    .select('spin_result, status')
+                                    .eq('id', queueId)
+                                    .maybeSingle();
+
+                                if (retryData && retryData.spin_result !== null) {
+                                    console.log(`✅ Result found on retry ${retryCount}:`, retryData.spin_result);
+                                    if (retryData) {
+                                        const isWin = effectiveSelections.includes(retryData.spin_result!);
+                                        if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+
+                                        // Limpiar localStorage
+                                        try {
+                                            localStorage.removeItem(`spin_${id}_active`);
+                                        } catch (e) { }
+                                    }
+                                    return;
+                                }
+
+                                console.log(`🔄 Retry ${retryCount}/${maxRetries}: Still no result...`);
+                            }
+
+                            if (isMounted && retryCount >= maxRetries) {
+                                console.error("❌ Max retries reached. Result not found.");
+                                // Stay in loading state - user can refresh
+                            }
+                        };
+
+                        retryFetch();
                         return;
                     }
                 }
@@ -310,14 +393,28 @@ export default function ResultPage({
                 code: packageInfo.code
             }));
 
+            // CORRECTED LOGIC: Prioritize Auth Identity over potentially empty Store
+            const authName = user?.user_metadata?.full_name || profile?.display_name;
+            const authEmoji = user?.user_metadata?.emoji || '😎'; // Fallback if no specific emoji field
+
+            const nameToUse = authName || useGameStore.getState().nickname;
+            const emojiToUse = authEmoji || useGameStore.getState().emoji;
+
+            // Enforce identity update in store
+            useGameStore.getState().setIdentity(nameToUse, emojiToUse);
+
+            // NUEVO: Limpiar queueId anterior para permitir nueva entrada
+            console.log("🔄 Limpiando queueId anterior antes de auto-rejoin");
+            useGameStore.getState().setQueueId(null);
+
             // Create new queue entry
             const activeWheelId = useGameStore.getState().activeWheelId;
             const { data: queueData, error: queueError } = await supabase
                 .from('player_queue')
                 .insert({
                     screen_number: parseInt(id),
-                    player_name: useGameStore.getState().nickname,
-                    player_emoji: useGameStore.getState().emoji,
+                    player_name: nameToUse,
+                    player_emoji: emojiToUse,
                     player_id: user?.id || null,
                     status: 'selecting',
                     selected_wheel_id: activeWheelId || null,
@@ -357,10 +454,21 @@ export default function ResultPage({
         <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-900 text-white perspective-1000">
 
             {status === 'loading' && (
-                <div className="text-center animate-pulse">
+                <div className="text-center animate-pulse flex flex-col items-center">
                     <div className="text-6xl mb-4 animate-spin">🎲</div>
                     <h1 className="text-2xl font-bold text-white mb-2">Girando...</h1>
-                    <p className="text-gray-400">¡Buena Suerte!</p>
+                    <p className="text-gray-400 mb-8">¡Buena Suerte!</p>
+
+                    {/* RESET BUTTON (Visible after 10s of loading) */}
+                    <div className="mt-8 opacity-0 animate-in fade-in duration-1000 delay-[10000ms]">
+                        <p className="text-xs text-gray-500 mb-4">Si la ruleta se detuvo y no ves el resultado:</p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="text-xs font-bold text-yellow-500 underline uppercase tracking-widest"
+                        >
+                            Refrescar Pantalla
+                        </button>
+                    </div>
                 </div>
             )}
 

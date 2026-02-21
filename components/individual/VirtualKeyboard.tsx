@@ -10,6 +10,7 @@ interface VirtualKeyboardProps {
     onConfirm: () => void;
     value: string; // This should be the raw 5-char value (e.g. "AA027")
     errorMessage?: string;
+    isLoading?: boolean;
 }
 
 export default function VirtualKeyboard({
@@ -19,7 +20,8 @@ export default function VirtualKeyboard({
     onClose,
     onConfirm,
     value,
-    errorMessage
+    errorMessage,
+    isLoading
 }: VirtualKeyboardProps) {
     // Format: XX-NNN (2 letters + 3 numbers)
     const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -176,10 +178,17 @@ export default function VirtualKeyboard({
                         </button>
                         <button
                             onClick={onConfirm}
-                            disabled={value.length < 5}
-                            className="col-span-2 h-16 rounded-2xl bg-yellow-500 text-black font-black text-xl uppercase tracking-widest disabled:opacity-50 disabled:grayscale transition-all active:scale-95 shadow-[0_0_30px_rgba(234,179,8,0.3)]"
+                            disabled={value.length < 5 || isLoading}
+                            className="col-span-2 h-16 rounded-2xl bg-yellow-500 text-black font-black text-xl uppercase tracking-widest disabled:opacity-50 disabled:grayscale transition-all active:scale-95 shadow-[0_0_30px_rgba(234,179,8,0.3)] flex items-center justify-center gap-2"
                         >
-                            Canjear
+                            {isLoading ? (
+                                <>
+                                    <div className="w-5 h-5 border-4 border-black/20 border-t-black rounded-full animate-spin" />
+                                    <span>...</span>
+                                </>
+                            ) : (
+                                'Canjear'
+                            )}
                         </button>
                     </div>
                 </div>

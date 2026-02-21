@@ -1,0 +1,7 @@
+tunnel: 6a1bae3c-a80b-4c25-b442-121c13001b21
+credentials-file: C:\Users\lukea\.cloudflared\6a1bae3c-a80b-4c25-b442-121c13001b21.json
+
+ingress:
+  - hostname: ruleta.lukeapp.me
+    service: http://localhost:3000
+  - service: http_status:404

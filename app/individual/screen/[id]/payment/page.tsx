@@ -29,7 +29,21 @@ export default function PaymentPage({
         const mode = (modeParam as 'group' | 'individual') || (wheelId ? 'individual' : 'group');
 
         setGameMode(mode, wheelId || undefined);
-    }, [searchParams, setGameMode, id]);
+
+        // SYNC WITH TV: Ensure the database reflects the choice
+        if (wheelId && mode === 'individual') {
+            supabase
+                .from('screen_state')
+                .update({
+                    current_wheel_id: wheelId,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('screen_number', parseInt(id))
+                .then(({ error }) => {
+                    if (!error) console.log("✅ Screen synced from Payment page:", wheelId);
+                });
+        }
+    }, [searchParams, setGameMode, id, supabase]);
 
     const { nickname, emoji, setQueueId } = useGameStore();
     const { user } = useAuth();
@@ -149,13 +163,15 @@ export default function PaymentPage({
 
     const confirmRedemption = async () => {
         const rawCode = redeemCode.trim().toUpperCase();
-        if (rawCode.length < 5) return;
-
-        // Auto-format for DB Search: XX-NNN
-        const cleanCode = `${rawCode.slice(0, 2)}-${rawCode.slice(2)}`;
+        // Robust Formatting: Strip any dashes/spaces and Re-format XX-NNN
+        const stripped = rawCode.replace(/[^A-Z0-9]/g, '');
+        if (stripped.length < 5) return;
+        const cleanCode = `${stripped.slice(0, 2)}-${stripped.slice(2, 5)}`;
 
         setIsRedeeming(true);
         setRedeemError('');
+
+        console.log("🔍 Redeeming code:", cleanCode, "with fingerprint:", getDeviceFingerprint());
 
         try {
             // Get device fingerprint
@@ -304,6 +320,7 @@ export default function PaymentPage({
                     onClose={() => setShowCodeInput(false)}
                     onConfirm={confirmRedemption}
                     errorMessage={redeemError}
+                    isLoading={isRedeeming}
                 />
             )}
 

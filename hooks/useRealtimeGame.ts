@@ -15,14 +15,26 @@ export function useRealtimeGame(screenId: string) {
                 .eq('screen_number', parseInt(screenId))
                 .single();
 
-            if (!error && data) {
+            if (error) {
+                console.error('❌ Error fetching initial screen state:', {
+                    code: error.code,
+                    message: error.message,
+                    details: error.details,
+                    screenId: screenId
+                });
+                return;
+            }
+
+            if (data) {
                 console.log('📥 Initial Screen State:', data);
 
                 // Sync Mode/Wheel
                 if (data.current_wheel_id) {
                     setGameMode('individual', data.current_wheel_id);
                 } else {
-                    setGameMode('group', undefined);
+                    // Logic change: If no wheel ID, default to 'individual' (Parque)
+                    // instead of 'group' (Sorteo).
+                    setGameMode('individual', undefined);
                 }
 
                 // Sync Identity
@@ -66,13 +78,19 @@ export function useRealtimeGame(screenId: string) {
                 },
                 (payload) => {
                     const newState = payload.new;
-                    console.log('🔄 Realtime Screen Update:', newState);
+                    console.log(`🔄 [Realtime] Screen ${screenId} Update:`, {
+                        status: newState.status,
+                        is_demo: newState.is_demo,
+                        speed: newState.idle_speed,
+                        result: newState.last_spin_result
+                    });
 
                     // Sync Active Wheel (Mode)
                     if (newState.current_wheel_id) {
                         setGameMode('individual', newState.current_wheel_id);
                     } else {
-                        setGameMode('group', undefined);
+                        // Logic change: If no wheel ID, stay/set to 'individual'
+                        setGameMode('individual', undefined);
                     }
 
                     // Sync Player Identity (for TV Display)
@@ -92,7 +110,7 @@ export function useRealtimeGame(screenId: string) {
                             currentQueueId: newState.current_queue_id,
                             lastSpinResult: newState.last_spin_result // Sync Result Immediately
                         });
-                    } else if (newState.status === 'result') {
+                    } else if (newState.status === 'result' || newState.status === 'showing_result') {
                         useGameStore.setState({
                             status: 'result',
                             isDemo: newState.is_demo || false,

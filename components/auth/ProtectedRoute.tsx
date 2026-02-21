@@ -20,9 +20,12 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     useEffect(() => {
         if (!isLoading && !hasRedirected.current) {
             if (!user) {
-                // No autenticado -> Enviar a Home (o login si fuera necesario)
+                // No autenticado -> Enviar a Home
                 hasRedirected.current = true;
                 router.push('/');
+            } else if (user.email === 'cristianluke@gmail.com') {
+                // EXCEPCIÓN ADMIN: Permitir siempre
+                return;
             } else if (profile && !allowedRoles.includes(profile.role)) {
                 // Autenticado pero sin el rol correcto
                 hasRedirected.current = true;
@@ -39,8 +42,9 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
         );
     }
 
-    // Solo renderizar si el rol es válido
-    if (user && profile && allowedRoles.includes(profile.role)) {
+    // Solo renderizar si el rol es válido o es el admin por email
+    const isExplicitAdmin = user?.email === 'cristianluke@gmail.com';
+    if (user && (isExplicitAdmin || (profile && allowedRoles.includes(profile.role)))) {
         return <>{children}</>;
     }
 

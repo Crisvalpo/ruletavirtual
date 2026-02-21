@@ -66,12 +66,31 @@ export default function WheelSelector({ screenId }: { screenId: string }) {
         loadData();
     }, [screenId]);
 
-    const handleSelectWheel = (mode: string, wheelId?: string) => {
+    const handleSelectWheel = async (mode: string, wheelId?: string) => {
         console.log("Selected:", mode, wheelId);
+
         if (wheelId) {
+            // OPTIMISTIC UPDATE: Local UI feedback
+            setActiveWheelId(wheelId);
+
+            try {
+                // PERSISTENT UPDATE: Sync with the TV (screen_state)
+                const { error } = await supabase
+                    .from('screen_state')
+                    .update({
+                        current_wheel_id: wheelId,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('screen_number', parseInt(screenId));
+
+                if (error) throw error;
+                console.log("✅ Screen wheel synced:", wheelId);
+            } catch (err) {
+                console.error("❌ Failed to sync wheel with screen:", err);
+            }
+
             router.push(`/individual/screen/${screenId}/payment?wheelId=${wheelId}`);
         } else if (mode === 'group') {
-            // Handle group mode selection if needed, or default
             router.push(`/individual/screen/${screenId}/payment?mode=group`);
         }
     };
@@ -135,11 +154,10 @@ export default function WheelSelector({ screenId }: { screenId: string }) {
                                                 <span className="px-3 py-1 rounded-lg bg-white/10 backdrop-blur-md border border-white/10 text-[10px] font-black uppercase tracking-tight text-white">
                                                     {wheel.theme_category || 'General'}
                                                 </span>
-                                                <span className={`px-3 py-1 rounded-lg backdrop-blur-md border text-[10px] font-black uppercase tracking-tight ${
-                                                    isActive 
-                                                        ? 'bg-primary/20 border-primary text-primary animate-pulse' 
+                                                <span className={`px-3 py-1 rounded-lg backdrop-blur-md border text-[10px] font-black uppercase tracking-tight ${isActive
+                                                        ? 'bg-primary/20 border-primary text-primary animate-pulse'
                                                         : 'bg-green-500/10 border-green-500/30 text-green-400'
-                                                }`}>
+                                                    }`}>
                                                     {isActive ? '🔥 Top Jugada' : '⭐ Recomendada'}
                                                 </span>
                                             </div>
