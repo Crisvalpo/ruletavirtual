@@ -43,6 +43,12 @@ function AdminContent() {
                 {/* Header - Minimalist row for buttons only */}
                 <div className="flex justify-end mb-4 gap-3">
                     <button
+                        onClick={() => window.location.href = '/'}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-xl transition-all active:scale-95 text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-md"
+                    >
+                        🏠 HUB PRINCIPAL
+                    </button>
+                    <button
                         onClick={() => window.location.href = '/staff/scanner'}
                         className="bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-bold px-4 py-2 rounded-xl transition-all active:scale-95 text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm"
                     >

@@ -122,9 +122,14 @@ export default function QueueList({ screenId, assets: screenAssets }: { screenId
                     {/* 1. Show Active Selectors (First in line effectively) */}
                     {activeSelectors.map((player) => (
                         <div key={player.id} className="flex flex-col gap-1 border-b border-white/10 pb-2 mb-1">
-                            <div className="flex items-center gap-2 text-yellow-400/90 animate-pulse">
-                                <span className="text-sm font-bold truncate max-w-[120px]">
-                                    {player.player_emoji} {player.player_name}
+                            <div className="flex items-center gap-2 text-yellow-400/90 animate-pulse overflow-hidden">
+                                {player.player_emoji?.startsWith('http') ? (
+                                    <img src={player.player_emoji} alt="P" className="w-5 h-5 rounded-full border border-white/20 object-cover flex-none" />
+                                ) : (
+                                    <span className="text-sm flex-none">{player.player_emoji}</span>
+                                )}
+                                <span className="text-sm font-bold truncate">
+                                    {player.player_name}
                                 </span>
                                 <span className="text-[10px] uppercase bg-yellow-500/20 px-1.5 py-0.5 rounded text-yellow-300">
                                     Eligiendo...
@@ -176,8 +181,13 @@ export default function QueueList({ screenId, assets: screenAssets }: { screenId
                             <span className="text-xs font-mono opacity-50 w-4">
                                 {String(index + 1).padStart(2, '0')}
                             </span>
-                            <span className="text-sm italic font-medium truncate max-w-[120px]">
-                                {player.player_emoji} {player.player_name}
+                            <span className="text-sm italic font-medium truncate flex items-center gap-2">
+                                {player.player_emoji?.startsWith('http') ? (
+                                    <img src={player.player_emoji} alt="P" className="w-4 h-4 rounded-full border border-white/20 object-cover flex-none opacity-70" />
+                                ) : (
+                                    <span className="flex-none opacity-70">{player.player_emoji}</span>
+                                )}
+                                <span className="truncate">{player.player_name}</span>
                             </span>
                         </div>
                     ))}

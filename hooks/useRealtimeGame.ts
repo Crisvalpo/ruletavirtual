@@ -7,12 +7,18 @@ export function useRealtimeGame(screenId: string) {
     const setGameMode = useGameStore((state) => state.setGameMode);
 
     useEffect(() => {
+        const parsedId = parseInt(screenId);
+        if (isNaN(parsedId)) {
+            console.warn('⚠️ useRealtimeGame: Waiting for valid screenId:', screenId);
+            return;
+        }
+
         // 0. Initial Fetch (Sync current state on load)
         const fetchInitialState = async () => {
             const { data, error } = await supabase
                 .from('screen_state')
                 .select('*')
-                .eq('screen_number', parseInt(screenId))
+                .eq('screen_number', parsedId)
                 .single();
 
             if (error) {
@@ -20,8 +26,9 @@ export function useRealtimeGame(screenId: string) {
                     code: error.code,
                     message: error.message,
                     details: error.details,
-                    screenId: screenId
+                    hint: error.hint
                 });
+                console.error('Context:', { screenId, parsedId });
                 return;
             }
 
@@ -32,8 +39,6 @@ export function useRealtimeGame(screenId: string) {
                 if (data.current_wheel_id) {
                     setGameMode('individual', data.current_wheel_id);
                 } else {
-                    // Logic change: If no wheel ID, default to 'individual' (Parque)
-                    // instead of 'group' (Sorteo).
                     setGameMode('individual', undefined);
                 }
 
@@ -50,7 +55,7 @@ export function useRealtimeGame(screenId: string) {
                         isDemo: data.is_demo || false,
                         idleSpeed: data.idle_speed || 1.0,
                         currentQueueId: data.current_queue_id,
-                        lastSpinResult: data.last_spin_result // Sync on Load
+                        lastSpinResult: data.last_spin_result
                     });
                 } else {
                     useGameStore.setState({
@@ -67,18 +72,18 @@ export function useRealtimeGame(screenId: string) {
 
         // 1. Subscribe to screen_state changes for this screen
         const channel = supabase
-            .channel(`screen_${screenId}`)
+            .channel(`screen_${parsedId}`)
             .on(
                 'postgres_changes',
                 {
                     event: 'UPDATE',
                     schema: 'public',
                     table: 'screen_state',
-                    filter: `screen_number=eq.${screenId}`
+                    filter: `screen_number=eq.${parsedId}`
                 },
                 (payload) => {
                     const newState = payload.new;
-                    console.log(`🔄 [Realtime] Screen ${screenId} Update:`, {
+                    console.log(`🔄 [Realtime] Screen ${parsedId} Update:`, {
                         status: newState.status,
                         is_demo: newState.is_demo,
                         speed: newState.idle_speed,
@@ -89,12 +94,10 @@ export function useRealtimeGame(screenId: string) {
                     if (newState.current_wheel_id) {
                         setGameMode('individual', newState.current_wheel_id);
                     } else {
-                        // Logic change: If no wheel ID, stay/set to 'individual'
                         setGameMode('individual', undefined);
                     }
 
-                    // Sync Player Identity (for TV Display)
-                    // If name is null (idle), reset to default Jugador/😎
+                    // Sync Player Identity
                     useGameStore.getState().setIdentity(
                         newState.player_name || 'Jugador',
                         newState.player_emoji || '😎'
@@ -102,13 +105,12 @@ export function useRealtimeGame(screenId: string) {
 
                     // Sync Status (Trigger Spin) & Speed
                     if (newState.status === 'spinning') {
-                        // Directly update store to trigger reaction in components
                         useGameStore.setState({
                             status: 'spinning',
                             isDemo: newState.is_demo || false,
                             idleSpeed: newState.idle_speed || 1.0,
                             currentQueueId: newState.current_queue_id,
-                            lastSpinResult: newState.last_spin_result // Sync Result Immediately
+                            lastSpinResult: newState.last_spin_result
                         });
                     } else if (newState.status === 'result' || newState.status === 'showing_result') {
                         useGameStore.setState({
@@ -116,7 +118,7 @@ export function useRealtimeGame(screenId: string) {
                             isDemo: newState.is_demo || false,
                             idleSpeed: newState.idle_speed || 1.0,
                             currentQueueId: newState.current_queue_id,
-                            lastSpinResult: newState.last_spin_result // Keep result available
+                            lastSpinResult: newState.last_spin_result
                         });
                     } else if (newState.status === 'idle' || newState.status === 'waiting_for_spin') {
                         useGameStore.setState({
@@ -124,7 +126,7 @@ export function useRealtimeGame(screenId: string) {
                             isDemo: newState.is_demo || false,
                             idleSpeed: newState.idle_speed || 1.0,
                             currentQueueId: newState.current_queue_id,
-                            lastSpinResult: null // Clear result
+                            lastSpinResult: null
                         });
                     }
                 }

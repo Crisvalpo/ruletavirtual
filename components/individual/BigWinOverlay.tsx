@@ -6,10 +6,11 @@ interface BigWinOverlayProps {
     resultIndex: number | null;
     assets: { background: string; segments: any[] } | null;
     playerName?: string | null;
+    playerEmoji?: string | null;
     type?: 'win' | 'loss';
 }
 
-export default function BigWinOverlay({ isVisible, resultIndex, assets, playerName, type = 'win' }: BigWinOverlayProps) {
+export default function BigWinOverlay({ isVisible, resultIndex, assets, playerName, playerEmoji, type = 'win' }: BigWinOverlayProps) {
     const [imageLoaded, setImageLoaded] = useState(false);
     const [winnerImage, setWinnerImage] = useState<string | null>(null);
 
@@ -106,7 +107,14 @@ export default function BigWinOverlay({ isVisible, resultIndex, assets, playerNa
                         )}
                     </div>
 
-                    <div className="text-3xl text-white font-bold tracking-wide">
+                    <div className="text-3xl text-white font-bold tracking-wide flex items-center gap-3">
+                        {playerEmoji && (
+                            playerEmoji.startsWith('http') ? (
+                                <img src={playerEmoji} alt="P" className="w-12 h-12 rounded-full border-2 border-white/20 object-cover shadow-lg" />
+                            ) : (
+                                <span className="text-4xl">{playerEmoji}</span>
+                            )
+                        )}
                         {displayLabel}
                     </div>
 

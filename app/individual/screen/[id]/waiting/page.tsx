@@ -188,7 +188,8 @@ export default function WaitingPage({
                     console.warn("⚠️ Screen stuck on result > 12s! Forcing ADVANCE (Nuclear Option)...");
                     // Use the robust function that cleans everything & promotes
                     await supabase.rpc('force_advance_queue', {
-                        p_screen_number: parseInt(id)
+                        p_screen_number: parseInt(id),
+                        p_expected_queue_id: queueId
                     });
                 }
             }

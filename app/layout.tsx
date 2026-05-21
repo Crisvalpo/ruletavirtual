@@ -11,6 +11,10 @@ export const metadata: Metadata = {
         statusBarStyle: 'black-translucent',
         title: 'Ruleta'
     },
+    icons: {
+        icon: '/icons/icon-192x192.png',
+        apple: '/icons/icon-180x180.png'
+    },
     viewport: {
         width: 'device-width',
         initialScale: 1,
@@ -28,7 +32,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="es">
+        <html lang="es" suppressHydrationWarning>
             <body>
                 <AuthProvider>
                     {children}

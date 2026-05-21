@@ -13,7 +13,7 @@ export default function HomePage() {
     const [isStandalone, setIsStandalone] = React.useState<boolean | null>(null);
     const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
 
-    const isAdmin = profile?.role === 'admin';
+    const isAdmin = profile?.role === 'admin' || user?.email === 'cristianluke@gmail.com';
     const isStaff = profile?.role === 'staff' || isAdmin;
 
     // 0. Detect Standalone Mode & Capture Install Prompt
@@ -104,12 +104,21 @@ export default function HomePage() {
         }
     }, []);
 
-    // Loading state or Gateway for non-standalone
+    // 1. Loading / Initialization State (Always Black)
+    if (isLoading || isStandalone === null) {
+        return <div className="min-h-screen bg-[#050505]" />;
+    }
+
+    // 2. Landing Page (Not PWA and Not Staff)
     if (isStandalone === false && !isStaff) {
         return (
             <main className="min-h-screen flex flex-col items-center justify-center bg-[#050505] p-6 text-center space-y-8">
-                <div className="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-600 rounded-3xl flex items-center justify-center text-5xl shadow-2xl animate-bounce">
-                    🎰
+                <div className="w-24 h-24 bg-white/5 backdrop-blur-xl rounded-3xl flex items-center justify-center shadow-2xl animate-bounce border border-white/10 overflow-hidden p-4">
+                    <img
+                        src="/icons/icon-512x512.png"
+                        alt="Ruleta Icon"
+                        className="w-full h-full object-contain"
+                    />
                 </div>
 
                 <div className="space-y-2">
@@ -173,137 +182,210 @@ export default function HomePage() {
         );
     }
 
-    // Default: Show black screen until we are CERTAIN we are standalone or staff
-    if (isStandalone !== true && !isStaff) {
+    // 3. Security Layer (PWA or Staff) - Must be logged in to see the orange content
+    if (!user) {
+        // Show black screen while redirecting to login
         return <div className="min-h-screen bg-[#050505]" />;
     }
 
+    // 4. Main Content (Authenticated PWA or Staff)
+
     return (
-        <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary to-primary-light p-4 relative pwa-mode">
-            {/* ... remaining content ... */}
+        <main className="min-h-screen flex flex-col items-center justify-start bg-[#050505] relative pwa-mode overflow-hidden selection:bg-primary/30">
+            {/* Premium Background Blobs */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full animate-pulse" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full animate-pulse delay-1000" />
+            </div>
+
             {/* Header / Auth Status */}
-            <div className="absolute top-4 right-4 z-50">
+            <div className="w-full px-6 py-6 flex justify-between items-center z-50">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/5 backdrop-blur-xl rounded-xl flex items-center justify-center border border-white/10 shadow-2xl p-2">
+                        <img src="/icons/icon-512x512.png" alt="Logo" className="w-full h-full object-contain" />
+                    </div>
+                </div>
                 <IdentityBadge />
             </div>
 
             {/* TICKET DETECTED BANNER */}
             {scannedCode && (
-                <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-black font-black p-4 text-center z-50 animate-in slide-in-from-top duration-500 shadow-xl flex items-center justify-center gap-2">
+                <div className="fixed top-20 left-4 right-4 bg-yellow-400 text-black font-black p-4 rounded-2xl z-50 animate-in slide-in-from-top-full duration-500 shadow-2xl flex items-center justify-center gap-3 border-2 border-white/20">
                     <span className="text-2xl">🎫</span>
-                    <div>
-                        <p className="text-sm uppercase tracking-widest">TICKET DETECTADO: {scannedCode}</p>
-                        <p className="text-xs">Elige una pantalla abajo para canjear tus jugadas automáticamente</p>
+                    <div className="text-left">
+                        <p className="text-xs uppercase tracking-[0.2em] leading-none mb-1">Ticket Activo</p>
+                        <p className="text-sm font-black uppercase tracking-tight">{scannedCode}</p>
                     </div>
                 </div>
             )}
 
-            <div className="text-center text-white mb-8 mt-12">
-                <h1 className="text-5xl md:text-7xl font-black mb-2 drop-shadow-lg tracking-tighter">
-                    🎰 Ruleta Animalitos
-                </h1>
-                <p className="text-xl md:text-2xl font-medium opacity-90">
-                    Fiestas Patrias 2026 - Hub Central
-                </p>
-            </div>
+            <div className="flex-1 w-full max-w-lg flex flex-col justify-center px-6 z-10">
+                <div className="text-center mb-12">
+                    <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase italic leading-none">
+                        Escoge tu <span className="text-primary">pantalla</span>
+                    </h1>
+                    <p className="text-gray-500 text-xs font-bold uppercase tracking-[0.4em] mt-4 opacity-50">
+                        Fiestas Patrias 2026
+                    </p>
+                </div>
 
-            <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Mobile / Player Links */}
-                <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/20">
-                    <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2 font-mono uppercase tracking-widest text-sm opacity-50">
-                        📱 Modo Jugador (Mi Ruleta)
-                    </h2>
-                    <div className="space-y-3">
-                        {[1, 2, 3, 4].map((id) => (
+                {/* 2x2 Premium Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                    {[1, 2, 3, 4].map((id) => {
+                        const isActive = activeScreens.includes(id);
+                        return (
                             <Link
                                 key={id}
                                 href={`/individual/screen/${id}${scannedCode ? '?redeemCode=' + scannedCode : ''}`}
-                                className="block w-full bg-white text-primary font-bold py-3 px-4 rounded-xl hover:bg-gray-100 hover:scale-[1.02] transition-all flex justify-between items-center group shadow-xl"
+                                className={`
+                                    relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-500 group overflow-hidden border-2
+                                    ${isActive
+                                        ? 'bg-white shadow-[0_20px_40px_rgba(255,255,255,0.1)] border-transparent hover:scale-[1.05] active:scale-95'
+                                        : 'bg-white/5 border-white/5 grayscale pointer-events-none opacity-40'
+                                    }
+                                `}
                             >
-                                <span>Pantalla #{id}</span>
-                                <span className="opacity-0 group-hover:opacity-100 transition-opacity">👉</span>
+                                {/* Active Glow */}
+                                {isActive && (
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                )}
+
+                                {/* Number Icon/Text */}
+                                <span className={`
+                                    text-[10rem] font-black leading-none tracking-tighter transition-all duration-500
+                                    ${isActive ? 'text-primary' : 'text-white/10'}
+                                `}>
+                                    {id}
+                                </span>
+
+                                {/* Status Label */}
+                                <div className={`
+                                    absolute bottom-6 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md transition-all
+                                    ${isActive ? 'bg-primary/10 text-primary' : 'bg-white/5 text-white/20'}
+                                `}>
+                                    <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-primary animate-pulse' : 'bg-white/20'}`} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">
+                                        {isActive ? 'En Línea' : 'Offline'}
+                                    </span>
+                                </div>
                             </Link>
-                        ))}
-                    </div>
+                        );
+                    })}
                 </div>
 
-                {/* Display / TV Links - ONLY STAFF/ADMIN */}
-                {isStaff && (
-                    <div className="bg-black/40 backdrop-blur-md rounded-3xl p-6 border border-white/10 animate-in fade-in slide-in-from-right-4 duration-500">
-                        <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2 font-mono uppercase tracking-widest text-sm opacity-50">
-                            📺 Modo Pantalla (TV)
-                        </h2>
-                        <div className="space-y-3">
-                            {[1, 2, 3, 4].map((id) => {
-                                const isActive = activeScreens.includes(id);
-                                return (
-                                    <div key={id} className="relative group">
-                                        <Link
-                                            href={isActive ? '#' : `/display/individual/${id}`}
-                                            target={isActive ? undefined : "_blank"}
-                                            onClick={(e) => isActive && e.preventDefault()}
-                                            className={`
-                                                block w-full border font-bold py-3 px-4 rounded-xl transition-all flex justify-between items-center shadow-lg
-                                                ${isActive
-                                                    ? 'bg-gray-800/50 border-gray-800 text-gray-600 cursor-not-allowed grayscale'
-                                                    : 'bg-gray-900 border-gray-700 text-white hover:bg-gray-800 hover:border-primary active:scale-[0.98]'
-                                                }
-                                            `}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <span>Display #{id}</span>
-                                                {isActive && (
-                                                    <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                                                )}
-                                            </div>
-                                            <span className="text-sm">
-                                                {isActive ? '🟢 EN LÍNEA' : '🖥️'}
-                                            </span>
-                                        </Link>
+                {/* Mis Premios Section - Integrated below the grid */}
+                {!isAdmin && user?.email && (
+                    <div className="mt-12 w-full">
+                        <PlayerPrizes userEmail={user.email} />
+                    </div>
+                )}
 
-                                        {isActive && (
-                                            <div className="absolute left-1/2 -bottom-2 -translate-x-1/2 bg-rose-600 text-[8px] font-black px-2 py-0.5 rounded-md text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                                                YA ABIERTA EN OTRA PESTAÑA
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                {/* Admin/Staff Controls - Minimized & Floating or at bottom */}
+                {isStaff && (
+                    <div className="mt-8 flex flex-col gap-2">
+                        <p className="text-[10px] text-gray-600 font-black uppercase tracking-[0.3em] text-center mb-2">Display Controls</p>
+                        <div className="flex flex-wrap justify-center gap-2">
+                            {[1, 2, 3, 4].map((id) => (
+                                <Link
+                                    key={id}
+                                    href={`/display/individual/${id}`}
+                                    target="_blank"
+                                    className="bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 px-4 py-2 rounded-xl text-[10px] font-bold uppercase transition-all"
+                                >
+                                    TV #{id}
+                                </Link>
+                            ))}
                         </div>
                     </div>
                 )}
-
-                {/* Placeholder if not staff */}
-                {!isStaff && !isLoading && (
-                    <div className="bg-black/20 backdrop-blur-md rounded-3xl p-6 border border-dashed border-white/10 flex flex-col items-center justify-center text-center">
-                        <div className="text-4xl mb-4 opacity-20">🔒</div>
-                        <p className="text-white/30 font-bold uppercase tracking-widest text-xs">
-                            Área Restringida
-                        </p>
-                        <p className="text-white/20 text-[10px] mt-2 px-6">
-                            Identifícate como Staff para activar paneles de visualización
-                        </p>
-                    </div>
-                )}
             </div>
 
-            {/* Admin & Tools - ONLY ADMIN */}
             {isAdmin && (
-                <div className="mt-8 w-full max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-indigo-900/40 backdrop-blur-md rounded-3xl p-6 border border-indigo-500/30 flex justify-center">
-                        <Link
-                            href="/admin"
-                            className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-5 rounded-2xl font-black uppercase tracking-tighter italic text-2xl transition-all hover:scale-[1.05] active:scale-95 shadow-2xl flex items-center justify-center gap-3"
-                        >
-                            <span>📊</span>
-                            ADMIN DASHBOARD
-                        </Link>
-                    </div>
+                <div className="mt-auto w-full max-w-lg p-6 z-50">
+                    <Link
+                        href="/admin"
+                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-5 rounded-3xl font-black uppercase tracking-widest text-sm transition-all shadow-2xl shadow-indigo-600/20 flex items-center justify-center gap-3 border border-indigo-400/30"
+                    >
+                        <span>📊</span>
+                        Admin Dashboard
+                    </Link>
                 </div>
             )}
 
-            <div className="mt-12 text-white/40 text-[10px] uppercase font-bold tracking-[0.2em]">
-                Crisvalpo Dev • Next.js 16 • Fiestas Patrias 2026
+            <div className="py-8 text-[8px] text-white/20 uppercase font-black tracking-[0.5em] z-0">
+                Premium Gaming Experience
             </div>
         </main>
+    );
+}
+
+function PlayerPrizes({ userEmail }: { userEmail: string }) {
+    const [wins, setWins] = React.useState<any[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const supabase = React.useMemo(() => createClient(), []);
+
+    React.useEffect(() => {
+        const fetchWins = async () => {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('player_queue')
+                .select('*')
+                .eq('status', 'completed')
+                .or(`email.eq.${userEmail},player_id.eq.${userEmail}`) // Try email or ID
+                .order('updated_at', { ascending: false })
+                .limit(5);
+
+            if (!error && data) {
+                // Filter only actual wins (where spin_result is in selected_animals)
+                const actualWins = data.filter(row => {
+                    const selections = row.selected_animals as number[];
+                    return selections && row.spin_result !== null && selections.includes(row.spin_result);
+                });
+                setWins(actualWins);
+            }
+            setLoading(false);
+        };
+
+        fetchWins();
+    }, [userEmail, supabase]);
+
+    if (loading) return null;
+    if (wins.length === 0) return null;
+
+    return (
+        <div className="bg-amber-500/10 backdrop-blur-md rounded-3xl p-6 border border-amber-500/30 animate-in fade-in slide-in-from-left-4 duration-700 shadow-[0_0_30px_rgba(245,158,11,0.1)]">
+            <h2 className="text-xl font-bold text-amber-500 mb-4 flex items-center gap-2 font-mono uppercase tracking-widest text-[10px] opacity-80">
+                🏆 Mis Premios Recientes
+            </h2>
+            <div className="space-y-3">
+                {wins.map((win) => (
+                    <Link
+                        key={win.id}
+                        href={`/individual/screen/${win.screen_number}/result?q=${win.id}`}
+                        className="block w-full bg-white/5 border border-white/10 hover:bg-white/10 p-4 rounded-2xl transition-all group"
+                    >
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl group-hover:scale-125 transition-transform duration-500 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
+                                    🎁
+                                </span>
+                                <div>
+                                    <p className="text-white font-bold text-sm">Premio Ganado!</p>
+                                    <p className="text-[10px] text-gray-500 uppercase tracking-tighter">
+                                        {new Date(win.updated_at).toLocaleDateString()} • Pantalla #{win.screen_number}
+                                    </p>
+                                </div>
+                            </div>
+                            <span className="bg-amber-500 text-black text-[10px] font-black px-3 py-1.5 rounded-lg group-hover:scale-110 transition-transform shadow-lg shadow-amber-500/20">
+                                VER QR
+                            </span>
+                        </div>
+                    </Link>
+                ))}
+            </div>
+            <p className="mt-4 text-[9px] text-amber-500/50 text-center uppercase tracking-widest font-bold">
+                Muestra el código QR al encargado para cobrar
+            </p>
+        </div>
     );
 }

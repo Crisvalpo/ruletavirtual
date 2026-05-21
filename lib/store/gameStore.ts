@@ -1,11 +1,11 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 interface GameState {
     // Session & Identity
     screenId: string | null;
     nickname: string;
-    emoji: string;
+    emoji: string; // Can be a literal emoji or a profile photo URL
     queueId: string | null;
     currentQueueId: string | null; // Sync for TV
 
@@ -84,13 +84,9 @@ export const useGameStore = create<GameState>()(
         }),
         {
             name: 'ruleta-game-storage',
-            partialize: (state) => ({
-                nickname: state.nickname,
-                emoji: state.emoji,
-                // Do NOT persist screenId, activeWheelId, or gameMode
-                // because multiple screens in different tabs/windows on the SAME machine
-                // share localStorage. Persisting these would cause Tab 1 to overwrite Tab 2.
-            }),
+            storage: createJSONStorage(() => sessionStorage),
+            // Al usar sessionStorage, ya no hay riesgo de interferencia entre pestañas en una misma máquina,
+            // por lo que persistimos todo el estado del juego para soportar F5 sin problemas.
         }
     )
 );

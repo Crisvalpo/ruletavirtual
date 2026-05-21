@@ -289,10 +289,15 @@ export default function ScreenControlDashboard() {
 
                                     <button
                                         onClick={() => handleForceAdvance(screen.screen_number)}
-                                        className="w-full bg-white border border-rose-100 hover:border-rose-200 text-rose-600 text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
+                                        className={`w-full text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 border
+                                            ${isActive
+                                                ? 'bg-rose-600 border-rose-600 text-white shadow-rose-500/20'
+                                                : 'bg-white border-rose-100 text-rose-600 hover:bg-rose-50'
+                                            }
+                                        `}
                                         title="Forzar limpieza de pantalla y avance de fila"
                                     >
-                                        🧹 Limpiar
+                                        🧹 Destrabar / Limpiar
                                     </button>
                                 </div>
                             </div>

@@ -32,6 +32,7 @@ export default function DisplayScreenPage({
     const activeWheelId = useGameStore((state) => state.activeWheelId);
     const realNickname = useGameStore(state => state.nickname); // Moved up for access
     const realEmoji = useGameStore(state => state.emoji); // Moved up
+    const currentQueueId = useGameStore(state => state.currentQueueId);
 
     // 3. Logic: Determine effective mode
     const isGroupEvent = venueMode === 'group_event';
@@ -254,15 +255,25 @@ export default function DisplayScreenPage({
                         }
                     } catch (err: any) {
                         console.error("❌ Failed to load wheel assets:", {
-                            message: err.message,
+                            wheelId: effectiveActiveWheelId,
+                            message: err.message || "Unknown error",
                             details: err.details,
-                            hint: err.hint,
-                            code: err.code,
-                            full: err
+                            code: err.code
                         });
-                        // If not found or error, we could reset to null (group mode)
-                        // but for now we log it.
-                        setActiveWheelAssets(null); // Fallback to default if error
+                        console.log("⚠️ Falling back to Mario Wheel due to error");
+                        // FORCE FALLBACK TO MARIO (Built-in)
+                        const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+                        const segments = Array.from({ length: 12 }, (_, i) => ({
+                            id: i + 1,
+                            label: `Seg ${i + 1}`,
+                            color: 'transparent',
+                            imageWheel: `${STORAGE_BASE}/mario/segments/${i + 1}.png`,
+                            imageResult: `${STORAGE_BASE}/mario/selector/${i + 1}.jpg`
+                        }));
+                        setActiveWheelAssets({
+                            background: `${STORAGE_BASE}/mario/background.jpg`,
+                            segments: segments
+                        });
                     }
                 }
             } catch (err: any) {
@@ -514,6 +525,13 @@ export default function DisplayScreenPage({
         setStatus('result');
         setShowBigWin(true);
 
+        // --- 0b. BROADCAST TO MOBILE (Instant Sync) ---
+        supabase.channel(`screen_${screenIdNum}`).send({
+            type: 'broadcast',
+            event: 'spin_finished',
+            payload: { result: winnerIndex }
+        });
+
         // --- 1. Background Logic (Do not block visuals) ---
         (async () => {
             try {
@@ -588,7 +606,8 @@ export default function DisplayScreenPage({
                 if (!isDemo) {
                     setTimeout(async () => {
                         const { error } = await supabase.rpc('force_advance_queue', {
-                            p_screen_number: screenIdNum
+                            p_screen_number: screenIdNum,
+                            p_expected_queue_id: currentQueueId
                         });
                         if (error) console.error('Error cleaning session:', error);
                     }, 10000);
@@ -628,7 +647,7 @@ export default function DisplayScreenPage({
             // Only check if we are truly idle in DB
             const { data: screenData } = await supabase
                 .from('screen_state')
-                .select('status, updated_at')
+                .select('status, updated_at, current_queue_id')
                 .eq('screen_number', screenIdNum)
                 .single();
 
@@ -656,7 +675,8 @@ export default function DisplayScreenPage({
                 if (diffSeconds > 60) { // 60s timeout
                     console.warn('⚠️ TV Watchdog: Player inactive too long! Advancing...');
                     await supabase.rpc('force_advance_queue', {
-                        p_screen_number: screenIdNum
+                        p_screen_number: screenIdNum,
+                        p_expected_queue_id: screenData.current_queue_id
                     });
                 }
             }
@@ -694,7 +714,11 @@ export default function DisplayScreenPage({
                                 {previewPlayer && status === 'idle' && (!realNickname || realNickname === 'Jugador') ? 'Preparando...' : 'Jugando ahora'}
                             </p>
                             <div className="flex items-center gap-2">
-                                <span className="text-3xl">{displayEmoji}</span>
+                                {displayEmoji?.startsWith('http') ? (
+                                    <img src={displayEmoji} alt="P" className="w-10 h-10 rounded-full border border-white/20 object-cover shadow-lg" />
+                                ) : (
+                                    <span className="text-3xl">{displayEmoji}</span>
+                                )}
                                 <span className="text-2xl font-bold text-yellow-400">{displayNickname}</span>
                             </div>
                         </div>
@@ -708,7 +732,7 @@ export default function DisplayScreenPage({
                                     // Resolve Image
                                     let imgSrc = null;
                                     if (activeWheelAssets?.segments) {
-                                        const seg = activeWheelAssets.segments.find(s => s.id === selId);
+                                        const seg = activeWheelAssets.segments.find((s: any) => s.id === selId);
                                         // Use imageResult (selector icon) instead of wedge
                                         if (seg) imgSrc = seg.imageResult || seg.imageWheel;
                                     }
@@ -914,7 +938,7 @@ export default function DisplayScreenPage({
                                     if (spin && activeWheelAssets?.segments) {
                                         // Assuming result_index matches ID (1-based)
                                         // If segments are 0-indexed in array but have IDs:
-                                        const segment = activeWheelAssets.segments.find(s => s.id === spin.result_index);
+                                        const segment = activeWheelAssets.segments.find((s: any) => s.id === spin.result_index);
                                         if (segment) imageSrc = segment.imageResult || segment.imageWheel;
                                     }
 
@@ -979,6 +1003,7 @@ export default function DisplayScreenPage({
                 resultIndex={result}
                 assets={activeWheelAssets}
                 playerName={realNickname}
+                playerEmoji={realEmoji}
                 type={isWin ? 'win' : 'loss'}
             />
 

@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const fetchProfile = async (userId: string, mounted = true) => {
+    const fetchProfile = async (userId: string, userEmail?: string, mounted = true) => {
         try {
             const { data: profileData, error } = await supabase
                 .from('profiles')
@@ -46,7 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // SELF-HEALING: If profile is missing (PGRST116), create it
                 if (error.code === 'PGRST116') {
                     console.log('Perfil no encontrado. Auto-generando...');
+                    // Re-fetch user to be extra sure
                     const { data: { user: currentUser } } = await supabase.auth.getUser();
+                    const emailToUse = userEmail || currentUser?.email;
 
                     if (currentUser) {
                         const { error: insertError } = await supabase
@@ -56,12 +58,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 email: currentUser.email,
                                 display_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || 'Jugador',
                                 avatar_url: currentUser.user_metadata?.avatar_url,
-                                role: currentUser.email === 'cristianluke@gmail.com' ? 'admin' : 'player'
+                                role: emailToUse === 'cristianluke@gmail.com' ? 'admin' : 'player'
                             });
 
                         if (!insertError) {
                             // Retry fetch
-                            return fetchProfile(userId, mounted);
+                            return fetchProfile(userId, emailToUse, mounted);
                         } else {
                             console.error('Error al auto-generar perfil:', insertError);
                         }
@@ -73,8 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             if (profileData && mounted) {
-                // FORCE ADMIN for specific user
-                if (user?.email === 'cristianluke@gmail.com') {
+                // FORCE ADMIN for specific user (Hard override)
+                const emailToUse = userEmail || user?.email;
+                if (emailToUse === 'cristianluke@gmail.com') {
+                    console.log('🛠️ Admin detectado por email:', emailToUse);
                     profileData.role = 'admin';
                 }
                 setProfile(profileData);
@@ -115,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUser(newSession?.user ?? null);
 
                     if (newSession?.user) {
-                        await fetchProfile(newSession.user.id, isMounted);
+                        await fetchProfile(newSession.user.id, newSession.user.email, isMounted);
                     } else {
                         setProfile(null);
                     }
@@ -161,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [user?.id]);
 
     const signInWithGoogle = async () => {
-        const origin = window.location.origin;
+        const origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
         const currentPath = window.location.pathname + window.location.search;
 
         await supabase.auth.signInWithOAuth({
@@ -177,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signInWithEmail = async (email: string) => {
-        const origin = window.location.origin;
+        const origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
         const currentPath = window.location.pathname + window.location.search;
 
         return await supabase.auth.signInWithOtp({
@@ -193,7 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const refreshProfile = async () => {
-        if (user) await fetchProfile(user.id);
+        if (user) await fetchProfile(user.id, user.email);
     };
 
     return (

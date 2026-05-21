@@ -1,14 +1,15 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useGameStore } from '@/lib/store/gameStore';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useVenueSettings } from '@/hooks/useVenueSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getDeviceFingerprint } from '@/lib/deviceFingerprint';
 import { useRealtimeGame } from '@/hooks/useRealtimeGame';
+import Link from 'next/link';
 
 export default function ResultPage({
     params
@@ -22,6 +23,10 @@ export default function ResultPage({
 
     // Sync with global screen state to know when it's safe to play again
     useRealtimeGame(id);
+
+    const searchParams = useSearchParams();
+    const urlQueueId = searchParams.get('q');
+    const effectiveQueueId = queueId || urlQueueId;
 
     const [status, setStatus] = useState<'loading' | 'winning' | 'losing' | 'auto_rejoin'>('loading');
     const [dbSelections, setDbSelections] = useState<number[]>([]);
@@ -54,26 +59,26 @@ export default function ResultPage({
 
     // Redirect if no queueId (no active session)
     useEffect(() => {
-        if (!queueId) {
+        if (!effectiveQueueId) {
             // Give it a moment in case zustand is still hydrating
             const timer = setTimeout(() => {
-                if (!queueId) {
+                if (!effectiveQueueId) {
                     router.push(`/individual/screen/${id}`);
                 }
             }, 500);
             return () => clearTimeout(timer);
         }
-    }, [queueId, id, router]);
+    }, [effectiveQueueId, id, router]);
 
     useEffect(() => {
         // If user just identified themselves while on this page, link the prize
-        if (isIdentified && queueId && !isSaved) {
+        if (isIdentified && effectiveQueueId && !isSaved) {
             handleSavePrize(user.email!);
         }
-    }, [isIdentified, queueId]);
+    }, [isIdentified, effectiveQueueId]);
 
     const handleSavePrize = async (userEmail: string) => {
-        if (!queueId) return;
+        if (!effectiveQueueId) return;
         setIsSaving(true);
         const { error } = await supabase
             .from('player_queue')
@@ -81,16 +86,15 @@ export default function ResultPage({
                 email: userEmail,
                 player_id: user?.id
             })
-            .eq('id', queueId);
+            .eq('id', effectiveQueueId);
 
         if (!error) setIsSaved(true);
         setIsSaving(false);
     };
 
     useEffect(() => {
-        let isMounted = true;
-
-        const checkResult = async () => {
+        // 1. Core Result Logic
+        const checkResult = React.useCallback(async (isMounted: boolean) => {
             try {
                 // 0. RECUPERAR DESDE LOCALSTORAGE si no hay queueId
                 if (!queueId) {
@@ -105,7 +109,7 @@ export default function ResultPage({
                                 console.log("💾 Recovered queueId from localStorage:", savedQueueId);
                                 useGameStore.getState().setQueueId(savedQueueId);
                                 // Re-run check with recovered queueId
-                                setTimeout(() => checkResult(), 100);
+                                setTimeout(() => checkResult(isMounted), 100);
                                 return;
                             } else {
                                 // Expirado, limpiar
@@ -117,13 +121,13 @@ export default function ResultPage({
                     }
                 }
 
-                if (!queueId) return;
+                if (!effectiveQueueId) return;
 
                 // 1. Fetch own queue record first (Session specific result)
                 const { data: queueData, error: queueError } = await supabase
                     .from('player_queue')
                     .select('selected_animals, spin_result, status, package_code, player_name, player_emoji')
-                    .eq('id', queueId)
+                    .eq('id', effectiveQueueId)
                     .maybeSingle();
 
                 if (queueError) {
@@ -154,10 +158,9 @@ export default function ResultPage({
                     .maybeSingle();
 
                 // 3. PRIORITY CHECK: If screen is spinning OR player status is playing, WAIT.
-                // We only show result if status is 'completed' (from player) or 'showing_result' (from screen)
-
+                // LOOSENED: If store already says 'result' (globalStatus), we allow transition.
                 const isSpinning = screenData?.status === 'spinning' || queueData?.status === 'playing';
-                const isCompleted = queueData?.status === 'completed' || screenData?.status === 'showing_result';
+                const isCompleted = queueData?.status === 'completed' || screenData?.status === 'showing_result' || globalStatus === 'result';
 
                 if (isSpinning && !isCompleted) {
                     if (isMounted) setStatus('loading');
@@ -230,7 +233,7 @@ export default function ResultPage({
 
                 // 5. Fallback for idle/result transition
                 if (screenData) {
-                    if (screenData.last_spin_result !== null && screenData.status === 'showing_result') {
+                    if (screenData.last_spin_result !== null && (screenData.status === 'showing_result' || screenData.status === 'result')) {
                         const selections = dbSelections.length > 0 ? dbSelections : selectedAnimals;
                         if (selections.length > 0) {
                             const isWin = selections.includes(screenData.last_spin_result);
@@ -241,50 +244,61 @@ export default function ResultPage({
             } catch (err) {
                 console.error("Unexpected error in checkResult:", err);
             }
-        };
+        }, [id, queueId, effectiveQueueId, supabase, selectedAnimals, dbSelections, globalStatus]);
 
-        checkResult();
+        useEffect(() => {
+            let isMounted = true;
+            checkResult(isMounted);
 
-        // 2. Realtime Subscription for OUR OWN record
-        const channel = supabase
-            .channel(`player_result_${queueId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'player_queue',
-                    filter: `id=eq.${queueId}`
-                },
-                (payload) => {
-                    console.log("📨 Realtime Packet:", payload);
-                    if (isMounted) {
-                        const newResult = payload.new.spin_result;
-                        const newStatus = payload.new.status;
-                        console.log(`Checking update: Result=${newResult}, Status=${newStatus}`);
+            // 2. Realtime Subscription for OUR OWN record
+            const channel = supabase
+                .channel(`player_result_${queueId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'player_queue',
+                        filter: `id=eq.${queueId}`
+                    },
+                    (payload) => {
+                        console.log("📨 Queue Update Packet:", payload);
+                        if (isMounted) {
+                            const newResult = payload.new.spin_result;
+                            const newStatus = payload.new.status;
 
-                        // STRICT CHECK: Only show if status is explicitly COMPLETED
-                        if (newResult !== null && newStatus === 'completed') {
-                            console.log("🎯 Personal Result Received (COMPLETED):", newResult);
-                            const selections = (payload.new.selected_animals as number[]) || selectedAnimals;
-                            const isWin = selections.includes(newResult);
-                            setStatus(isWin ? 'winning' : 'losing');
-                        } else {
-                            console.log("⏳ Result received but waiting for completion (Status is " + newStatus + ")");
-                            // Optional: Force loading if status is playing
-                            if (newStatus === 'playing') {
-                                setStatus('loading');
+                            // Transition if completed OR result is available and screen turned to result
+                            if (newResult !== null && (newStatus === 'completed' || globalStatus === 'result')) {
+                                const selections = (payload.new.selected_animals as number[]) || selectedAnimals;
+                                const isWin = selections.includes(newResult);
+                                setStatus(isWin ? 'winning' : 'losing');
                             }
                         }
                     }
-                }
-            )
-            .subscribe((status) => console.log("📡 Subscription Status:", status));
+                )
+                .subscribe();
 
-        return () => {
-            isMounted = false;
-            supabase.removeChannel(channel);
-        };
+            // 3. SECONARY SYNC: Listen for Broadcast from Display (Instant)
+            const displayChannel = supabase.channel(`screen_${id}`);
+            displayChannel
+                .on('broadcast', { event: 'spin_finished' }, ({ payload }) => {
+                    console.log("⚡ Instant Broadcast received:", payload);
+                    if (isMounted && payload.result !== null) {
+                        const selections = dbSelections.length > 0 ? dbSelections : selectedAnimals;
+                        if (selections.length > 0) {
+                            const isWin = selections.includes(payload.result);
+                            setStatus(isWin ? 'winning' : 'losing');
+                        }
+                    }
+                })
+                .subscribe();
+
+            return () => {
+                isMounted = false;
+                supabase.removeChannel(channel);
+                supabase.removeChannel(displayChannel);
+            };
+        }, [id, selectedAnimals, queueId, supabase, checkResult, globalStatus, dbSelections]);
     }, [id, selectedAnimals, queueId, supabase]);
 
     // Check for package tracking and auto-rejoin
@@ -451,165 +465,182 @@ export default function ResultPage({
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-900 text-white perspective-1000">
+        <div className="min-h-screen bg-gray-900 text-white flex flex-col pwa-mode">
+            {/* Navigation Header */}
+            <div className="bg-black/20 backdrop-blur-md border-b border-white/5 px-4 py-2 flex justify-between items-center z-50 sticky top-0">
+                <div className="flex items-center gap-2">
+                    <span className="text-xl">{useGameStore.getState().emoji}</span>
+                    <span className="font-black text-xs uppercase tracking-tight">{nickname}</span>
+                </div>
 
-            {status === 'loading' && (
-                <div className="text-center animate-pulse flex flex-col items-center">
-                    <div className="text-6xl mb-4 animate-spin">🎲</div>
-                    <h1 className="text-2xl font-bold text-white mb-2">Girando...</h1>
-                    <p className="text-gray-400 mb-8">¡Buena Suerte!</p>
+                <Link
+                    href="/"
+                    className="bg-white/5 border border-white/10 py-1.5 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2"
+                >
+                    <span>📺</span>
+                    Cambiar Pantalla
+                </Link>
+            </div>
 
-                    {/* RESET BUTTON (Visible after 10s of loading) */}
-                    <div className="mt-8 opacity-0 animate-in fade-in duration-1000 delay-[10000ms]">
-                        <p className="text-xs text-gray-500 mb-4">Si la ruleta se detuvo y no ves el resultado:</p>
+            <div className="flex-1 flex flex-col items-center justify-center p-4">
+                {status === 'loading' && (
+                    <div className="text-center animate-pulse flex flex-col items-center">
+                        <div className="text-6xl mb-4 animate-spin">🎲</div>
+                        <h1 className="text-2xl font-bold text-white mb-2">Girando...</h1>
+                        <p className="text-gray-400 mb-8">¡Buena Suerte!</p>
+
+                        {/* RESET BUTTON (Visible after 10s of loading) */}
+                        <div className="mt-8 opacity-0 animate-in fade-in duration-1000 delay-[10000ms]">
+                            <p className="text-xs text-gray-500 mb-4">Si la ruleta se detuvo y no ves el resultado:</p>
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="text-xs font-bold text-yellow-500 underline uppercase tracking-widest"
+                            >
+                                Refrescar Pantalla
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {status === 'winning' && (
+                    <div className="text-center animate-in zoom-in duration-500 max-w-sm w-full">
+                        <div className="text-6xl mb-4 animate-bounce">🎉</div>
+                        <h1 className="text-4xl font-bold text-yellow-400 mb-2">¡GANASTE!</h1>
+                        <p className="text-xl mb-4">La ruleta cayó en tu elección</p>
+
+                        {!isSaved ? (
+                            <div className="bg-gray-800/80 backdrop-blur-md p-6 rounded-2xl border border-yellow-500/30 mb-6 shadow-xl">
+                                <h3 className="text-lg font-bold text-yellow-500 mb-2">🎁 Asegura tu Premio</h3>
+                                <p className="text-xs text-gray-400 mb-6">Inicia sesión para registrar este premio en tu historial y participar en sorteos especiales.</p>
+
+                                <button
+                                    onClick={signInWithGoogle}
+                                    disabled={isSaving}
+                                    className="w-full bg-white hover:bg-gray-100 text-gray-900 font-black py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg"
+                                >
+                                    <span className="text-xl">
+                                        <svg width="24" height="24" viewBox="0 0 24 24">
+                                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                                            <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" fill="#FBBC05" />
+                                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                                        </svg>
+                                    </span>
+                                    INICIAR CON GOOGLE
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="bg-green-500/20 border border-green-500/50 p-4 rounded-xl mb-6 flex items-center gap-3 animate-in fade-in">
+                                <span className="text-2xl">✅</span>
+                                <div className="text-left">
+                                    <p className="font-bold text-green-400 text-sm">¡Premio Registrado!</p>
+                                    <p className="text-[10px] text-green-300">Vinculado a {user?.email || 'tu cuenta'}</p>
+                                </div>
+                            </div>
+                        )}
+
+
+                        <div className="bg-white text-gray-900 p-6 rounded-xl mb-6 transform rotate-2 shadow-2xl border-4 border-yellow-400 flex flex-col justify-center">
+                            <p className="font-bold text-sm text-gray-400 uppercase tracking-widest mb-1">CÓDIGO DE CANJE</p>
+                            <p className="text-3xl font-black text-green-600 tracking-tighter leading-tight">PREMIO NIVEL 1</p>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-3xl inline-block shadow-2xl transform -rotate-1">
+                            <QRCodeCanvas
+                                value={`${(baseUrl || window.location.origin).trim()}/staff/validate/${ticketCode || queueId?.slice(0, 8)}`}
+                                size={180}
+                                level="H"
+                                includeMargin={false}
+                                className="rounded-lg"
+                            />
+                            <p className="mt-2 text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">QR VÁLIDO EN MESÓN</p>
+                        </div>
+
+                        <div className="mt-8 flex flex-col gap-4">
+                            {packageInfo && packageInfo.spinsRemaining > 0 ? (
+                                <button
+                                    onClick={handleAutoRejoin}
+                                    disabled={isScreenBusy}
+                                    className={`bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 animate-pulse disabled:opacity-50 disabled:grayscale disabled:animate-none`}
+                                >
+                                    {isScreenBusy ? 'Esperando ruleta...' : `Sig. Giro (${packageInfo.spinsRemaining})`}
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handlePlayAgain}
+                                    disabled={isScreenBusy}
+                                    className={`bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
+                                >
+                                    {isScreenBusy ? 'Esperando ruleta...' : 'Jugar de Nuevo'}
+                                </button>
+                            )}
+                            <p className="text-xs text-gray-500">Muestra esta pantalla al staff para cobrar</p>
+                        </div>
+                    </div>
+                )}
+
+                {status === 'losing' && (
+                    <div className="text-center animate-in fade-in slide-in-from-bottom-10 duration-500 max-w-sm w-full">
+                        <div className="text-6xl mb-4 grayscale opacity-50">😢</div>
+                        <h1 className="text-3xl font-bold text-gray-300 mb-2">¡Casi!</h1>
+                        <p className="text-xl mb-8 text-gray-400">Hoy no fue tu día de suerte.</p>
+
+                        <div className="bg-gray-800 p-8 rounded-2xl mb-8 border border-gray-700">
+                            <p className="text-gray-400 italic">"El que la sigue la consigue"</p>
+                        </div>
+
                         <button
-                            onClick={() => window.location.reload()}
-                            className="text-xs font-bold text-yellow-500 underline uppercase tracking-widest"
+                            onClick={handlePlayAgain}
+                            disabled={isScreenBusy}
+                            className={`w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
                         >
-                            Refrescar Pantalla
+                            {isScreenBusy ? 'Esperando ruleta...' : 'Intentar de Nuevo'}
                         </button>
                     </div>
-                </div>
-            )}
+                )}
 
-            {status === 'winning' && (
-                <div className="text-center animate-in zoom-in duration-500 max-w-sm w-full">
-                    <div className="text-6xl mb-4 animate-bounce">🎉</div>
-                    <h1 className="text-4xl font-bold text-yellow-400 mb-2">¡GANASTE!</h1>
-                    <p className="text-xl mb-4">La ruleta cayó en tu elección</p>
-
-                    {!isSaved ? (
-                        <div className="bg-gray-800/80 backdrop-blur-md p-6 rounded-2xl border border-yellow-500/30 mb-6 shadow-xl">
-                            <h3 className="text-lg font-bold text-yellow-500 mb-2">🎁 Asegura tu Premio</h3>
-                            <p className="text-xs text-gray-400 mb-6">Inicia sesión para registrar este premio en tu historial y participar en sorteos especiales.</p>
-
-                            <button
-                                onClick={signInWithGoogle}
-                                disabled={isSaving}
-                                className="w-full bg-white hover:bg-gray-100 text-gray-900 font-black py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg"
-                            >
-                                <span className="text-xl">
-                                    <svg width="24" height="24" viewBox="0 0 24 24">
-                                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                                        <path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" fill="#FBBC05" />
-                                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                                    </svg>
-                                </span>
-                                INICIAR CON GOOGLE
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="bg-green-500/20 border border-green-500/50 p-4 rounded-xl mb-6 flex items-center gap-3 animate-in fade-in">
-                            <span className="text-2xl">✅</span>
-                            <div className="text-left">
-                                <p className="font-bold text-green-400 text-sm">¡Premio Registrado!</p>
-                                <p className="text-[10px] text-green-300">Vinculado a {user?.email || 'tu cuenta'}</p>
-                            </div>
-                        </div>
-                    )}
-
-
-                    <div className="bg-white text-gray-900 p-6 rounded-xl mb-6 transform rotate-2 shadow-2xl border-4 border-yellow-400 flex flex-col justify-center">
-                        <p className="font-bold text-sm text-gray-400 uppercase tracking-widest mb-1">CÓDIGO DE CANJE</p>
-                        <p className="text-3xl font-black text-green-600 tracking-tighter leading-tight">PREMIO NIVEL 1</p>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-3xl inline-block shadow-2xl transform -rotate-1">
-                        <QRCodeCanvas
-                            value={`${(baseUrl || window.location.origin).trim()}/staff/validate/${ticketCode || queueId?.slice(0, 8)}`}
-                            size={180}
-                            level="H"
-                            includeMargin={false}
-                            className="rounded-lg"
-                        />
-                        <p className="mt-2 text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">QR VÁLIDO EN MESÓN</p>
-                    </div>
-
-                    <div className="mt-8 flex flex-col gap-4">
-                        {packageInfo && packageInfo.spinsRemaining > 0 ? (
-                            <button
-                                onClick={handleAutoRejoin}
-                                disabled={isScreenBusy}
-                                className={`bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 animate-pulse disabled:opacity-50 disabled:grayscale disabled:animate-none`}
-                            >
-                                {isScreenBusy ? 'Esperando ruleta...' : `Sig. Giro (${packageInfo.spinsRemaining})`}
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handlePlayAgain}
-                                disabled={isScreenBusy}
-                                className={`bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
-                            >
-                                {isScreenBusy ? 'Esperando ruleta...' : 'Jugar de Nuevo'}
-                            </button>
-                        )}
-                        <p className="text-xs text-gray-500">Muestra esta pantalla al staff para cobrar</p>
-                    </div>
-                </div>
-            )}
-
-            {status === 'losing' && (
-                <div className="text-center animate-in fade-in slide-in-from-bottom-10 duration-500 max-w-sm w-full">
-                    <div className="text-6xl mb-4 grayscale opacity-50">😢</div>
-                    <h1 className="text-3xl font-bold text-gray-300 mb-2">¡Casi!</h1>
-                    <p className="text-xl mb-8 text-gray-400">Hoy no fue tu día de suerte.</p>
-
-                    <div className="bg-gray-800 p-8 rounded-2xl mb-8 border border-gray-700">
-                        <p className="text-gray-400 italic">"El que la sigue la consigue"</p>
-                    </div>
-
-                    <button
-                        onClick={handlePlayAgain}
-                        disabled={isScreenBusy}
-                        className={`w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
-                    >
-                        {isScreenBusy ? 'Esperando ruleta...' : 'Intentar de Nuevo'}
-                    </button>
-                </div>
-            )}
-
-            {status === 'auto_rejoin' && packageInfo && (
-                <div className="text-center animate-in fade-in zoom-in duration-500 max-w-sm w-full">
-                    <div className="text-6xl mb-4">🎯</div>
-                    <h1 className="text-3xl font-bold text-purple-400 mb-2">¡Tienes más giros!</h1>
-                    <p className="text-xl mb-4 text-gray-300">
-                        Te quedan <span className="text-yellow-400 font-bold">{packageInfo.spinsRemaining}</span> giros
-                    </p>
-
-                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 rounded-2xl mb-6 shadow-2xl">
-                        <p className="text-white/80 text-sm mb-2">Próximo giro</p>
-                        <p className="text-white text-3xl font-bold">
-                            {packageInfo.spinNumber} de {packageInfo.totalSpins}
+                {status === 'auto_rejoin' && packageInfo && (
+                    <div className="text-center animate-in fade-in zoom-in duration-500 max-w-sm w-full">
+                        <div className="text-6xl mb-4">🎯</div>
+                        <h1 className="text-3xl font-bold text-purple-400 mb-2">¡Tienes más giros!</h1>
+                        <p className="text-xl mb-4 text-gray-300">
+                            Te quedan <span className="text-yellow-400 font-bold">{packageInfo.spinsRemaining}</span> giros
                         </p>
+
+                        <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 rounded-2xl mb-6 shadow-2xl">
+                            <p className="text-white/80 text-sm mb-2">Próximo giro</p>
+                            <p className="text-white text-3xl font-bold">
+                                {packageInfo.spinNumber} de {packageInfo.totalSpins}
+                            </p>
+                        </div>
+
+                        <div className="bg-gray-800/80 backdrop-blur-md p-6 rounded-2xl border border-purple-500/30 mb-6">
+                            <p className="text-gray-300 mb-4">
+                                {isScreenBusy ? 'Esperando a que la ruleta se libere...' : 'Preparando tu siguiente giro...'}
+                            </p>
+                            {!isScreenBusy && (
+                                <div className="text-5xl font-bold text-purple-400">
+                                    {autoRejoinCountdown}
+                                </div>
+                            )}
+                            {isScreenBusy && (
+                                <div className="text-xl font-bold text-yellow-400 animate-pulse">
+                                    ⏳
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={handleAutoRejoin}
+                            disabled={isScreenBusy}
+                            className={`w-full bg-purple-500 hover:bg-purple-600 text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
+                        >
+                            {isScreenBusy ? 'Esperando...' : 'Continuar Ahora'}
+                        </button>
                     </div>
+                )}
 
-                    <div className="bg-gray-800/80 backdrop-blur-md p-6 rounded-2xl border border-purple-500/30 mb-6">
-                        <p className="text-gray-300 mb-4">
-                            {isScreenBusy ? 'Esperando a que la ruleta se libere...' : 'Preparando tu siguiente giro...'}
-                        </p>
-                        {!isScreenBusy && (
-                            <div className="text-5xl font-bold text-purple-400">
-                                {autoRejoinCountdown}
-                            </div>
-                        )}
-                        {isScreenBusy && (
-                            <div className="text-xl font-bold text-yellow-400 animate-pulse">
-                                ⏳
-                            </div>
-                        )}
-                    </div>
-
-                    <button
-                        onClick={handleAutoRejoin}
-                        disabled={isScreenBusy}
-                        className={`w-full bg-purple-500 hover:bg-purple-600 text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
-                    >
-                        {isScreenBusy ? 'Esperando...' : 'Continuar Ahora'}
-                    </button>
-                </div>
-            )}
-
+            </div>
         </div>
     );
 }

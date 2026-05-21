@@ -23,12 +23,17 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
     const { user, profile, signInWithGoogle, isLoading } = useAuth();
     const supabase = createClient();
 
-    // Pre-fill name from profile if available (only once)
+    // Pre-fill name and emoji from profile if available
     useEffect(() => {
         if (profile?.display_name && !name) {
             setName(profile.display_name);
         }
+        if (profile?.avatar_url && selectedEmoji === '😎') {
+            setSelectedEmoji(profile.avatar_url);
+        }
     }, [profile]);
+
+    const isUsingGooglePhoto = selectedEmoji.startsWith('http');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,19 +41,19 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
 
         setIsSubmitting(true);
 
-        // 1. Update Profile in DB (even if anonymous)
+        // 1. Update Profile in DB (if logged in)
         if (user) {
             await supabase
                 .from('profiles')
                 .update({
                     display_name: name.trim(),
-                    avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${name.trim()}`
+                    avatar_url: isUsingGooglePhoto ? selectedEmoji : profile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${name.trim()}`
                 })
                 .eq('id', user.id);
         }
 
         // 2. Update Local Store
-        setIdentity(name, selectedEmoji);
+        setIdentity(name.trim(), selectedEmoji);
 
         setIsSubmitting(false);
         onComplete();
@@ -63,19 +68,38 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Emoji Selector */}
+                    {/* Luck Charm Selector */}
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-3 text-center">
-                            Elige tu Amuleto de la Suerte
+                            Tu Amuleto de la Suerte
                         </label>
                         <div className="grid grid-cols-6 gap-2">
+                            {/* Google Photo Option (If available) */}
+                            {profile?.avatar_url && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedEmoji(profile.avatar_url)}
+                                    className={`
+                                        p-1 rounded-xl transition-all relative overflow-hidden aspect-square flex items-center justify-center
+                                        ${selectedEmoji === profile.avatar_url
+                                            ? 'ring-4 ring-primary ring-offset-2 scale-105 shadow-lg'
+                                            : 'bg-gray-100 hover:bg-gray-200 grayscale-[0.3]'}
+                                    `}
+                                >
+                                    <img src={profile.avatar_url} alt="Google" className="w-full h-full object-cover rounded-lg" />
+                                    {selectedEmoji === profile.avatar_url && (
+                                        <div className="absolute top-0 right-0 bg-primary text-[8px] p-0.5 rounded-bl-lg font-bold">✨</div>
+                                    )}
+                                </button>
+                            )}
+
                             {EMOJI_OPTIONS.map((emoji) => (
                                 <button
                                     key={emoji}
                                     type="button"
                                     onClick={() => setSelectedEmoji(emoji)}
                                     className={`
-                                        text-2xl p-2 rounded-xl transition-all
+                                        text-2xl p-2 rounded-xl transition-all aspect-square flex items-center justify-center
                                         ${selectedEmoji === emoji
                                             ? 'bg-primary ring-4 ring-primary/30 scale-110 shadow-lg'
                                             : 'bg-gray-100 hover:bg-gray-200'}

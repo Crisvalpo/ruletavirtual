@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import WheelSelector from '@/components/individual/WheelSelector';
 import NickEntry from '@/components/individual/NickEntry';
 import PWAInstallPrompt from '@/components/individual/PWAInstallPrompt';
@@ -160,24 +161,38 @@ export default function JoinScreenPage({
         <div className="min-h-screen bg-[#050505] flex flex-col pwa-mode">
             {/* Identity Bar */}
             <div className="bg-[#111] border-b border-white/5 px-4 py-2 flex justify-between items-center shadow-2xl z-20 sticky top-0">
-                <button
-                    onClick={handleChangeIdentity}
-                    className="flex items-center gap-3 hover:bg-white/5 p-1 rounded-xl transition-all group pr-4"
-                    title="Cambiar Apodo o Emoji"
-                >
-                    <div className="relative w-8 h-8 flex items-center justify-center bg-white/5 rounded-xl border border-white/10 text-xl group-hover:border-primary/50 transition-colors">
-                        {emoji}
-                        <div className="absolute -top-1 -right-1 bg-primary text-[8px] p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                            ✏️
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={handleChangeIdentity}
+                        className="flex items-center gap-3 hover:bg-white/5 p-1 rounded-xl transition-all group pr-4"
+                        title="Cambiar Apodo o Emoji"
+                    >
+                        <div className="relative w-8 h-8 flex items-center justify-center bg-white/5 rounded-xl border border-white/10 text-xl group-hover:border-primary/50 transition-colors overflow-hidden">
+                            {emoji?.startsWith('http') ? (
+                                <img src={emoji} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                emoji
+                            )}
+                            <div className="absolute -top-1 -right-1 bg-primary text-[8px] p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                ✏️
+                            </div>
                         </div>
-                    </div>
-                    <div className="text-left">
-                        <p className="font-black text-white text-md tracking-tight flex items-center gap-2">
-                            {nickname}
-                            <span className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase tracking-tighter">Editar Perfil</span>
-                        </p>
-                    </div>
-                </button>
+                        <div className="text-left">
+                            <p className="font-black text-white text-md tracking-tight flex items-center gap-2">
+                                {nickname}
+                                <span className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase tracking-tighter">Editar Perfil</span>
+                            </p>
+                        </div>
+                    </button>
+
+                    <Link
+                        href="/"
+                        className="bg-white/5 border border-white/10 py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2"
+                    >
+                        <span>📺</span>
+                        Cambiar Pantalla
+                    </Link>
+                </div>
 
                 <IdentityBadge />
             </div>

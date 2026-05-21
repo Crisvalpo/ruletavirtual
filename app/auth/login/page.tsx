@@ -50,8 +50,12 @@ export default function LoginPage() {
 
             <div className="w-full max-w-md z-10">
                 <div className="text-center mb-10">
-                    <div className="inline-block p-4 bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 mb-6 shadow-2xl">
-                        <span className="text-5xl">🎰</span>
+                    <div className="inline-block p-4 bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 mb-6 shadow-2xl overflow-hidden w-24 h-24">
+                        <img
+                            src="/icons/icon-512x512.png"
+                            alt="Ruleta Icon"
+                            className="w-full h-full object-contain"
+                        />
                     </div>
                     <h1 className="text-4xl font-black text-white tracking-tighter mb-2">
                         Bienvenido a la Ruleta

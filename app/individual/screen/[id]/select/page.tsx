@@ -3,6 +3,7 @@
 import { useGameStore } from '@/lib/store/gameStore';
 import DynamicAnimalSelector from '@/components/individual/DynamicAnimalSelector';
 import SpinCounter from '@/components/individual/SpinCounter';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import React from 'react';
@@ -202,7 +203,8 @@ export default function SelectionPage({
                 if (diffSeconds > 12) {
                     console.warn(`⚠️ Failsafe: Screen stuck on ${screenData.status}! Forcing advance...`);
                     await supabase.rpc('force_advance_queue', {
-                        p_screen_number: parseInt(id)
+                        p_screen_number: parseInt(id),
+                        p_expected_queue_id: queueId
                     });
                 }
             }
@@ -418,6 +420,15 @@ export default function SelectionPage({
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {/* Change Screen Button */}
+                        <Link
+                            href="/"
+                            className="bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-full shadow-inner text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white hover:border-gray-600 transition-all flex items-center gap-2"
+                        >
+                            <span>📺</span>
+                            Cambiar
+                        </Link>
+
                         {/* Package Progress - Inline */}
                         {packageInfo && (
                             <div className="bg-purple-600/20 border border-purple-500/30 px-3 py-1.5 rounded-full shadow-inner flex items-center gap-2">
