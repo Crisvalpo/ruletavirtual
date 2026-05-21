@@ -9,7 +9,7 @@ Sistema profesional de ruleta para Fiestas Patrias 2026  con 3 modos de operaciÃ
 - **Styling**: Tailwind CSS + CSS Variables
 - **Database**: Supabase (PostgreSQL + Realtime)
 - **Payments**: Mercado Pago
-- **Deployment**: Vercel / Self-hosted
+- **Deployment**: Ubuntu / Luke Server (lukeapp.me)
 
 ## ðŸ“‚ Estructura del Proyecto
 
