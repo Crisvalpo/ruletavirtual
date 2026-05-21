@@ -839,9 +839,9 @@ export default function DisplayScreenPage({
                 </div>
             )}
 
-            {/* ZONA DE JUEGO (Izquierda): Ruleta + Info Card */}
+            {/* ZONA DE JUEGO: Ruleta ocupa todo el fondo, Info Card flotante */}
             {!isBillboardScreen && (
-                <div className="w-full h-full relative flex items-center justify-center p-[4vh] z-10">
+                <div className="absolute inset-0 flex items-start justify-center z-10 pt-0">
                     {/* Top Left Container: Info & Queue */}
                     <div className="absolute top-[3vh] left-[3vh] z-40 flex flex-col gap-[1.5vh] items-start max-w-[40%]">
                         {/* 1. Main Info Card */}
@@ -906,54 +906,36 @@ export default function DisplayScreenPage({
                         <QueueList screenId={screenIdNum} assets={activeWheelAssets} />
                     </div>
 
-                    {/* Ruleta Wrapper */}
-                    <div className="w-full h-full flex items-center justify-center">
-                        {(() => {
-                            const segmentCount = activeWheelAssets?.segments?.length;
-                            const isFanMode = !isGroupEvent && (assetsLoading || (segmentCount ? segmentCount <= 20 : true));
+                    {/* Ruleta Wrapper — código original restaurado */}
+                    {(() => {
+                        const segmentCount = activeWheelAssets?.segments?.length;
+                        const isFanMode = !isGroupEvent && (assetsLoading || (segmentCount ? segmentCount <= 20 : true));
 
-                            if (isFanMode) {
-                                // Modo abanico (fan): ocupa todo el ancho disponible
-                                return (
-                                    <div className={`relative w-full transition-all duration-500 overflow-hidden flex items-start justify-center
-                                        ${assetsLoading ? 'opacity-0' : 'opacity-100'}
-                                    `} style={{ aspectRatio: '2 / 1' }}>
-                                        <div className="relative w-full h-full" style={{ aspectRatio: '1 / 1' }}>
-                                            <WheelCanvas
-                                                isSpinning={storeStatus === 'spinning'}
-                                                isIdle={storeStatus === 'idle'}
-                                                idleSpeed={idleSpeed || 1.0}
-                                                targetIndex={result}
-                                                onSpinComplete={handleSpinComplete}
-                                                segments={activeWheelAssets?.segments}
-                                                className="w-full h-full object-contain"
-                                            />
-                                        </div>
-                                    </div>
-                                );
-                            }
-
-                            // Modo círculo completo
-                            return (
-                                <div className={`relative max-h-[85vh] max-w-[85vh] aspect-square transition-all duration-500 flex items-center justify-center
-                                    ${assetsLoading ? 'opacity-0' : 'opacity-100'}
-                                `}>
-                                    <div className="relative w-full h-full flex items-center justify-center">
-                                        <WheelCanvas
-                                            isSpinning={storeStatus === 'spinning'}
-                                            isIdle={storeStatus === 'idle'}
-                                            idleSpeed={idleSpeed || 1.0}
-                                            targetIndex={result}
-                                            onSpinComplete={handleSpinComplete}
-                                            segments={activeWheelAssets?.segments}
-                                            className="w-full h-full object-contain"
-                                        />
-                                        <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-0 h-0 border-t-[1.8vh] border-t-transparent border-l-[3.6vh] border-l-red-600 border-b-[1.8vh] border-b-transparent filter drop-shadow-lg z-20"></div>
-                                    </div>
+                        return (
+                            <div className={`relative w-full transition-all duration-500 flex items-start justify-center
+                                ${isFanMode ? 'aspect-[2/1] overflow-hidden' : 'aspect-square items-center'}
+                                ${assetsLoading ? 'opacity-0' : 'opacity-100'}
+                            `}>
+                                {/* Canvas: Always square intrinsic matching width.
+                                In Fan Mode, it overflows the container (bottom cropped). */}
+                                <div className={`relative w-full aspect-square`}>
+                                    <WheelCanvas
+                                        isSpinning={storeStatus === 'spinning'}
+                                        isIdle={storeStatus === 'idle'}
+                                        idleSpeed={idleSpeed || 1.0}
+                                        targetIndex={result}
+                                        onSpinComplete={handleSpinComplete}
+                                        segments={activeWheelAssets?.segments}
+                                        className="w-full h-full"
+                                    />
                                 </div>
-                            );
-                        })()}
-                    </div>
+
+                                {!isFanMode && (
+                                    <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-0 h-0 border-t-[1.8vh] border-t-transparent border-l-[3.6vh] border-l-red-600 border-b-[1.8vh] border-b-transparent filter drop-shadow-lg z-20"></div>
+                                )}
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
 

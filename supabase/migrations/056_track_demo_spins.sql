@@ -3,6 +3,11 @@
 
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS demo_spins_used INTEGER NOT NULL DEFAULT 0;
 
+-- Drop all existing overloaded versions of play_demo_spin to avoid signature conflicts
+DROP FUNCTION IF EXISTS play_demo_spin(integer);
+DROP FUNCTION IF EXISTS play_demo_spin(integer, text, text);
+DROP FUNCTION IF EXISTS play_demo_spin(integer, text, text, uuid);
+
 CREATE OR REPLACE FUNCTION play_demo_spin(
   p_screen_number INTEGER
 ) RETURNS JSONB AS $$
