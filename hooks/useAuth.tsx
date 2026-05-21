@@ -10,6 +10,7 @@ interface Profile {
     avatar_url: string;
     role: 'player' | 'staff' | 'admin';
     cooldown_until: string | null;
+    demo_spins_used: number;
 }
 
 interface AuthContextType {

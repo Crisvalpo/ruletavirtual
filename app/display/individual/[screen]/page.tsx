@@ -52,7 +52,9 @@ export default function DisplayScreenPage({
     const effectiveMode = isGroupEvent ? 'group' : 'individual';
 
     // Celebration State
-    const [status, setStatus] = useState<'idle' | 'spinning' | 'result' | 'duplicate'>('idle');
+    const [status, setStatus] = useState<'idle' | 'spinning' | 'result'>('idle');
+    const [isDuplicateScreen, setIsDuplicateScreen] = useState(false);
+    const [isLocalDuplicate, setIsLocalDuplicate] = useState(false);
     const [result, setResult] = useState<number | null>(null);
     // History State
     const [lastSpins, setLastSpins] = useState<any[]>([]);
@@ -93,9 +95,9 @@ export default function DisplayScreenPage({
                     });
                 });
 
-                // NO DUPLICATE DETECTED? Stay in current state (reset duplicate if it was there)
+                // NO DUPLICATE DETECTED?
                 if (otherInstances.length <= 1) {
-                    if (status === 'duplicate') setStatus('idle');
+                    setIsDuplicateScreen(false);
                     return;
                 }
 
@@ -107,10 +109,9 @@ export default function DisplayScreenPage({
                 const firstInstance = otherInstances[0];
                 if (firstInstance.id !== instanceId.current) {
                     console.warn(`🚫 OTRA PESTAÑA DETECTADA (ID: ${instanceId.current}): Bloqueando esta instancia secundaria.`);
-                    setStatus('duplicate');
+                    setIsDuplicateScreen(true);
                 } else {
-                    // We are the master. If we were in duplicate mode, clear it.
-                    if (status === 'duplicate') setStatus('idle');
+                    setIsDuplicateScreen(false);
                 }
             })
             .subscribe(async (subStatus) => {
@@ -128,6 +129,38 @@ export default function DisplayScreenPage({
             supabase.removeChannel(channel);
         };
     }, [screenIdNum, supabase]);
+
+    // 2.6 Local BroadcastChannel: Prevent Duplicate Screens on Same Device
+    useEffect(() => {
+        if (!screenIdNum || typeof window === 'undefined') return;
+
+        const channelName = `ruleta_screen_session_${screenIdNum}`;
+        const bc = new BroadcastChannel(channelName);
+
+        // Send ping to detect if there's already an active tab
+        bc.postMessage({ type: 'ping', id: instanceId.current });
+
+        const handleMessage = (event: MessageEvent) => {
+            const data = event.data;
+            if (!data) return;
+
+            if (data.type === 'ping' && data.id !== instanceId.current) {
+                // Another tab is pinging. We are active, so we respond with pong.
+                bc.postMessage({ type: 'pong', id: instanceId.current });
+            } else if (data.type === 'pong' && data.id !== instanceId.current) {
+                // We received a pong from an already active tab. We must block ourselves.
+                console.warn(`🚫 Local BroadcastChannel: duplicate tab detected for screen ${screenIdNum}`);
+                setIsLocalDuplicate(true);
+            }
+        };
+
+        bc.addEventListener('message', handleMessage);
+
+        return () => {
+            bc.removeEventListener('message', handleMessage);
+            bc.close();
+        };
+    }, [screenIdNum]);
 
     // 2.7 Supabase Broadcast: Remote Reload
     useEffect(() => {
@@ -690,309 +723,287 @@ export default function DisplayScreenPage({
     const displayNickname = (status === 'idle' && (!realNickname || realNickname === 'Jugador') && previewPlayer) ? previewPlayer.nickname : realNickname;
     const displayEmoji = (status === 'idle' && (!realNickname || realNickname === 'Jugador') && previewPlayer) ? previewPlayer.emoji : realEmoji;
 
-    return (
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-8 overflow-hidden relative">
-            {/* ... other code ... */}
+    const isBlocked = isDuplicateScreen || isLocalDuplicate;
 
-            {/* Top Left Container: Info & Queue */}
-            <div className="absolute top-8 left-8 z-50 flex flex-col gap-4 items-start">
-
-                {/* 1. Main Info Card */}
-                <div className="bg-white/10 backdrop-blur-md px-6 py-3 rounded-xl border border-white/20 flex items-center gap-4 shadow-lg">
-                    <div>
-                        <h2 className="text-2xl font-bold text-white">Pantalla {screen}</h2>
-                        <div className="flex items-center gap-2 mt-1">
-                            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                            <span className="text-sm text-gray-300">Conectado</span>
-                        </div>
-                    </div>
-
-                    {/* Player Identity Badge */}
-                    {displayNickname && (displayNickname !== 'Jugador' || status !== 'idle' || previewPlayer) && (
-                        <div className="border-l border-white/20 pl-4 animate-in fade-in slide-in-from-left-4 duration-500">
-                            <p className="text-xs text-gray-400 uppercase tracking-widest">
-                                {previewPlayer && status === 'idle' && (!realNickname || realNickname === 'Jugador') ? 'Preparando...' : 'Jugando ahora'}
-                            </p>
-                            <div className="flex items-center gap-2">
-                                {displayEmoji?.startsWith('http') ? (
-                                    <img src={displayEmoji} alt="P" className="w-10 h-10 rounded-full border border-white/20 object-cover shadow-lg" />
-                                ) : (
-                                    <span className="text-3xl">{displayEmoji}</span>
-                                )}
-                                <span className="text-2xl font-bold text-yellow-400">{displayNickname}</span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Active Selections Visualization */}
-                    {currentSelections.length > 0 && (
-                        <div className="flex items-center gap-2 border-l border-white/20 pl-4 animate-in fade-in slide-in-from-right-4 duration-700 delay-200">
-                            <div className="flex -space-x-3">
-                                {currentSelections.map((selId, idx) => {
-                                    // Resolve Image
-                                    let imgSrc = null;
-                                    if (activeWheelAssets?.segments) {
-                                        const seg = activeWheelAssets.segments.find((s: any) => s.id === selId);
-                                        // Use imageResult (selector icon) instead of wedge
-                                        if (seg) imgSrc = seg.imageResult || seg.imageWheel;
-                                    }
-                                    if (!imgSrc) {
-                                        const animal = ANIMAL_LIST.find(a => a.id === selId);
-                                        // Use imageSelector (animal portrait)
-                                        if (animal) imgSrc = animal.imageSelector || animal.imageWheel;
-                                    }
-
-                                    return (
-                                        <div key={idx} className="w-10 h-10 rounded-full border-2 border-gray-800 bg-gray-700 relative overflow-hidden shadow-lg">
-                                            {imgSrc ? (
-                                                <Image src={imgSrc} alt="Choice" fill className="object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">{selId}</div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <span className="text-[10px] text-gray-400 font-mono tracking-tighter">APUESTA<br />ACTIVA</span>
-                        </div>
-                    )}
+    if (isBlocked) {
+        return (
+            <div className="fixed inset-0 z-[9999] bg-slate-900 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500 font-sans">
+                <div className="w-24 h-24 bg-rose-500/20 rounded-full flex items-center justify-center text-5xl mb-6 border border-rose-500/30 animate-pulse text-rose-500">
+                    ⚠️
                 </div>
+                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tighter">Pantalla Duplicada</h2>
+                <p className="text-slate-400 max-w-md font-medium text-lg leading-relaxed">
+                    Esta pantalla (<span className="text-rose-400">#{screenIdNum}</span>) ya se encuentra abierta en otra pestaña o dispositivo.
+                </p>
+                <div className="mt-8 flex flex-col gap-4 w-full max-w-xs transition-all">
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="bg-white hover:bg-slate-100 text-slate-900 font-black py-4 rounded-2xl uppercase tracking-widest text-xs active:scale-95 shadow-xl transition-all"
+                    >
+                        🔄 Reintentar
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
-                {/* 2. Queue List (Stacked Below) */}
-                <QueueList screenId={screenIdNum} assets={activeWheelAssets} />
-            </div >
+    return (
+        <div className="w-screen h-screen min-h-screen bg-gray-900 overflow-hidden relative font-sans">
+            {/* Background (z-0) */}
+            {!isBillboardScreen && (
+                <div className="absolute inset-0 z-0">
+                    {activeWheelAssets?.background && (
+                        <Image
+                            src={activeWheelAssets.background}
+                            alt="Background"
+                            fill
+                            className="object-cover opacity-100"
+                            priority
+                        />
+                    )}
+                    <div className="absolute inset-0 bg-black/40" />
+                </div>
+            )}
 
-            {/* --- VISUALIZACIÓN SEGÚN MODO --- */}
             {/* CASO 1: MODO EVENTO - PANTALLA LATERAL (CARTELERA / ESTADÍSTICAS) */}
-            {
-                isBillboardScreen && (
-                    <div className="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-start text-center p-0 overflow-hidden font-sans">
-                        {/* Header Publicitario */}
-                        <div className="w-full bg-indigo-600 py-8 shadow-2xl z-20">
-                            <h1 className="text-6xl font-black text-white uppercase tracking-tighter animate-pulse">
-                                🔥 ¡Gran Sorteo en Vivo! 🔥
-                            </h1>
-                            <p className="text-indigo-200 text-xl font-bold mt-2 uppercase tracking-widest">
-                                Atentos a la Pantalla Principal
-                            </p>
-                        </div>
+            {isBillboardScreen && (
+                <div className="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-start text-center p-0 overflow-hidden font-sans">
+                    {/* Header Publicitario */}
+                    <div className="w-full bg-indigo-600 py-8 shadow-2xl z-20">
+                        <h1 className="text-6xl font-black text-white uppercase tracking-tighter animate-pulse">
+                            🔥 ¡Gran Sorteo en Vivo! 🔥
+                        </h1>
+                        <p className="text-indigo-200 text-xl font-bold mt-2 uppercase tracking-widest">
+                            Atentos a la Pantalla Principal
+                        </p>
+                    </div>
 
-                        <div className="flex-1 w-full grid grid-cols-2 gap-8 p-12 bg-gradient-to-br from-slate-900 to-indigo-950">
-                            {/* Estadísticas / Últimos Resultados */}
-                            <div className="bg-white/5 backdrop-blur-xl rounded-[3rem] border border-white/10 p-10 flex flex-col shadow-inner">
-                                <h3 className="text-3xl font-black text-indigo-400 mb-8 uppercase tracking-widest text-left flex items-center gap-4">
-                                    <span className="w-3 h-3 rounded-full bg-indigo-500 animate-ping" />
-                                    Últimos Ganadores
-                                </h3>
-                                <div className="space-y-4 flex-1">
-                                    {[1, 2, 3, 4, 5].map((i) => (
-                                        <div key={i} className="flex justify-between items-center bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center text-2xl">🎟️</div>
-                                                <span className="text-2xl font-black text-white uppercase">Ticket #{4592 - i * 4}</span>
-                                            </div>
-                                            <span className="text-3xl font-black text-emerald-400 font-mono tracking-tighter">${(10000 * (6 - i)).toLocaleString()}</span>
+                    <div className="flex-1 w-full grid grid-cols-2 gap-8 p-12 bg-gradient-to-br from-slate-900 to-indigo-950">
+                        {/* Estadísticas / Últimos Resultados */}
+                        <div className="bg-white/5 backdrop-blur-xl rounded-[3rem] border border-white/10 p-10 flex flex-col shadow-inner">
+                            <h3 className="text-3xl font-black text-indigo-400 mb-8 uppercase tracking-widest text-left flex items-center gap-4">
+                                <span className="w-3 h-3 rounded-full bg-indigo-500 animate-ping" />
+                                Últimos Ganadores
+                            </h3>
+                            <div className="space-y-4 flex-1">
+                                {[1, 2, 3, 4, 5].map((i) => (
+                                    <div key={i} className="flex justify-between items-center bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center text-2xl">🎟️</div>
+                                            <span className="text-2xl font-black text-white uppercase">Ticket #{4592 - i * 4}</span>
                                         </div>
-                                    ))}
+                                        <span className="text-3xl font-black text-emerald-400 font-mono tracking-tighter">${(10000 * (6 - i)).toLocaleString()}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Espacio Publicitario / Promo */}
+                        <div className="flex flex-col gap-8">
+                            <div className="flex-1 bg-gradient-to-tr from-amber-500 to-orange-600 rounded-[3rem] p-10 flex flex-col items-center justify-center text-white shadow-2xl relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 rounded-full -mr-32 -mt-32 blur-3xl transition-transform group-hover:scale-110" />
+                                <span className="text-8xl mb-6 transform group-hover:scale-110 transition-transform">🍿</span>
+                                <h2 className="text-5xl font-black uppercase italic tracking-tighter leading-none mb-4">¡Combo Ruleta!</h2>
+                                <p className="text-2xl font-bold opacity-90 max-w-xs uppercase leading-tight">
+                                    Pide tu combo y recibe <span className="text-yellow-300 font-black">2 TIROS GRATIS</span>
+                                </p>
+                            </div>
+                            <div className="h-1/3 bg-white/5 backdrop-blur-md rounded-[3rem] border border-white/10 p-8 flex items-center justify-center gap-6">
+                                <div className="text-left flex-1">
+                                    <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">Próximo Sorteo</p>
+                                    <p className="text-3xl font-black text-white uppercase italic">En Instantes</p>
+                                </div>
+                                <div className="w-20 h-20 rounded-full border-4 border-indigo-500/30 flex items-center justify-center text-2xl font-black text-indigo-400">
+                                    VS
+                                </div>
+                                <div className="text-right flex-1">
+                                    <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">Premio Mayor</p>
+                                    <p className="text-3xl font-black text-emerald-400 uppercase italic">$1.000.000</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer con QR */}
+                    <div className="w-full bg-white/5 border-t border-white/10 py-6 px-12 flex justify-between items-center">
+                        <div className="flex items-center gap-6">
+                            <span className="text-slate-400 font-bold uppercase tracking-widest">Sigue participando:</span>
+                            <span className="text-2xl font-black text-white tracking-widest">RULETA.LUKEAPP.ME</span>
+                        </div>
+                        <div className="flex gap-4">
+                            <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                            <div className="w-3 h-3 rounded-full bg-emerald-500 opacity-50" />
+                            <div className="w-3 h-3 rounded-full bg-emerald-500 opacity-20" />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ZONA DE JUEGO (Izquierda): Ruleta + Info Card */}
+            {!isBillboardScreen && (
+                <div className="w-full h-full relative flex items-center justify-center p-[4vh] z-10">
+                    {/* Top Left Container: Info & Queue */}
+                    <div className="absolute top-[3vh] left-[3vh] z-40 flex flex-col gap-[1.5vh] items-start max-w-[40%]">
+                        {/* 1. Main Info Card */}
+                        <div className="bg-white/10 backdrop-blur-md px-[2vw] py-[1.5vh] rounded-[1.5vh] border border-white/20 flex items-center gap-[1.5vw] shadow-lg">
+                            <div>
+                                <h2 className="text-[2.2vh] font-bold text-white leading-tight">Pantalla {screen}</h2>
+                                <div className="flex items-center gap-[0.5vw] mt-[0.5vh]">
+                                    <div className="w-[1.2vh] h-[1.2vh] bg-green-500 rounded-full animate-pulse"></div>
+                                    <span className="text-[1.3vh] text-gray-300">Conectado</span>
                                 </div>
                             </div>
 
-                            {/* Espacio Publicitario / Promo */}
-                            <div className="flex flex-col gap-8">
-                                <div className="flex-1 bg-gradient-to-tr from-amber-500 to-orange-600 rounded-[3rem] p-10 flex flex-col items-center justify-center text-white shadow-2xl relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 rounded-full -mr-32 -mt-32 blur-3xl transition-transform group-hover:scale-110" />
-                                    <span className="text-8xl mb-6 transform group-hover:scale-110 transition-transform">🍿</span>
-                                    <h2 className="text-5xl font-black uppercase italic tracking-tighter leading-none mb-4">¡Combo Ruleta!</h2>
-                                    <p className="text-2xl font-bold opacity-90 max-w-xs uppercase leading-tight">
-                                        Pide tu combo y recibe <span className="text-yellow-300 font-black">2 TIROS GRATIS</span>
+                            {/* Player Identity Badge */}
+                            {displayNickname && (displayNickname !== 'Jugador' || status !== 'idle' || previewPlayer) && (
+                                <div className="border-l border-white/20 pl-[1.5vw] animate-in fade-in slide-in-from-left-4 duration-500">
+                                    <p className="text-[1vh] text-gray-400 uppercase tracking-widest leading-none mb-[0.5vh]">
+                                        {previewPlayer && status === 'idle' && (!realNickname || realNickname === 'Jugador') ? 'Preparando...' : 'Jugando ahora'}
                                     </p>
-                                </div>
-                                <div className="h-1/3 bg-white/5 backdrop-blur-md rounded-[3rem] border border-white/10 p-8 flex items-center justify-center gap-6">
-                                    <div className="text-left flex-1">
-                                        <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">Próximo Sorteo</p>
-                                        <p className="text-3xl font-black text-white uppercase italic">En Instantes</p>
-                                    </div>
-                                    <div className="w-20 h-20 rounded-full border-4 border-indigo-500/30 flex items-center justify-center text-2xl font-black text-indigo-400">
-                                        VS
-                                    </div>
-                                    <div className="text-right flex-1">
-                                        <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">Premio Mayor</p>
-                                        <p className="text-3xl font-black text-emerald-400 uppercase italic">$1.000.000</p>
+                                    <div className="flex items-center gap-[0.5vw]">
+                                        {displayEmoji?.startsWith('http') ? (
+                                            <img src={displayEmoji} alt="P" className="w-[4.5vh] h-[4.5vh] rounded-full border border-white/20 object-cover shadow-lg" />
+                                        ) : (
+                                            <span className="text-[2.5vh]">{displayEmoji}</span>
+                                        )}
+                                        <span className="text-[2.2vh] font-bold text-yellow-400">{displayNickname}</span>
                                     </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {/* Active Selections Visualization */}
+                            {currentSelections.length > 0 && (
+                                <div className="flex items-center gap-[0.5vw] border-l border-white/20 pl-[1.5vw] animate-in fade-in slide-in-from-right-4 duration-700 delay-200">
+                                    <div className="flex -space-x-[1.2vh]">
+                                        {currentSelections.map((selId, idx) => {
+                                            let imgSrc = null;
+                                            if (activeWheelAssets?.segments) {
+                                                const seg = activeWheelAssets.segments.find((s: any) => s.id === selId);
+                                                if (seg) imgSrc = seg.imageResult || seg.imageWheel;
+                                            }
+                                            if (!imgSrc) {
+                                                const animal = ANIMAL_LIST.find(a => a.id === selId);
+                                                if (animal) imgSrc = animal.imageSelector || animal.imageWheel;
+                                            }
+
+                                            return (
+                                                <div key={idx} className="w-[4.5vh] h-[4.5vh] rounded-full border-2 border-gray-800 bg-gray-700 relative overflow-hidden shadow-lg">
+                                                    {imgSrc ? (
+                                                        <Image src={imgSrc} alt="Choice" fill className="object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-[1.2vh] font-bold text-white">{selId}</div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <span className="text-[0.9vh] text-gray-400 font-mono tracking-tighter leading-tight">APUESTA<br />ACTIVA</span>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Footer con QR */}
-                        <div className="w-full bg-white/5 border-t border-white/10 py-6 px-12 flex justify-between items-center">
-                            <div className="flex items-center gap-6">
-                                <span className="text-slate-400 font-bold uppercase tracking-widest">Sigue participando:</span>
-                                <span className="text-2xl font-black text-white tracking-widest">RULETA.LUKEAPP.ME</span>
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                                <div className="w-3 h-3 rounded-full bg-emerald-500 opacity-50" />
-                                <div className="w-3 h-3 rounded-full bg-emerald-500 opacity-20" />
-                            </div>
-                        </div>
+                        {/* 2. Queue List (Stacked Below) */}
+                        <QueueList screenId={screenIdNum} assets={activeWheelAssets} />
                     </div>
-                )
-            }
 
-            {/* CASO 2: PANTALLA DE JUEGO (CENTRAL O INDIVIDUAL) */}
-            {
-                !isBillboardScreen && (
-                    <div className="absolute inset-0 z-0">
-                        {activeWheelAssets?.background && (
-                            <Image
-                                src={activeWheelAssets.background}
-                                alt="Background"
-                                fill
-                                className="object-cover opacity-100"
-                            />
-                        )}
-                        <div className="absolute inset-0 bg-black/40" />
-                    </div>
-                )
-            }
-
-            {/* Canvas Container (Oculto si es Billboard) */}
-            {
-                !isBillboardScreen && (
-                    // Remove padding/centering constraints for Fan Mode to hit top edge
-                    <div className="absolute inset-0 flex items-start justify-center z-10 pt-0">
-
-                        {/* Ruleta Wrapper */}
+                    {/* Ruleta Wrapper */}
+                    <div className="w-full h-full flex items-center justify-center">
                         {(() => {
                             const segmentCount = activeWheelAssets?.segments?.length;
-                            // Fan Mode strictly for Individual Play (Parque)
-                            // If it's Group Event (Sorteo), it's ALWAYS full circle.
-                            // While loading assets in Parque, assume it's a Fan (to avoid circle flicker)
                             const isFanMode = !isGroupEvent && (assetsLoading || (segmentCount ? segmentCount <= 20 : true));
 
                             return (
-                                // Fan Mode: Limit height to avoid scroll. 2:1 aspect ratio roughly crops the empty bottom half.
-                                <div className={`relative w-full transition-all duration-500 flex items-start justify-center 
-                                ${isFanMode ? 'aspect-[2/1] overflow-hidden' : 'aspect-square items-center'}
-                                ${assetsLoading ? 'opacity-0' : 'opacity-100'}
-                            `}>
-                                    {/* Canvas: Always square intrinsic matching width. 
-                                    In Fan Mode, it overflows the container (bottom cropped). */}
-                                    <div className={`relative w-full aspect-square`}>
+                                <div className={`relative w-full max-h-[85vh] transition-all duration-500 flex items-center justify-center 
+                                    ${isFanMode ? 'aspect-[2/1] overflow-hidden items-start' : 'aspect-square'}
+                                    ${assetsLoading ? 'opacity-0' : 'opacity-100'}
+                                `}>
+                                    <div className={`relative w-full h-full max-w-[85vh] aspect-square flex items-center justify-center`}>
                                         <WheelCanvas
                                             isSpinning={storeStatus === 'spinning'}
                                             isIdle={storeStatus === 'idle'}
-                                            idleSpeed={idleSpeed || 1.0} // Use subscribed value
+                                            idleSpeed={idleSpeed || 1.0}
                                             targetIndex={result}
                                             onSpinComplete={handleSpinComplete}
                                             segments={activeWheelAssets?.segments}
-                                            className="w-full h-full"
+                                            className="w-full h-full object-contain"
                                         />
                                     </div>
 
-                                    {/* Logo Central Overlay - Removed as requested */}
-
-
-                                    {/* Pointer Overlay: ONLY for Group Mode */}
                                     {!isFanMode && (
-                                        <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-0 h-0 border-t-[20px] border-t-transparent border-l-[40px] border-l-red-600 border-b-[20px] border-b-transparent filter drop-shadow-lg z-20"></div>
+                                        <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-0 h-0 border-t-[1.8vh] border-t-transparent border-l-[3.6vh] border-l-red-600 border-b-[1.8vh] border-b-transparent filter drop-shadow-lg z-20"></div>
                                     )}
                                 </div>
                             );
                         })()}
                     </div>
-                )
-            }
+                </div>
+            )}
 
             {/* QR Sidebar (Solo en Modo Individual) */}
-            {
-                !isGroupEvent && (
-                    <div className={`absolute right-0 top-0 h-full w-80 bg-gray-800/90 backdrop-blur-lg border-l border-white/10 p-6 flex flex-col items-center justify-start pt-12 text-center transition-all duration-700 ease-in-out z-50 ${status === 'spinning' ? 'opacity-0 translate-x-20 pointer-events-none' : 'opacity-100 translate-x-0'}`}>
+            {!isGroupEvent && !isBillboardScreen && (
+                <div className={`absolute right-0 top-0 h-full bg-slate-950/90 backdrop-blur-lg border-l border-white/10 p-[3vh] px-[2vw] flex flex-col items-center justify-start text-center transition-all duration-700 ease-in-out z-50 overflow-hidden
+                    ${status === 'spinning' 
+                        ? 'w-0 min-w-0 max-w-0 opacity-0 border-l-transparent pointer-events-none translate-x-full' 
+                        : 'w-[22vw] min-w-[260px] max-w-[340px] opacity-100 translate-x-0'
+                    }`}
+                >
+                    {/* Header Text */}
+                    <h3 className="text-[3vh] font-black text-white leading-tight mb-[0.5vh] tracking-tight">¡Juega Ahora!</h3>
+                    <p className="text-[2vh] text-primary font-extrabold mb-[0.2vh] uppercase tracking-wide">Escanea para unirte</p>
+                    <p className="text-[1.5vh] text-gray-400 mb-[2vh]">Solo $1,000 por jugada</p>
 
-                        {/* Header Text */}
-                        <h3 className="text-3xl font-bold text-white mb-2">¡Juega Ahora!</h3>
-                        <p className="text-xl text-primary font-bold mb-1">Escanea para unirte</p>
-                        <p className="text-gray-400 mb-6">Solo $1,000 por jugada</p>
+                    {/* QR Code */}
+                    <div className="bg-white p-[1.5vh] rounded-[2vh] shadow-2xl mb-[2vh] transform hover:scale-105 transition-all w-[18vh] h-[18vh] max-w-[85%] max-h-[180px] flex items-center justify-center aspect-square">
+                        {clientUrl && (
+                            <QRCodeCanvas
+                                value={`${(baseUrl || clientUrl).trim()}/individual/screen/${screen}`}
+                                size={150}
+                                level="H"
+                                includeMargin={false}
+                                className="w-full h-full rounded-[1vh]"
+                            />
+                        )}
+                    </div>
 
-                        {/* QR Code */}
-                        <div className="bg-white p-4 rounded-3xl shadow-2xl mb-8 transform hover:scale-105 transition-all w-full max-w-[240px] flex items-center justify-center">
-                            {clientUrl && (
-                                <QRCodeCanvas
-                                    value={`${(baseUrl || clientUrl).trim()}/individual/screen/${screen}`}
-                                    size={200}
-                                    level="H"
-                                    includeMargin={false}
-                                    className="rounded-xl"
-                                />
-                            )}
-                        </div>
+                    {/* History Grid */}
+                    <div className="w-full max-w-[220px] flex-none">
+                        <h4 className="text-[1.3vh] uppercase tracking-wider text-gray-500 mb-[1vh] border-b border-white/10 pb-[0.5vh] leading-none">Últimos 9</h4>
+                        <div className="grid grid-cols-3 gap-[0.8vh]">
+                            {[...lastSpins, ...Array(9)].slice(0, 9).map((spin, i) => {
+                                let imageSrc = null;
+                                if (spin && activeWheelAssets?.segments) {
+                                    const segment = activeWheelAssets.segments.find((s: any) => s.id === spin.result_index);
+                                    if (segment) imageSrc = segment.imageResult || segment.imageWheel;
+                                }
 
-                        {/* History Grid */}
-                        <div className="w-full max-w-[240px]">
-                            <h4 className="text-sm uppercase tracking-widest text-gray-500 mb-3 border-b border-white/10 pb-1">Últimos 9</h4>
-                            <div className="grid grid-cols-3 gap-2">
-                                {/* Render actual history, padded to 9 items */}
-                                {[...lastSpins, ...Array(9)].slice(0, 9).map((spin, i) => {
-                                    // Find image for this result
-                                    let imageSrc = null;
-                                    if (spin && activeWheelAssets?.segments) {
-                                        // Assuming result_index matches ID (1-based)
-                                        // If segments are 0-indexed in array but have IDs:
-                                        const segment = activeWheelAssets.segments.find((s: any) => s.id === spin.result_index);
-                                        if (segment) imageSrc = segment.imageResult || segment.imageWheel;
-                                    }
-
-                                    return (
-                                        <div key={i} className="aspect-square bg-white/5 rounded-lg border border-white/10 overflow-hidden relative flex items-center justify-center">
-                                            {spin ? (
-                                                imageSrc ? (
-                                                    <div className="w-full h-full relative">
-                                                        <Image
-                                                            src={imageSrc}
-                                                            alt="Res"
-                                                            fill
-                                                            className="object-contain p-1"
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-yellow-500 font-bold">#{spin.result_index}</span>
-                                                )
+                                return (
+                                    <div key={i} className="aspect-square bg-white/5 rounded-[0.8vh] border border-white/10 overflow-hidden relative flex items-center justify-center">
+                                        {spin ? (
+                                            imageSrc ? (
+                                                <div className="w-full h-full relative">
+                                                    <Image
+                                                        src={imageSrc}
+                                                        alt="Res"
+                                                        fill
+                                                        className="object-contain p-[0.3vh]"
+                                                    />
+                                                </div>
                                             ) : (
-                                                // Empty Slot
-                                                <div className="w-1 h-1 bg-white/5 rounded-full" />
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Visual Mode Indicator for Staff Debug (Minimized) */}
-                        <div className="mt-auto opacity-30 hover:opacity-100 transition-opacity text-[10px] text-gray-500 text-left w-full">
-                            Mode: {venueMode} | Central: {centralScreenId} <br />
-                            Evt: {isGroupEvent ? 'Yes' : 'No'} | St: {status}
+                                                <span className="text-[1.8vh] text-yellow-500 font-bold">#{spin.result_index}</span>
+                                            )
+                                        ) : (
+                                            <div className="w-[0.5vh] h-[0.5vh] bg-white/10 rounded-full" />
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
-                )
-            }
 
-            {/* DUPLICATE BLOCKER OVERLAY */}
-            {status === 'duplicate' && (
-                <div className="fixed inset-0 z-[999] bg-slate-900 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
-                    <div className="w-24 h-24 bg-rose-500/20 rounded-full flex items-center justify-center text-5xl mb-6 border border-rose-500/30 animate-pulse text-rose-500">
-                        ⚠️
-                    </div>
-                    <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tighter">Pantalla Duplicada</h2>
-                    <p className="text-slate-400 max-w-md font-medium text-lg leading-relaxed">
-                        Esta pantalla (<span className="text-rose-400">#{screenIdNum}</span>) ya se encuentra abierta en otra pestaña o dispositivo.
-                    </p>
-                    <div className="mt-8 flex flex-col gap-4 w-full max-w-xs transition-all">
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="bg-white hover:bg-slate-100 text-slate-900 font-black py-4 rounded-2xl uppercase tracking-widest text-xs active:scale-95 shadow-xl transition-all"
-                        >
-                            🔄 Reintentar
-                        </button>
+                    {/* Staff Debug Info */}
+                    <div className="mt-auto opacity-30 hover:opacity-100 transition-opacity text-[1.1vh] text-gray-500 text-left w-full pt-[1.5vh] leading-normal flex-none">
+                        Mode: {venueMode} | Central: {centralScreenId} <br />
+                        Evt: {isGroupEvent ? 'Yes' : 'No'} | St: {status}
                     </div>
                 </div>
             )}

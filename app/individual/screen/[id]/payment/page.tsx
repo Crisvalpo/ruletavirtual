@@ -46,7 +46,7 @@ export default function PaymentPage({
     }, [searchParams, setGameMode, id, supabase]);
 
     const { nickname, emoji, setQueueId } = useGameStore();
-    const { user } = useAuth();
+    const { user, profile, refreshProfile } = useAuth();
 
     // Redirect to entry if no identity configured
     useEffect(() => {
@@ -60,20 +60,26 @@ export default function PaymentPage({
     }, [nickname, id, searchParams, router]);
 
     // Demo Mode State
-    const [demoSpins, setDemoSpins] = React.useState(2);
+    const demoSpins = Math.max(0, 2 - (profile?.demo_spins_used ?? 0));
     const [canDemo, setCanDemo] = React.useState(false);
     const [isSpinningDemo, setIsSpinningDemo] = React.useState(false);
 
     // Check Queue Availability for Demo
     useEffect(() => {
         const checkQueue = async () => {
-            const { count, error } = await supabase
+            const { count: queueCount, error: queueError } = await supabase
                 .from('player_queue')
                 .select('*', { count: 'exact', head: true })
                 .eq('screen_number', parseInt(id))
                 .in('status', ['waiting', 'playing', 'selecting', 'ready', 'spinning']);
 
-            if (!error && count === 0) {
+            const { data: screenData, error: screenError } = await supabase
+                .from('screen_state')
+                .select('status')
+                .eq('screen_number', parseInt(id))
+                .maybeSingle();
+
+            if (!queueError && !screenError && (queueCount === 0 || queueCount === null) && screenData?.status === 'idle') {
                 setCanDemo(true);
             } else {
                 setCanDemo(false);
@@ -88,20 +94,25 @@ export default function PaymentPage({
     const handleDemoSpin = async () => {
         if (demoSpins <= 0) return;
 
-        const { count } = await supabase
+        const { count: queueCount } = await supabase
             .from('player_queue')
             .select('*', { count: 'exact', head: true })
             .eq('screen_number', parseInt(id))
             .in('status', ['waiting', 'playing', 'selecting', 'ready', 'spinning']);
 
-        if (count && count > 0) {
+        const { data: screenData } = await supabase
+            .from('screen_state')
+            .select('status')
+            .eq('screen_number', parseInt(id))
+            .maybeSingle();
+
+        if ((queueCount && queueCount > 0) || screenData?.status !== 'idle') {
             setCanDemo(false);
-            alert("⚠️ Alguien se unió a la fila. El Modo Práctica ya no está disponible.");
+            alert("⚠️ La pantalla está ocupada o alguien se unió a la fila. El Modo Práctica ya no está disponible.");
             return;
         }
 
         setIsSpinningDemo(true);
-        setDemoSpins(prev => prev - 1);
 
         const { data, error } = await supabase.rpc('play_demo_spin', {
             p_screen_number: parseInt(id)
@@ -113,10 +124,9 @@ export default function PaymentPage({
             if (data?.message) alert(data.message);
         } else {
             // Success
+            await refreshProfile();
             setTimeout(() => setIsSpinningDemo(false), 5000);
         }
-
-
     };
 
     const handlePayment = async (method: 'cash' | 'mercadopago', codeUsed?: string) => {
