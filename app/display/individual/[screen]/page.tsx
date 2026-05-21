@@ -912,12 +912,33 @@ export default function DisplayScreenPage({
                             const segmentCount = activeWheelAssets?.segments?.length;
                             const isFanMode = !isGroupEvent && (assetsLoading || (segmentCount ? segmentCount <= 20 : true));
 
+                            if (isFanMode) {
+                                // Modo abanico (fan): ocupa todo el ancho disponible
+                                return (
+                                    <div className={`relative w-full transition-all duration-500 overflow-hidden flex items-start justify-center
+                                        ${assetsLoading ? 'opacity-0' : 'opacity-100'}
+                                    `} style={{ aspectRatio: '2 / 1' }}>
+                                        <div className="relative w-full h-full" style={{ aspectRatio: '1 / 1' }}>
+                                            <WheelCanvas
+                                                isSpinning={storeStatus === 'spinning'}
+                                                isIdle={storeStatus === 'idle'}
+                                                idleSpeed={idleSpeed || 1.0}
+                                                targetIndex={result}
+                                                onSpinComplete={handleSpinComplete}
+                                                segments={activeWheelAssets?.segments}
+                                                className="w-full h-full object-contain"
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            // Modo círculo completo
                             return (
-                                <div className={`relative w-full max-h-[85vh] transition-all duration-500 flex items-center justify-center 
-                                    ${isFanMode ? 'aspect-[2/1] overflow-hidden items-start' : 'aspect-square'}
+                                <div className={`relative max-h-[85vh] max-w-[85vh] aspect-square transition-all duration-500 flex items-center justify-center
                                     ${assetsLoading ? 'opacity-0' : 'opacity-100'}
                                 `}>
-                                    <div className={`relative w-full h-full max-w-[85vh] aspect-square flex items-center justify-center`}>
+                                    <div className="relative w-full h-full flex items-center justify-center">
                                         <WheelCanvas
                                             isSpinning={storeStatus === 'spinning'}
                                             isIdle={storeStatus === 'idle'}
@@ -927,11 +948,8 @@ export default function DisplayScreenPage({
                                             segments={activeWheelAssets?.segments}
                                             className="w-full h-full object-contain"
                                         />
-                                    </div>
-
-                                    {!isFanMode && (
                                         <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-0 h-0 border-t-[1.8vh] border-t-transparent border-l-[3.6vh] border-l-red-600 border-b-[1.8vh] border-b-transparent filter drop-shadow-lg z-20"></div>
-                                    )}
+                                    </div>
                                 </div>
                             );
                         })()}
