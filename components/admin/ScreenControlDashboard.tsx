@@ -21,6 +21,7 @@ interface QueueHead {
 export default function ScreenControlDashboard() {
     const [screens, setScreens] = useState<ScreenState[]>([]);
     const [queues, setQueues] = useState<Record<number, QueueHead | null>>({});
+    const [activeWheels, setActiveWheels] = useState<{ id: string; name: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const supabase = createClient();
 
@@ -61,6 +62,18 @@ export default function ScreenControlDashboard() {
 
             if (isMounted) {
                 setQueues(nextPlayers);
+            }
+
+            // 3. Fetch active wheels
+            const { data: wheelsData, error: wheelsError } = await supabase
+                .from('individual_wheels')
+                .select('id, name')
+                .eq('is_active', true)
+                .order('name');
+
+            if (wheelsError) throw wheelsError;
+            if (wheelsData && isMounted) {
+                setActiveWheels(wheelsData);
             }
         } catch (err: any) {
             if (err.name !== 'AbortError') {
@@ -200,6 +213,35 @@ export default function ScreenControlDashboard() {
                                             {screen.status}
                                         </span>
                                     </div>
+                                </div>
+
+                                <div className="mb-3">
+                                    <label className="text-[8px] text-slate-400 uppercase font-black tracking-widest mb-1 block">Tema Asignado:</label>
+                                    <select
+                                        value={screen.current_wheel_id || ''}
+                                        onChange={async (e) => {
+                                            const wheelId = e.target.value || null;
+                                            // Update local state optimistically
+                                            setScreens(prev => prev.map(s =>
+                                                s.screen_number === screen.screen_number ? { ...s, current_wheel_id: wheelId } : s
+                                            ));
+                                            // Update Supabase
+                                            const { error } = await supabase
+                                                .from('screen_state')
+                                                .update({ current_wheel_id: wheelId })
+                                                .eq('screen_number', screen.screen_number);
+                                            if (error) {
+                                                console.error("Error updating screen theme:", error);
+                                                alert("Error al guardar tema: " + error.message);
+                                            }
+                                        }}
+                                        className="w-full bg-slate-50 border border-slate-200 text-xs font-bold rounded-lg p-1.5 focus:border-indigo-600 focus:bg-white outline-none transition-all text-slate-900"
+                                    >
+                                        <option value="">Seleccionar Tema...</option>
+                                        {activeWheels.map(w => (
+                                            <option key={w.id} value={w.id}>{w.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
 
                                 <div className="mb-3 min-h-[3rem] flex flex-col justify-center">

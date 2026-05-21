@@ -391,25 +391,11 @@ export default function SelectionPage({
         );
     }
 
-    const handleChangeWheel = () => {
-        useGameStore.getState().setGameMode('individual', undefined); // Clear wheel selection to prevent auto-redirect
-        router.push(`/individual/screen/${id}`);
-    };
-
     return (
         <div className="h-[100dvh] bg-gray-900 text-white flex flex-col overflow-hidden">
             <header className="px-4 py-3 bg-gray-900/90 backdrop-blur-sm z-10 flex-none border-b border-gray-800">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <button
-                            onClick={handleChangeWheel}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 transition-colors"
-                            aria-label="Cambiar Ruleta"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M19 12H5M12 19l-7-7 7-7" />
-                            </svg>
-                        </button>
                         <div>
                             <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
                                 Elige 3 {mode === 'group' ? 'Animales' : 'Opciones'}

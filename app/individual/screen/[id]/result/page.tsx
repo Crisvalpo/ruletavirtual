@@ -30,6 +30,17 @@ export default function ResultPage({
 
     const [status, setStatus] = useState<'loading' | 'winning' | 'losing' | 'auto_rejoin'>('loading');
     const [dbSelections, setDbSelections] = useState<number[]>([]);
+
+    const selectedAnimalsRef = React.useRef(selectedAnimals);
+    const dbSelectionsRef = React.useRef(dbSelections);
+
+    useEffect(() => {
+        selectedAnimalsRef.current = selectedAnimals;
+    }, [selectedAnimals]);
+
+    useEffect(() => {
+        dbSelectionsRef.current = dbSelections;
+    }, [dbSelections]);
     const [email, setEmail] = useState('');
     const [isSaved, setIsSaved] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -92,214 +103,229 @@ export default function ResultPage({
         setIsSaving(false);
     };
 
-    useEffect(() => {
-        // 1. Core Result Logic
-        const checkResult = React.useCallback(async (isMounted: boolean) => {
-            try {
-                // 0. RECUPERAR DESDE LOCALSTORAGE si no hay queueId
-                if (!queueId) {
-                    try {
-                        const savedSpin = localStorage.getItem(`spin_${id}_active`);
-                        if (savedSpin) {
-                            const { queueId: savedQueueId, timestamp, screenNumber } = JSON.parse(savedSpin);
+    // 1. Core Result Logic
+    const checkResult = React.useCallback(async (isMounted: boolean) => {
+        try {
+            // 0. RECUPERAR DESDE LOCALSTORAGE si no hay queueId
+            if (!queueId) {
+                try {
+                    const savedSpin = localStorage.getItem(`spin_${id}_active`);
+                    if (savedSpin) {
+                        const { queueId: savedQueueId, timestamp, screenNumber } = JSON.parse(savedSpin);
 
-                            // Validar que sea reciente (< 10 minutos)
-                            const ageMinutes = (Date.now() - timestamp) / 1000 / 60;
-                            if (ageMinutes < 10 && screenNumber === parseInt(id)) {
-                                console.log("💾 Recovered queueId from localStorage:", savedQueueId);
-                                useGameStore.getState().setQueueId(savedQueueId);
-                                // Re-run check with recovered queueId
-                                setTimeout(() => checkResult(isMounted), 100);
-                                return;
-                            } else {
-                                // Expirado, limpiar
-                                localStorage.removeItem(`spin_${id}_active`);
-                            }
-                        }
-                    } catch (e) {
-                        console.warn("Could not recover from localStorage:", e);
-                    }
-                }
-
-                if (!effectiveQueueId) return;
-
-                // 1. Fetch own queue record first (Session specific result)
-                const { data: queueData, error: queueError } = await supabase
-                    .from('player_queue')
-                    .select('selected_animals, spin_result, status, package_code, player_name, player_emoji')
-                    .eq('id', effectiveQueueId)
-                    .maybeSingle();
-
-                if (queueError) {
-                    console.error("Error fetching session result:", queueError);
-                    return;
-                }
-
-                if (queueData) {
-                    // RESTORE IDENTITY: Critical for anonymous users after reload
-                    if (queueData.player_name) {
-                        useGameStore.getState().setIdentity(queueData.player_name, queueData.player_emoji || '😎');
-                    }
-
-                    const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
-                    if (effectiveSelections.length > 0 && isMounted) {
-                        setDbSelections(effectiveSelections);
-                    }
-                    if (queueData.package_code && isMounted) {
-                        setTicketCode(queueData.package_code);
-                    }
-                }
-
-                // 2. Fetch global screen state (REQUIRED for sync)
-                const { data: screenData } = await supabase
-                    .from('screen_state')
-                    .select('last_spin_result, status')
-                    .eq('screen_number', parseInt(id))
-                    .maybeSingle();
-
-                // 3. PRIORITY CHECK: If screen is spinning OR player status is playing, WAIT.
-                // LOOSENED: If store already says 'result' (globalStatus), we allow transition.
-                const isSpinning = screenData?.status === 'spinning' || queueData?.status === 'playing';
-                const isCompleted = queueData?.status === 'completed' || screenData?.status === 'showing_result' || globalStatus === 'result';
-
-                if (isSpinning && !isCompleted) {
-                    if (isMounted) setStatus('loading');
-                    return;
-                }
-
-                if (queueData) {
-                    const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
-
-                    // 4. Strict Completion Check with Retry Logic
-                    if (queueData.spin_result !== null && isCompleted) {
-                        const isWin = effectiveSelections.includes(queueData.spin_result);
-                        if (isMounted) setStatus(isWin ? 'winning' : 'losing');
-
-                        // Limpiar localStorage ya que tenemos el resultado
-                        try {
+                        // Validar que sea reciente (< 10 minutos)
+                        const ageMinutes = (Date.now() - timestamp) / 1000 / 60;
+                        if (ageMinutes < 10 && screenNumber === parseInt(id)) {
+                            console.log("💾 Recovered queueId from localStorage:", savedQueueId);
+                            useGameStore.getState().setQueueId(savedQueueId);
+                            // Re-run check with recovered queueId
+                            setTimeout(() => checkResult(isMounted), 100);
+                            return;
+                        } else {
+                            // Expirado, limpiar
                             localStorage.removeItem(`spin_${id}_active`);
-                            console.log("🧹 Cleaned localStorage after successful result");
-                        } catch (e) {
-                            console.warn("Could not clean localStorage:", e);
-                        }
-
-                        return;
-                    }
-
-                    // 4b. If spinning but no result yet, retry up to 5 times
-                    if (queueData.spin_result === null && isSpinning) {
-                        console.log("⏳ Spinning in progress, result not ready yet. Will retry...");
-                        let retryCount = 0;
-                        const maxRetries = 5;
-
-                        const retryFetch = async () => {
-                            while (retryCount < maxRetries && isMounted) {
-                                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
-                                retryCount++;
-
-                                const { data: retryData } = await supabase
-                                    .from('player_queue')
-                                    .select('spin_result, status')
-                                    .eq('id', queueId)
-                                    .maybeSingle();
-
-                                if (retryData && retryData.spin_result !== null) {
-                                    console.log(`✅ Result found on retry ${retryCount}:`, retryData.spin_result);
-                                    if (retryData) {
-                                        const isWin = effectiveSelections.includes(retryData.spin_result!);
-                                        if (isMounted) setStatus(isWin ? 'winning' : 'losing');
-
-                                        // Limpiar localStorage
-                                        try {
-                                            localStorage.removeItem(`spin_${id}_active`);
-                                        } catch (e) { }
-                                    }
-                                    return;
-                                }
-
-                                console.log(`🔄 Retry ${retryCount}/${maxRetries}: Still no result...`);
-                            }
-
-                            if (isMounted && retryCount >= maxRetries) {
-                                console.error("❌ Max retries reached. Result not found.");
-                                // Stay in loading state - user can refresh
-                            }
-                        };
-
-                        retryFetch();
-                        return;
-                    }
-                }
-
-                // 5. Fallback for idle/result transition
-                if (screenData) {
-                    if (screenData.last_spin_result !== null && (screenData.status === 'showing_result' || screenData.status === 'result')) {
-                        const selections = dbSelections.length > 0 ? dbSelections : selectedAnimals;
-                        if (selections.length > 0) {
-                            const isWin = selections.includes(screenData.last_spin_result);
-                            if (isMounted) setStatus(isWin ? 'winning' : 'losing');
                         }
                     }
+                } catch (e) {
+                    console.warn("Could not recover from localStorage:", e);
                 }
-            } catch (err) {
-                console.error("Unexpected error in checkResult:", err);
             }
-        }, [id, queueId, effectiveQueueId, supabase, selectedAnimals, dbSelections, globalStatus]);
 
-        useEffect(() => {
-            let isMounted = true;
-            checkResult(isMounted);
+            if (!effectiveQueueId) return;
 
-            // 2. Realtime Subscription for OUR OWN record
-            const channel = supabase
-                .channel(`player_result_${queueId}`)
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'UPDATE',
-                        schema: 'public',
-                        table: 'player_queue',
-                        filter: `id=eq.${queueId}`
-                    },
-                    (payload) => {
-                        console.log("📨 Queue Update Packet:", payload);
-                        if (isMounted) {
-                            const newResult = payload.new.spin_result;
-                            const newStatus = payload.new.status;
+            // 1. Fetch own queue record first (Session specific result)
+            const { data: queueData, error: queueError } = await supabase
+                .from('player_queue')
+                .select('selected_animals, spin_result, status, package_code, player_name, player_emoji')
+                .eq('id', effectiveQueueId)
+                .maybeSingle();
 
-                            // Transition if completed OR result is available and screen turned to result
-                            if (newResult !== null && (newStatus === 'completed' || globalStatus === 'result')) {
-                                const selections = (payload.new.selected_animals as number[]) || selectedAnimals;
-                                const isWin = selections.includes(newResult);
-                                setStatus(isWin ? 'winning' : 'losing');
-                            }
-                        }
+            if (queueError) {
+                console.error("Error fetching session result:", queueError);
+                return;
+            }
+
+            if (queueData) {
+                // RESTORE IDENTITY: Critical for anonymous users after reload
+                if (queueData.player_name) {
+                    useGameStore.getState().setIdentity(queueData.player_name, queueData.player_emoji || '😎');
+                }
+
+                const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
+                if (effectiveSelections.length > 0 && isMounted) {
+                    setDbSelections(effectiveSelections);
+                }
+                if (queueData.package_code && isMounted) {
+                    setTicketCode(queueData.package_code);
+                }
+            }
+
+            // 2. Fetch global screen state (REQUIRED for sync)
+            const { data: screenData } = await supabase
+                .from('screen_state')
+                .select('last_spin_result, status')
+                .eq('screen_number', parseInt(id))
+                .maybeSingle();
+
+            // 3. PRIORITY CHECK: If screen is spinning OR player status is playing, WAIT.
+            // LOOSENED: If store already says 'result' (globalStatus), we allow transition.
+            const isSpinning = screenData?.status === 'spinning' || queueData?.status === 'playing';
+            const isCompleted = queueData?.status === 'completed' || screenData?.status === 'showing_result' || globalStatus === 'result';
+
+            if (isSpinning && !isCompleted) {
+                if (isMounted) setStatus('loading');
+                return;
+            }
+
+            if (queueData) {
+                const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
+
+                // 4. Strict Completion Check with Retry Logic
+                if (queueData.spin_result !== null && isCompleted) {
+                    const isWin = effectiveSelections.includes(queueData.spin_result);
+                    if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+
+                    // Limpiar localStorage ya que tenemos el resultado
+                    try {
+                        localStorage.removeItem(`spin_${id}_active`);
+                        console.log("🧹 Cleaned localStorage after successful result");
+                    } catch (e) {
+                        console.warn("Could not clean localStorage:", e);
                     }
-                )
-                .subscribe();
 
-            // 3. SECONARY SYNC: Listen for Broadcast from Display (Instant)
-            const displayChannel = supabase.channel(`screen_${id}`);
-            displayChannel
-                .on('broadcast', { event: 'spin_finished' }, ({ payload }) => {
-                    console.log("⚡ Instant Broadcast received:", payload);
-                    if (isMounted && payload.result !== null) {
-                        const selections = dbSelections.length > 0 ? dbSelections : selectedAnimals;
-                        if (selections.length > 0) {
-                            const isWin = selections.includes(payload.result);
+                    return;
+                }
+
+                // 4b. If spinning but no result yet, retry up to 5 times
+                if (queueData.spin_result === null && isSpinning) {
+                    console.log("⏳ Spinning in progress, result not ready yet. Will retry...");
+                    let retryCount = 0;
+                    const maxRetries = 5;
+
+                    const retryFetch = async () => {
+                        while (retryCount < maxRetries && isMounted) {
+                            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
+                            retryCount++;
+
+                            const { data: retryData } = await supabase
+                                .from('player_queue')
+                                .select('spin_result, status')
+                                .eq('id', effectiveQueueId)
+                                .maybeSingle();
+
+                            if (retryData && retryData.spin_result !== null) {
+                                console.log(`✅ Result found on retry ${retryCount}:`, retryData.spin_result);
+                                const isWin = effectiveSelections.includes(retryData.spin_result!);
+                                if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+
+                                // Limpiar localStorage
+                                try {
+                                    localStorage.removeItem(`spin_${id}_active`);
+                                } catch (e) { }
+                                return;
+                            }
+
+                            console.log(`🔄 Retry ${retryCount}/${maxRetries}: Still no result...`);
+                        }
+
+                        if (isMounted && retryCount >= maxRetries) {
+                            console.error("❌ Max retries reached. Result not found.");
+                            // Stay in loading state - user can refresh
+                        }
+                    };
+
+                    retryFetch();
+                    return;
+                }
+            }
+
+            // 5. Fallback for idle/result transition
+            if (screenData) {
+                if (screenData.last_spin_result !== null && (screenData.status === 'showing_result' || screenData.status === 'result')) {
+                    const selections = dbSelections.length > 0 ? dbSelections : selectedAnimals;
+                    if (selections.length > 0) {
+                        const isWin = selections.includes(screenData.last_spin_result);
+                        if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Unexpected error in checkResult:", err);
+        }
+    }, [id, queueId, effectiveQueueId, supabase, selectedAnimals, dbSelections, globalStatus]);
+
+    const checkResultRef = React.useRef(checkResult);
+    useEffect(() => {
+        checkResultRef.current = checkResult;
+    }, [checkResult]);
+
+    // 2. Realtime Subscriptions
+    useEffect(() => {
+        let isMounted = true;
+        
+        // Execute initial check safely via ref
+        if (checkResultRef.current) {
+            checkResultRef.current(isMounted);
+        }
+
+        if (!effectiveQueueId) return;
+
+        console.log("🔌 Subscribing to player_result channel for queueId:", effectiveQueueId);
+
+        // 2. Realtime Subscription for OUR OWN record
+        const channel = supabase
+            .channel(`player_result_${effectiveQueueId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'player_queue',
+                    filter: `id=eq.${effectiveQueueId}`
+                },
+                (payload) => {
+                    console.log("📨 Queue Update Packet:", payload);
+                    if (isMounted) {
+                        const newResult = payload.new.spin_result;
+                        if (newResult !== null) {
+                            const selections = (payload.new.selected_animals as number[]) || dbSelectionsRef.current || selectedAnimalsRef.current;
+                            const isWin = selections.includes(newResult);
                             setStatus(isWin ? 'winning' : 'losing');
                         }
                     }
-                })
-                .subscribe();
+                }
+            )
+            .subscribe((status) => {
+                console.log(`🔌 Channel status for player_result_${effectiveQueueId}:`, status);
+            });
 
-            return () => {
-                isMounted = false;
-                supabase.removeChannel(channel);
-                supabase.removeChannel(displayChannel);
-            };
-        }, [id, selectedAnimals, queueId, supabase, checkResult, globalStatus, dbSelections]);
-    }, [id, selectedAnimals, queueId, supabase]);
+        console.log("🔌 Subscribing to display broadcast channel screen_", id);
+        // 3. SECONARY SYNC: Listen for Broadcast from Display (Instant)
+        const displayChannel = supabase.channel(`screen_${id}`);
+        displayChannel
+            .on('broadcast', { event: 'spin_finished' }, ({ payload }) => {
+                console.log("⚡ Instant Broadcast received:", payload);
+                if (isMounted && payload.result !== null) {
+                    const selections = dbSelectionsRef.current.length > 0 ? dbSelectionsRef.current : selectedAnimalsRef.current;
+                    if (selections.length > 0) {
+                        const isWin = selections.includes(payload.result);
+                        setStatus(isWin ? 'winning' : 'losing');
+                    } else {
+                        console.warn("⚠️ Broadcast received but selections are empty!");
+                    }
+                }
+            })
+            .subscribe((status) => {
+                console.log(`🔌 Channel status for screen_${id}:`, status);
+            });
+
+        return () => {
+            console.log("🔌 Cleaning up channel subscriptions for queueId:", effectiveQueueId);
+            isMounted = false;
+            supabase.removeChannel(channel);
+            supabase.removeChannel(displayChannel);
+        };
+    }, [id, effectiveQueueId, supabase]);
 
     // Check for package tracking and auto-rejoin
     useEffect(() => {

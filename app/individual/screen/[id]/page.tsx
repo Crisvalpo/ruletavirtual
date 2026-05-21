@@ -25,6 +25,10 @@ export default function JoinScreenPage({
     const searchParams = useSearchParams();
     const supabase = createClient();
 
+    const [resolvedWheelId, setResolvedWheelId] = useState<string | null>(null);
+    const [resolvingWheel, setResolvingWheel] = useState(true);
+    const [checkingQueue, setCheckingQueue] = useState(!!queueId);
+
     // Check for "continue in browser" preference
     useEffect(() => {
         const skipped = localStorage.getItem('pwa_prompt_skipped') === 'true';
@@ -47,17 +51,62 @@ export default function JoinScreenPage({
         }
     }, [user, isLoading, router]);
 
-    // ... (rest of the effects constant) ...
+    // Fetch Screen Theme (current_wheel_id) from Supabase
+    useEffect(() => {
+        const fetchScreenTheme = async () => {
+            setResolvingWheel(true);
+            try {
+                const { data: screenData, error } = await supabase
+                    .from('screen_state')
+                    .select('current_wheel_id')
+                    .eq('screen_number', parseInt(id))
+                    .single();
+
+                if (error) {
+                    console.error("Error fetching screen theme:", error);
+                }
+
+                let wheelId = screenData?.current_wheel_id;
+                if (!wheelId) {
+                    // Fallback: Fetch first active wheel
+                    const { data: fallbackWheel } = await supabase
+                        .from('individual_wheels')
+                        .select('id')
+                        .eq('is_active', true)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                    wheelId = fallbackWheel?.id || null;
+                }
+
+                if (wheelId) {
+                    setResolvedWheelId(wheelId);
+                    // Update activeWheelId in the store as well
+                    useGameStore.getState().setGameMode('individual', wheelId);
+                }
+            } catch (err) {
+                console.error("Error in fetchScreenTheme:", err);
+            } finally {
+                setResolvingWheel(false);
+            }
+        };
+
+        fetchScreenTheme();
+    }, [id, supabase]);
+
+    // Verify Active Queue & Setup Identity
     useEffect(() => {
         setScreenId(id);
 
         if (queueId) {
+            setCheckingQueue(true);
             supabase
                 .from('player_queue')
                 .select('status, created_at')
                 .eq('id', queueId)
                 .single()
                 .then(({ data }) => {
+                    let isActiveQueue = false;
                     if (data) {
                         const created = new Date(data.created_at).getTime();
                         const now = new Date().getTime();
@@ -65,17 +114,24 @@ export default function JoinScreenPage({
 
                         if (withinWindow) {
                             if (data.status === 'waiting' || data.status === 'playing' || data.status === 'spinning') {
+                                isActiveQueue = true;
                                 router.push(`/individual/screen/${id}/select`);
                             }
                             else if (data.status === 'selecting') {
-                                const currentWheelId = useGameStore.getState().activeWheelId;
-                                if (currentWheelId) {
-                                    router.push(`/individual/screen/${id}/select`);
-                                }
+                                isActiveQueue = true;
+                                router.push(`/individual/screen/${id}/select`);
                             }
                         }
                     }
+                    if (!isActiveQueue) {
+                        setCheckingQueue(false);
+                    }
+                },
+                () => {
+                    setCheckingQueue(false);
                 });
+        } else {
+            setCheckingQueue(false);
         }
 
         if (nickname && nickname !== 'Jugador') {
@@ -87,7 +143,7 @@ export default function JoinScreenPage({
     useEffect(() => {
         const checkActivePackage = async () => {
             const stored = localStorage.getItem('current_package');
-            if (!stored || !hasIdentity) return;
+            if (!stored || !hasIdentity || resolvingWheel || !resolvedWheelId) return;
 
             try {
                 const packageData = JSON.parse(stored);
@@ -102,10 +158,7 @@ export default function JoinScreenPage({
                     const spinsRemaining = data.total_spins - data.spins_consumed;
 
                     if (spinsRemaining > 0) {
-                        const wheelId = searchParams.get('wheelId');
-                        if (wheelId) {
-                            router.push(`/individual/screen/${id}/payment?wheelId=${wheelId}`);
-                        }
+                        router.push(`/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
                     } else {
                         localStorage.removeItem('current_package');
                     }
@@ -116,35 +169,29 @@ export default function JoinScreenPage({
         };
 
         checkActivePackage();
-    }, [hasIdentity, id, router, searchParams, supabase]);
+    }, [hasIdentity, id, router, resolvedWheelId, resolvingWheel, supabase]);
 
-
-    const handleStartFresh = () => {
-        resetGame();
-    };
-
-
-    const handleChangeIdentity = () => {
-        resetGame();
-        setHasIdentity(false);
-    };
-
-    // Handle redirect after identity setup
+    // Handle redirect to payment directly
     useEffect(() => {
-        if (hasIdentity && nickname !== 'Jugador') {
-            const returnTo = searchParams.get('returnTo');
-            const wheelId = searchParams.get('wheelId');
-
-            if (returnTo === 'payment' && wheelId) {
-                router.push(`/individual/screen/${id}/payment?wheelId=${wheelId}`);
-            }
+        if (hasIdentity && nickname !== 'Jugador' && !resolvingWheel && resolvedWheelId && !checkingQueue) {
+            router.push(`/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
         }
-    }, [hasIdentity, nickname, searchParams, id, router]);
+    }, [hasIdentity, nickname, id, router, resolvingWheel, resolvedWheelId, checkingQueue]);
 
     // --- FLOW STEPS ---
 
     // 1. Initial Loading
-    if (isLoading) return null;
+    if (isLoading || resolvingWheel || checkingQueue) {
+        return (
+            <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-white space-y-6">
+                <div className="w-16 h-16 border-4 border-white/10 border-t-yellow-400 rounded-full animate-spin" />
+                <div className="text-center animate-pulse">
+                    <p className="text-lg font-bold tracking-widest text-white/50 uppercase">Conectando</p>
+                    <p className="text-xs text-white/30">Cargando la configuración de la pantalla...</p>
+                </div>
+            </div>
+        );
+    }
 
     // 2. Install Prompt (if not in standalone and not skipped)
     if (installStep) {
@@ -156,50 +203,13 @@ export default function JoinScreenPage({
         return <NickEntry screenId={id} onComplete={() => setHasIdentity(true)} />;
     }
 
-
+    // Fallback UI (usually redirected before this point)
     return (
-        <div className="min-h-screen bg-[#050505] flex flex-col pwa-mode">
-            {/* Identity Bar */}
-            <div className="bg-[#111] border-b border-white/5 px-4 py-2 flex justify-between items-center shadow-2xl z-20 sticky top-0">
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={handleChangeIdentity}
-                        className="flex items-center gap-3 hover:bg-white/5 p-1 rounded-xl transition-all group pr-4"
-                        title="Cambiar Apodo o Emoji"
-                    >
-                        <div className="relative w-8 h-8 flex items-center justify-center bg-white/5 rounded-xl border border-white/10 text-xl group-hover:border-primary/50 transition-colors overflow-hidden">
-                            {emoji?.startsWith('http') ? (
-                                <img src={emoji} alt="Avatar" className="w-full h-full object-cover" />
-                            ) : (
-                                emoji
-                            )}
-                            <div className="absolute -top-1 -right-1 bg-primary text-[8px] p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                ✏️
-                            </div>
-                        </div>
-                        <div className="text-left">
-                            <p className="font-black text-white text-md tracking-tight flex items-center gap-2">
-                                {nickname}
-                                <span className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase tracking-tighter">Editar Perfil</span>
-                            </p>
-                        </div>
-                    </button>
-
-                    <Link
-                        href="/"
-                        className="bg-white/5 border border-white/10 py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2"
-                    >
-                        <span>📺</span>
-                        Cambiar Pantalla
-                    </Link>
-                </div>
-
-                <IdentityBadge />
-            </div>
-
-            {/* Content */}
-            <div className="flex-1">
-                <WheelSelector screenId={id} />
+        <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-white space-y-6">
+            <div className="w-16 h-16 border-4 border-white/10 border-t-yellow-400 rounded-full animate-spin" />
+            <div className="text-center animate-pulse">
+                <p className="text-lg font-bold tracking-widest text-white/50 uppercase">Redireccionando</p>
+                <p className="text-xs text-white/30">Entrando a la zona de juego...</p>
             </div>
         </div>
     );
