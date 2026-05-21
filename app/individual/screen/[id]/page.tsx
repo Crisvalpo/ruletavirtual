@@ -17,7 +17,7 @@ export default function JoinScreenPage({
     params: Promise<{ id: string }>
 }) {
     const { id } = use(params);
-    const { nickname, emoji, resetGame, setScreenId, queueId } = useGameStore();
+    const { nickname, emoji, resetGame, setScreenId, queueId, setQueueId } = useGameStore();
     const [hasIdentity, setHasIdentity] = useState(false);
     const [installStep, setInstallStep] = useState(true);
     const router = useRouter();
@@ -98,15 +98,23 @@ export default function JoinScreenPage({
     useEffect(() => {
         setScreenId(id);
 
-        if (queueId) {
+        if (queueId && user) {
             setCheckingQueue(true);
             supabase
                 .from('player_queue')
-                .select('status, created_at')
+                .select('status, created_at, player_id')
                 .eq('id', queueId)
                 .single()
                 .then(({ data }) => {
                     let isActiveQueue = false;
+                    
+                    if (data && data.player_id !== user.id) {
+                        console.warn("🚫 Queue ID belongs to another user. Clearing local queue state.");
+                        setQueueId(null);
+                        setCheckingQueue(false);
+                        return;
+                    }
+
                     if (data) {
                         const created = new Date(data.created_at).getTime();
                         const now = new Date().getTime();
@@ -137,7 +145,7 @@ export default function JoinScreenPage({
         if (nickname && nickname !== 'Jugador') {
             setHasIdentity(true);
         }
-    }, [id, setScreenId, nickname, queueId, supabase, router]);
+    }, [id, setScreenId, nickname, queueId, supabase, router, user, setQueueId]);
 
     // Check for active package on device
     useEffect(() => {

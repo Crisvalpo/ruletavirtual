@@ -95,7 +95,8 @@ export default function ResultPage({
             .from('player_queue')
             .update({
                 email: userEmail,
-                player_id: user?.id
+                player_id: user?.id,
+                prize_won: 'PREMIO NIVEL 1' // Save prize so it appears in history
             })
             .eq('id', effectiveQueueId);
 
@@ -495,7 +496,11 @@ export default function ResultPage({
             {/* Navigation Header */}
             <div className="bg-black/20 backdrop-blur-md border-b border-white/5 px-4 py-2 flex justify-between items-center z-50 sticky top-0">
                 <div className="flex items-center gap-2">
-                    <span className="text-xl">{useGameStore.getState().emoji}</span>
+                    {useGameStore.getState().emoji?.startsWith('http') ? (
+                        <img src={useGameStore.getState().emoji} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-white/20" />
+                    ) : (
+                        <span className="text-xl">{useGameStore.getState().emoji}</span>
+                    )}
                     <span className="font-black text-xs uppercase tracking-tight">{nickname}</span>
                 </div>
 
@@ -600,6 +605,12 @@ export default function ResultPage({
                                     {isScreenBusy ? 'Esperando ruleta...' : 'Jugar de Nuevo'}
                                 </button>
                             )}
+
+                            {isSaved && (
+                                <Link href="/individual/prizes" className="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-full font-bold shadow-lg text-center transition-all">
+                                    Ver Mi Historial de Premios
+                                </Link>
+                            )}
                             <p className="text-xs text-gray-500">Muestra esta pantalla al staff para cobrar</p>
                         </div>
                     </div>
@@ -615,13 +626,21 @@ export default function ResultPage({
                             <p className="text-gray-400 italic">"El que la sigue la consigue"</p>
                         </div>
 
-                        <button
-                            onClick={handlePlayAgain}
-                            disabled={isScreenBusy}
-                            className={`w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
-                        >
-                            {isScreenBusy ? 'Esperando ruleta...' : 'Intentar de Nuevo'}
-                        </button>
+                        <div className="flex flex-col gap-4">
+                            <button
+                                onClick={handlePlayAgain}
+                                disabled={isScreenBusy}
+                                className={`w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:grayscale`}
+                            >
+                                {isScreenBusy ? 'Esperando ruleta...' : 'Intentar de Nuevo'}
+                            </button>
+
+                            {isIdentified && (
+                                <Link href="/individual/prizes" className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-full font-bold shadow-lg text-center transition-all">
+                                    Ver Mi Historial
+                                </Link>
+                            )}
+                        </div>
                     </div>
                 )}
 
