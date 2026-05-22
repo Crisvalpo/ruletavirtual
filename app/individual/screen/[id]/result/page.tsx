@@ -19,7 +19,7 @@ export default function ResultPage({
     const { id } = use(params);
     const router = useRouter();
     const supabase = createClient();
-    const { selectedAnimals, nickname, queueId, status: globalStatus } = useGameStore();
+    const { selectedAnimals, nickname, emoji, queueId, status: globalStatus } = useGameStore();
 
     // Sync with global screen state to know when it's safe to play again
     useRealtimeGame(id);
@@ -491,17 +491,20 @@ export default function ResultPage({
         router.push(`/individual/screen/${id}`);
     };
 
+    const displayName = profile?.display_name || nickname || 'Jugador';
+    const displayEmoji = profile?.avatar_url || emoji || '😎';
+
     return (
         <div className="min-h-screen bg-gray-900 text-white flex flex-col pwa-mode">
             {/* Navigation Header */}
             <div className="bg-black/20 backdrop-blur-md border-b border-white/5 px-4 py-2 flex justify-between items-center z-50 sticky top-0">
                 <div className="flex items-center gap-2">
-                    {useGameStore.getState().emoji?.startsWith('http') ? (
-                        <img src={useGameStore.getState().emoji} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-white/20" />
+                    {displayEmoji.startsWith('http') ? (
+                        <img src={displayEmoji} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-white/20" />
                     ) : (
-                        <span className="text-xl">{useGameStore.getState().emoji}</span>
+                        <span className="text-xl">{displayEmoji}</span>
                     )}
-                    <span className="font-black text-xs uppercase tracking-tight">{nickname}</span>
+                    <span className="font-black text-xs uppercase tracking-tight">{displayName}</span>
                 </div>
 
                 <Link
