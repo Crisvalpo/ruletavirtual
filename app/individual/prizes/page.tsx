@@ -113,8 +113,12 @@ export default function MyPrizesPage() {
                                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${prize.prize_payout_status === 'paid' ? 'bg-green-500' : 'bg-yellow-500'
                                     }`} />
 
-                                <div className="text-3xl bg-white/5 w-12 h-12 flex items-center justify-center rounded-xl border border-white/10 group-hover:scale-105 transition-all">
-                                    {prize.player_emoji}
+                                <div className="text-3xl bg-white/5 w-12 h-12 flex items-center justify-center rounded-xl border border-white/10 group-hover:scale-105 transition-all overflow-hidden">
+                                    {prize.player_emoji?.startsWith('http') ? (
+                                        <img src={prize.player_emoji} alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        prize.player_emoji
+                                    )}
                                 </div>
 
                                 <div className="flex-1">
@@ -168,7 +172,13 @@ export default function MyPrizesPage() {
                             </svg>
                         </button>
 
-                        <div className="text-5xl mb-3 mt-2">{activePrizeForQr.player_emoji}</div>
+                        <div className="text-5xl mb-3 mt-2 flex justify-center">
+                            {activePrizeForQr.player_emoji?.startsWith('http') ? (
+                                <img src={activePrizeForQr.player_emoji} alt="Avatar" className="w-16 h-16 rounded-2xl object-cover border border-white/10" />
+                            ) : (
+                                activePrizeForQr.player_emoji
+                            )}
+                        </div>
                         <h2 className="text-xl font-black text-white uppercase tracking-tight mb-1">
                             {activePrizeForQr.prize_won}
                         </h2>
