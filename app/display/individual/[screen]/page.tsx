@@ -157,7 +157,7 @@ export default function DisplayScreenPage({
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [screenIdNum, supabase]);
+    }, [screenIdNum, supabase, checkingAuth, isUnlocked]);
 
     // 2.6 Local BroadcastChannel: Prevent Duplicate Screens on Same Device
     useEffect(() => {
