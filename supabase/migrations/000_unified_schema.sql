@@ -3926,3 +3926,98 @@ ADD COLUMN IF NOT EXISTS email TEXT,
 ADD COLUMN IF NOT EXISTS prize_won TEXT;
 
 
+-- ==========================================
+-- SOURCE: 058_admin_demo_spin.sql
+-- ==========================================
+
+-- Migration 058: Admin Show Mode — Giro de Demostración sin límite para el administrador
+-- Permite al admin girar la ruleta frente al público para demostrar cómo se juega,
+-- sin límites de uso, con nombre y emoji personalizables, verificando el rol admin en BD.
+
+CREATE OR REPLACE FUNCTION public.admin_demo_spin(
+  p_screen_number INTEGER,
+  p_player_name TEXT DEFAULT 'Modo Show',
+  p_player_emoji TEXT DEFAULT '🎭'
+) RETURNS JSONB AS $$
+DECLARE
+  v_result INTEGER;
+  v_wheel_id UUID;
+  v_segment_count INTEGER;
+  v_rnd_index INTEGER;
+  v_user_id UUID;
+  v_user_role TEXT;
+BEGIN
+  -- 1. Verificar autenticación
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', 'No autenticado. Inicia sesión como administrador.');
+  END IF;
+
+  -- 2. Verificar rol admin en profiles
+  SELECT role INTO v_user_role FROM public.profiles WHERE id = v_user_id;
+  IF v_user_role IS NULL OR v_user_role != 'admin' THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Solo administradores pueden usar el Giro Show.');
+  END IF;
+
+  -- 3. Verificar que no haya un jugador real en pleno giro (no interrumpir partidas reales)
+  IF EXISTS (
+    SELECT 1 FROM public.screen_state
+    WHERE screen_number = p_screen_number
+      AND status IN ('spinning', 'waiting_for_spin')
+      AND (is_demo IS NULL OR is_demo = false)
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Hay un jugador real girando. Espera a que termine.');
+  END IF;
+
+  -- 4. Determinar resultado según la rueda activa
+  SELECT current_wheel_id INTO v_wheel_id
+  FROM public.screen_state
+  WHERE screen_number = p_screen_number;
+
+  IF v_wheel_id IS NOT NULL THEN
+    -- Rueda personalizada: contar segmentos
+    SELECT count(*) INTO v_segment_count
+    FROM public.individual_wheel_segments
+    WHERE wheel_id = v_wheel_id;
+
+    IF v_segment_count > 0 THEN
+      v_rnd_index := floor(random() * v_segment_count)::INTEGER;
+      SELECT position INTO v_result
+      FROM public.individual_wheel_segments
+      WHERE wheel_id = v_wheel_id
+      ORDER BY position ASC
+      LIMIT 1 OFFSET v_rnd_index;
+    ELSE
+      v_result := floor(random() * 12) + 1;
+    END IF;
+  ELSE
+    -- Modo estándar: 36 animales
+    v_result := floor(random() * 36) + 1;
+  END IF;
+
+  -- 5. Actualizar pantalla → modo spinning demo
+  UPDATE public.screen_state
+  SET
+    status = 'spinning',
+    is_demo = true,
+    player_name = p_player_name,
+    player_emoji = p_player_emoji,
+    last_spin_result = v_result,
+    updated_at = now()
+  WHERE screen_number = p_screen_number;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'result_index', v_result,
+    'message', 'Giro Show iniciado'
+  );
+
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object('success', false, 'message', SQLERRM);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMENT ON FUNCTION public.admin_demo_spin IS 'Giro Show ilimitado para administradores. Permite demostrar el juego al público sin límites ni registro en queue. Verificación de rol admin en BD.';
+
+
+

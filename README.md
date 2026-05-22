@@ -78,13 +78,15 @@ http://localhost:3000
 3. Habilitar Realtime en Settings
 4. Copiar API keys a `.env.local`
 
-## 📊 Documentación
+## 📊 Documentación de la Arquitectura y Auditoría
 
-Ver carpeta `brain/` para diseño completo:
-- 31 documentos técnicos
-- Arquitectura detallada
-- Flujos de usuario
-- Lógica de negocio
+Para una comprensión exhaustiva de la lógica del sistema, flujos en vivo, estado y progreso, consulta los siguientes documentos generados en la carpeta `docs/`:
+
+- 🏛️ [Arquitectura y Flujo de Datos](file:///d:/Github/RULETA/docs/ARQUITECTURA.md)
+- ⚙️ [Máquina de Estados y Lógica (Celular - TV)](file:///d:/Github/RULETA/docs/ESTADO_Y_LOGICA.md)
+- 🚀 [Estado de Avance, Estabilidad y Pendientes (Roadmap)](file:///d:/Github/RULETA/docs/AVANCE_Y_PENDIENTES.md)
+
+Además, hay documentos de referencia original en la carpeta `brain/` y `REF/`.
 
 ## 📄 Licencia
 

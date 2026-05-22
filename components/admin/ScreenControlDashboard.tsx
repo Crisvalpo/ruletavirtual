@@ -135,7 +135,7 @@ export default function ScreenControlDashboard() {
 
     const handleDemoSpin = async (screenId: number) => {
 
-        const { error } = await supabase.rpc('play_demo_spin', {
+        const { data, error } = await supabase.rpc('admin_demo_spin', {
             p_screen_number: screenId,
             p_player_name: 'Modo Show',
             p_player_emoji: '🎭'
@@ -143,7 +143,13 @@ export default function ScreenControlDashboard() {
 
         if (error) {
             console.error("Error in demo spin:", error);
-            alert(error.message);
+            alert("Error: " + error.message);
+            return;
+        }
+
+        const res = data as any;
+        if (res && !res.success) {
+            alert(res.message || 'No se pudo iniciar el giro de demostración.');
         }
     };
 
@@ -317,14 +323,14 @@ export default function ScreenControlDashboard() {
                                 <div className="grid grid-cols-1 gap-2">
                                     <button
                                         onClick={() => handleDemoSpin(screen.screen_number)}
-                                        disabled={isActive || !!nextPlayer}
+                                        disabled={screen.status === 'spinning' || screen.status === 'waiting_for_spin'}
                                         className={`w-full text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2
-                                            ${(isActive || !!nextPlayer)
+                                            ${(screen.status === 'spinning' || screen.status === 'waiting_for_spin')
                                                 ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-50'
                                                 : 'bg-slate-900 border border-slate-900 hover:bg-slate-800 text-white shadow-md'
                                             }
                                         `}
-                                        title={isActive || !!nextPlayer ? "Pantalla ocupada o con fila" : "Lanzar Giro de Publicidad"}
+                                        title={screen.status === 'spinning' ? "Hay un giro en curso" : "Lanzar Giro de Show para el Público"}
                                     >
                                         🎭 Giro Show
                                     </button>

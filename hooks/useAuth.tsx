@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
+import { useGameStore } from '@/lib/store/gameStore';
 
 interface Profile {
     id: string;
@@ -11,6 +12,9 @@ interface Profile {
     role: 'player' | 'staff' | 'admin';
     cooldown_until: string | null;
     demo_spins_used: number;
+    total_plays?: number;
+    total_wins?: number;
+    email?: string;
 }
 
 interface AuthContextType {
@@ -164,6 +168,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return () => { supabase.removeChannel(channel); };
     }, [user?.id]);
+
+    // Sincronizar el perfil con el Zustand local de la ruleta
+    useEffect(() => {
+        if (profile) {
+            const { nickname, emoji, setIdentity } = useGameStore.getState();
+            const newName = profile.display_name || 'Jugador';
+            const newEmoji = profile.avatar_url || '😎';
+            if (nickname !== newName || emoji !== newEmoji) {
+                setIdentity(newName, newEmoji);
+            }
+        }
+    }, [profile]);
 
     const signInWithGoogle = async () => {
         const origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;

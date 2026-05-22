@@ -30,7 +30,7 @@ export default function IdentityBadge() {
                         Jugador
                     </p>
                     <button
-                        onClick={() => (window.location.href = '/individual/prizes')}
+                        onClick={() => (window.location.href = '/individual/profile')}
                         className="text-[12px] font-black tracking-tight leading-tight text-left hover:text-primary transition-colors text-white"
                     >
                         {profile?.display_name || 'Sin Nombre'}

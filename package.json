@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "tunnel": "cloudflared tunnel --config .cloudflared/config.yml run"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.0",
