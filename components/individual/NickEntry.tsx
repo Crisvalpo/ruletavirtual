@@ -14,6 +14,7 @@ interface NickEntryProps {
 export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
     const [name, setName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     // Updated store action
     const setIdentity = useGameStore((state) => state.setIdentity);
@@ -28,23 +29,30 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name.trim()) return;
+        const trimmedName = name.trim();
+        if (!trimmedName) return;
+
+        if (trimmedName.toLowerCase() === 'jugador') {
+            setError('El nombre "Jugador" está reservado por el sistema. Por favor elige otro.');
+            return;
+        }
 
         setIsSubmitting(true);
+        setError(null);
 
         // 1. Update Profile in DB (if logged in)
         if (user) {
             await supabase
                 .from('profiles')
                 .update({
-                    display_name: name.trim(),
+                    display_name: trimmedName,
                     avatar_url: profile?.avatar_url
                 })
                 .eq('id', user.id);
         }
 
         // 2. Update Local Store
-        setIdentity(name.trim(), profile?.avatar_url || '😎');
+        setIdentity(trimmedName, profile?.avatar_url || '😎');
 
         setIsSubmitting(false);
         onComplete();
@@ -99,13 +107,23 @@ export default function NickEntry({ screenId, onComplete }: NickEntryProps) {
                         <input
                             type="text"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            onChange={(e) => {
+                                setName(e.target.value);
+                                if (error) setError(null);
+                            }}
                             maxLength={15}
                             placeholder={profile?.display_name || "Ej. Juan, La Jefa, Campeón..."}
                             className="w-full px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 focus:border-primary focus:outline-none text-lg font-bold text-center text-white placeholder-gray-600 transition-colors"
                             autoFocus
                         />
                     </div>
+
+                    {/* Error Message */}
+                    {error && (
+                        <div className="bg-red-500/10 text-red-400 text-xs p-3.5 rounded-xl text-center border border-red-500/20 font-bold">
+                            ⚠️ {error}
+                        </div>
+                    )}
 
                     {/* Submit Button */}
                     <button

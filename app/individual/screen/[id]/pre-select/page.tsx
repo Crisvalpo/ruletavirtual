@@ -57,6 +57,12 @@ export default function PreSelectPage({
         }
     }, [searchParams]);
 
+    // Redirect to entry if no identity configured
+    useEffect(() => {
+        if (nickname === 'Jugador') {
+            router.push(`/individual/screen/${id}`);
+        }
+    }, [nickname, id, router]);
 
     // 2. REALTIME BROADCAST (Restore visual magic)
     useEffect(() => {

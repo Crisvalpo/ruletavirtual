@@ -156,10 +156,17 @@ export default function ProfileDashboardPage() {
         setIsSavingProfile(true);
         setSaveMessage(null);
 
+        const trimmedName = displayName.trim();
+        if (trimmedName.toLowerCase() === 'jugador') {
+            setSaveMessage({ text: 'El nombre "Jugador" está reservado por el sistema. Por favor elige otro.', type: 'error' });
+            setIsSavingProfile(false);
+            return;
+        }
+
         const { error } = await supabase
             .from('profiles')
             .update({
-                display_name: displayName.trim(),
+                display_name: trimmedName,
                 updated_at: new Date().toISOString()
             })
             .eq('id', user.id);
