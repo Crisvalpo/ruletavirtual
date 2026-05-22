@@ -322,19 +322,20 @@ export default function HomePage() {
                                     relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-500 group overflow-hidden border-2
                                     ${isActive
                                         ? 'border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:scale-[1.05] active:scale-95 hover:border-white/20'
-                                        : 'bg-white/5 border-white/5 grayscale pointer-events-none opacity-40'
+                                        : 'bg-white/5 border-white/5 hover:scale-[1.02] active:scale-95 hover:border-white/10 opacity-70 hover:opacity-90'
                                     }
                                 `}
                             >
-                                {/* Background Image with Blur (Active screens) */}
-                                {isActive && imageUrl && (
+                                {/* Background Image with Blur */}
+                                {imageUrl && (
                                     <>
                                         <img
                                             src={imageUrl}
                                             alt={`Pantalla ${id}`}
-                                            className="absolute inset-0 w-full h-full object-cover filter blur-[4px] scale-110 group-hover:scale-125 transition-transform duration-700 opacity-60"
+                                            className={`absolute inset-0 w-full h-full object-cover filter blur-[3px] scale-110 group-hover:scale-125 transition-transform duration-700
+                                                ${isActive ? 'opacity-55' : 'opacity-20 grayscale-[40%]'}`}
                                         />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/30" />
                                     </>
                                 )}
 
@@ -343,12 +344,25 @@ export default function HomePage() {
                                     <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                 )}
 
+                                {/* Wheel Name Badge */}
+                                {screenConf?.wheel_name && (
+                                    <div className={`
+                                        absolute top-6 px-3.5 py-1.5 rounded-xl backdrop-blur-md border text-[9px] font-black uppercase tracking-widest z-10 transition-all duration-500
+                                        ${isActive 
+                                            ? 'bg-primary/25 text-primary border-primary/30 shadow-[0_4px_12px_rgba(249,115,22,0.15)] group-hover:scale-105' 
+                                            : 'bg-black/45 text-white/50 border-white/10 group-hover:text-white/70'
+                                        }
+                                    `}>
+                                        {screenConf.wheel_name}
+                                    </div>
+                                )}
+
                                 {/* Number Icon/Text */}
                                 <span className={`
                                     text-[10rem] font-black leading-none tracking-tighter transition-all duration-500 select-none z-10
                                     ${isActive 
-                                        ? 'text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] group-hover:scale-110' 
-                                        : 'text-white/10'
+                                        ? 'text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] group-hover:scale-105' 
+                                        : 'text-white/20 drop-shadow-[0_2px_6px_rgba(0,0,0,0.3)] group-hover:text-white/40 group-hover:scale-105'
                                     }
                                 `}>
                                     {id}
@@ -359,7 +373,7 @@ export default function HomePage() {
                                     absolute bottom-6 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md transition-all z-10 border
                                     ${isActive 
                                         ? 'bg-black/40 text-emerald-400 border-emerald-500/20 shadow-[0_4px_12px_rgba(0,0,0,0.25)]' 
-                                        : 'bg-white/5 text-white/20 border-white/5'
+                                        : 'bg-black/40 text-white/30 border-white/5'
                                     }
                                 `}>
                                     <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-white/20'}`} />
