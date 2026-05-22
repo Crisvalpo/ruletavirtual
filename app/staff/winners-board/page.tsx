@@ -251,7 +251,11 @@ function GameRecordCard({ record, onVerify }: GameRecordCardProps) {
             {/* Header */}
             <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
-                    <span className="text-3xl">{record.player_emoji}</span>
+                    {record.player_emoji?.startsWith('http') ? (
+                        <img src={record.player_emoji} alt="Avatar" className="w-10 h-10 rounded-xl object-cover border border-gray-200 flex-none" />
+                    ) : (
+                        <span className="text-3xl flex-none">{record.player_emoji}</span>
+                    )}
                     <div>
                         <p className="font-black text-gray-900 text-lg">{record.player_name}</p>
                         <p className="text-xs text-gray-500">
@@ -343,9 +347,14 @@ function VerificationModal({ record, onClose, onMarkPaid }: VerificationModalPro
                 {/* Info del jugador */}
                 <div className="bg-gray-50 rounded-xl p-4 mb-6">
                     <p className="text-xs text-gray-500 mb-1">Jugador</p>
-                    <p className="text-2xl font-black text-gray-900">
-                        {record.player_emoji} {record.player_name}
-                    </p>
+                    <div className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                        {record.player_emoji?.startsWith('http') ? (
+                            <img src={record.player_emoji} alt="Avatar" className="w-10 h-10 rounded-xl object-cover flex-none" />
+                        ) : (
+                            <span className="flex-none">{record.player_emoji}</span>
+                        )}
+                        <span>{record.player_name}</span>
+                    </div>
                     <p className="text-xs text-gray-500 mt-2">
                         Pantalla {record.screen_number} · {record.wheel_name}
                     </p>

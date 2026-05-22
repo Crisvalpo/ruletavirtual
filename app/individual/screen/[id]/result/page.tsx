@@ -26,9 +26,21 @@ export default function ResultPage({
 
     const searchParams = useSearchParams();
     const urlQueueId = searchParams.get('q');
+    const resParam = searchParams.get('res');
     const effectiveQueueId = queueId || urlQueueId;
 
-    const [status, setStatus] = useState<'loading' | 'winning' | 'losing' | 'auto_rejoin'>('loading');
+    // Obtener el estado inicial determinado por el query parameter 'res' para evitar flasheos celestes
+    const initialStatus = React.useMemo(() => {
+        if (resParam !== null && selectedAnimals.length > 0) {
+            const resNum = parseInt(resParam);
+            if (!isNaN(resNum)) {
+                return selectedAnimals.includes(resNum) ? 'winning' : 'losing';
+            }
+        }
+        return 'loading';
+    }, [resParam, selectedAnimals]);
+
+    const [status, setStatus] = useState<'loading' | 'winning' | 'losing' | 'auto_rejoin'>(initialStatus);
     const [dbSelections, setDbSelections] = useState<number[]>([]);
 
     const selectedAnimalsRef = React.useRef(selectedAnimals);
@@ -104,9 +116,21 @@ export default function ResultPage({
         setIsSaving(false);
     };
 
+    // Maintain a ref to the current status to prevent stale asynchronous DB queries 
+    // from overwriting a definitive 'winning' or 'losing' status back to 'loading'.
+    const statusRef = React.useRef(status);
+    useEffect(() => {
+        statusRef.current = status;
+    }, [status]);
+
     // 1. Core Result Logic
     const checkResult = React.useCallback(async (isMounted: boolean) => {
         try {
+            // Guard: If we already have a definitive terminal status, do not re-run checks
+            if (statusRef.current === 'winning' || statusRef.current === 'losing') {
+                return;
+            }
+
             // 0. RECUPERAR DESDE LOCALSTORAGE si no hay queueId
             if (!queueId) {
                 try {
@@ -181,66 +205,85 @@ export default function ResultPage({
             if (queueData) {
                 const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
 
-                // 4. Strict Completion Check with Retry Logic
-                if (queueData.spin_result !== null && isCompleted) {
-                    const isWin = effectiveSelections.includes(queueData.spin_result);
-                    if (isMounted) setStatus(isWin ? 'winning' : 'losing');
-
-                    // Limpiar localStorage ya que tenemos el resultado
-                    try {
-                        localStorage.removeItem(`spin_${id}_active`);
-                        console.log("🧹 Cleaned localStorage after successful result");
-                    } catch (e) {
-                        console.warn("Could not clean localStorage:", e);
+                // Determinamos el resultado efectivo. Si la BD no lo tiene aún, pero lo tenemos en el query param, lo usamos.
+                let effectiveSpinResult = queueData.spin_result;
+                if (effectiveSpinResult === null && resParam !== null) {
+                    const resNum = parseInt(resParam);
+                    if (!isNaN(resNum)) {
+                        effectiveSpinResult = resNum;
+                        console.log("🎯 Using spin result from query parameter as fallback:", resNum);
                     }
-
-                    return;
                 }
 
-                // 4b. If spinning but no result yet, retry up to 5 times
-                if (queueData.spin_result === null && isSpinning) {
-                    console.log("⏳ Spinning in progress, result not ready yet. Will retry...");
-                    let retryCount = 0;
-                    const maxRetries = 5;
+                // Caso A: El resultado del giro aún no ha sido calculado por el servidor (esperando en cola)
+                if (effectiveSpinResult === null) {
+                    if (isMounted) setStatus('loading');
 
-                    const retryFetch = async () => {
-                        while (retryCount < maxRetries && isMounted) {
-                            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
-                            retryCount++;
+                    if (isSpinning) {
+                        console.log("⏳ Spinning in progress, result not ready yet. Will retry...");
+                        let retryCount = 0;
+                        const maxRetries = 5;
 
-                            const { data: retryData } = await supabase
-                                .from('player_queue')
-                                .select('spin_result, status')
-                                .eq('id', effectiveQueueId)
-                                .maybeSingle();
+                        const retryFetch = async () => {
+                            while (retryCount < maxRetries && isMounted) {
+                                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
+                                retryCount++;
 
-                            if (retryData && retryData.spin_result !== null) {
-                                console.log(`✅ Result found on retry ${retryCount}:`, retryData.spin_result);
-                                const isWin = effectiveSelections.includes(retryData.spin_result!);
-                                if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+                                const { data: retryData } = await supabase
+                                    .from('player_queue')
+                                    .select('spin_result, status')
+                                    .eq('id', effectiveQueueId)
+                                    .maybeSingle();
 
-                                // Limpiar localStorage
-                                try {
-                                    localStorage.removeItem(`spin_${id}_active`);
-                                } catch (e) { }
-                                return;
+                                if (retryData && retryData.spin_result !== null) {
+                                    console.log(`✅ Result found on retry ${retryCount}:`, retryData.spin_result);
+                                    const isWin = effectiveSelections.includes(retryData.spin_result!);
+                                    if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+
+                                    // Limpiar localStorage
+                                    try {
+                                        localStorage.removeItem(`spin_${id}_active`);
+                                    } catch (e) { }
+                                    return;
+                                }
+
+                                console.log(`🔄 Retry ${retryCount}/${maxRetries}: Still no result...`);
                             }
 
-                            console.log(`🔄 Retry ${retryCount}/${maxRetries}: Still no result...`);
-                        }
+                            if (isMounted && retryCount >= maxRetries) {
+                                console.error("❌ Max retries reached. Result not found.");
+                                // Stay in loading state - user can refresh
+                            }
+                        };
 
-                        if (isMounted && retryCount >= maxRetries) {
-                            console.error("❌ Max retries reached. Result not found.");
-                            // Stay in loading state - user can refresh
-                        }
-                    };
-
-                    retryFetch();
+                        retryFetch();
+                    }
                     return;
                 }
+
+                // Caso B: El resultado ya está calculado, pero la ruleta en la TV aún está girando visualmente
+                // Nota: Si usamos resParam, asumimos que el giro ya terminó porque el broadcast nos redirigió
+                if (!isCompleted && queueData.spin_result === null) {
+                    if (isMounted) setStatus('loading');
+                    return;
+                }
+
+                // Caso C: El resultado está calculado y la ruleta ya terminó de girar en la TV (giro completado)
+                const isWin = effectiveSelections.includes(effectiveSpinResult);
+                if (isMounted) setStatus(isWin ? 'winning' : 'losing');
+
+                // Limpiar localStorage ya que tenemos el resultado
+                try {
+                    localStorage.removeItem(`spin_${id}_active`);
+                    console.log("🧹 Cleaned localStorage after successful result");
+                } catch (e) {
+                    console.warn("Could not clean localStorage:", e);
+                }
+
+                return;
             }
 
-            // 5. Fallback for idle/result transition
+            // 5. Fallback for idle/result transition (Only reached if queueData is null)
             if (screenData) {
                 if (screenData.last_spin_result !== null && (screenData.status === 'showing_result' || screenData.status === 'result')) {
                     const selections = dbSelections.length > 0 ? dbSelections : selectedAnimals;
@@ -253,7 +296,7 @@ export default function ResultPage({
         } catch (err) {
             console.error("Unexpected error in checkResult:", err);
         }
-    }, [id, queueId, effectiveQueueId, supabase, selectedAnimals, dbSelections, globalStatus]);
+    }, [id, queueId, effectiveQueueId, supabase, selectedAnimals, dbSelections, globalStatus, resParam]);
 
     const checkResultRef = React.useRef(checkResult);
     useEffect(() => {

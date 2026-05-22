@@ -203,7 +203,11 @@ function ValidateContent({
                                 {prizes.filter(p => p.prize_payout_status === 'pending').map((prize) => (
                                     <div key={prize.id} className="bg-black/50 border border-white/5 p-4 rounded-2xl flex justify-between items-center group">
                                         <div className="flex items-center gap-3">
-                                            <span className="text-3xl">{prize.player_emoji}</span>
+                                            {prize.player_emoji?.startsWith('http') ? (
+                                                <img src={prize.player_emoji} alt="Avatar" className="w-10 h-10 rounded-xl object-cover border border-white/10 flex-none" />
+                                            ) : (
+                                                <span className="text-3xl flex-none">{prize.player_emoji}</span>
+                                            )}
                                             <div>
                                                 <p className="font-bold text-white uppercase tracking-tight">{prize.player_name}</p>
                                                 <p className="text-[10px] text-gray-500 uppercase">Pantalla {prize.screen_number} • {new Date(prize.created_at).toLocaleTimeString()}</p>
@@ -232,7 +236,11 @@ function ValidateContent({
                                 {prizes.filter(p => p.prize_payout_status === 'paid').map((prize) => (
                                     <div key={prize.id} className="bg-black/20 border border-white/5 p-3 rounded-xl flex justify-between items-center">
                                         <div className="flex items-center gap-3">
-                                            <span className="text-xl">{prize.player_emoji}</span>
+                                            {prize.player_emoji?.startsWith('http') ? (
+                                                <img src={prize.player_emoji} alt="Avatar" className="w-6 h-6 rounded-lg object-cover border border-white/10 flex-none" />
+                                            ) : (
+                                                <span className="text-xl flex-none">{prize.player_emoji}</span>
+                                            )}
                                             <div>
                                                 <p className="font-bold text-white text-xs">{prize.player_name}</p>
                                                 <p className="text-[8px] text-gray-500">PAGADO EL {new Date(prize.created_at).toLocaleDateString()}</p>

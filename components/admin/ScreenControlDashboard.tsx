@@ -254,8 +254,12 @@ export default function ScreenControlDashboard() {
                                     <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest mb-1">Activo:</p>
                                     {screen.player_name ? (
                                         <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-lg">
-                                                {screen.player_emoji}
+                                            <div className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-lg overflow-hidden">
+                                                {screen.player_emoji?.startsWith('http') ? (
+                                                    <img src={screen.player_emoji} alt="Avatar" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    screen.player_emoji
+                                                )}
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="font-black text-slate-900 leading-none">{screen.player_name}</span>
@@ -276,7 +280,11 @@ export default function ScreenControlDashboard() {
                                         <div className="bg-white/60 rounded-xl p-3 border border-indigo-100 shadow-sm">
                                             <p className="text-[9px] text-indigo-500 uppercase font-black tracking-widest mb-2">Siguiente en Fila:</p>
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm">{nextPlayer.player_emoji}</span>
+                                                {nextPlayer.player_emoji?.startsWith('http') ? (
+                                                    <img src={nextPlayer.player_emoji} alt="Avatar" className="w-5 h-5 rounded-full object-cover border border-slate-100 flex-none" />
+                                                ) : (
+                                                    <span className="text-sm flex-none">{nextPlayer.player_emoji}</span>
+                                                )}
                                                 <span className="text-xs font-black text-slate-900 uppercase">
                                                     {nextPlayer.player_name}
                                                 </span>
