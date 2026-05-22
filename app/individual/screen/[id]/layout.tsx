@@ -19,7 +19,7 @@ export default function ScreenLayout({
         if (!id) return;
         const screenNum = parseInt(id as string);
 
-        const channel = supabase.channel('global_presence_monitor_layout');
+        const channel = supabase.channel('global_presence_monitor');
 
         const syncPresence = () => {
             const state = channel.presenceState();
