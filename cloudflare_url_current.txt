@@ -1,4 +1,0 @@
-Active Cloudflare Tunnel URL:
-https://second-climbing-stamps-photographers.trycloudflare.com
-Created at: 2026-05-21 20:09:44 UTC
-Local server: http://localhost:3000
