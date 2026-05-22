@@ -3,6 +3,8 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useGameStore } from '@/lib/store/gameStore';
 
+import Link from 'next/link';
+
 export default function IdentityBadge() {
     const { user, profile, isLoading, signInWithGoogle, signOut } = useAuth();
     const resetIdentity = useGameStore(state => state.resetIdentity);
@@ -16,7 +18,10 @@ export default function IdentityBadge() {
 
     return (
         <div className="flex items-center gap-2 bg-[#1a1a1a] border border-white/5 p-1.5 rounded-2xl shadow-xl">
-            <div className="flex items-center gap-3 px-2">
+            <Link
+                href="/individual/profile"
+                className="flex items-center gap-3 px-2 hover:opacity-80 transition-opacity cursor-pointer"
+            >
                 <div className="relative">
                     <img
                         src={profile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.id}`}
@@ -29,15 +34,12 @@ export default function IdentityBadge() {
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest leading-none">
                         Jugador
                     </p>
-                    <button
-                        onClick={() => (window.location.href = '/individual/profile')}
-                        className="text-[12px] font-black tracking-tight leading-tight text-left hover:text-primary transition-colors text-white"
-                    >
+                    <p className="text-[12px] font-black tracking-tight leading-tight text-left text-white">
                         {profile?.display_name || 'Sin Nombre'}
                         <span className="ml-1 text-[8px] opacity-30">🏆</span>
-                    </button>
+                    </p>
                 </div>
-            </div>
+            </Link>
 
             <div className="h-6 w-[1px] bg-white/10 mx-1" />
 

@@ -83,7 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // FORCE ADMIN for specific user (Hard override)
                 const emailToUse = userEmail || user?.email;
                 if (emailToUse === 'cristianluke@gmail.com') {
-                    console.log('🛠️ Admin detectado por email:', emailToUse);
                     profileData.role = 'admin';
                 }
                 setProfile(profileData);
