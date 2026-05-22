@@ -16,12 +16,14 @@ interface GameState {
     idleSpeed: number;
     gameMode: 'individual' | 'group';
     activeWheelId: string | null;
+    isRevenge: boolean;
     selectedAnimals: number[];
 
     // Actions
     setScreenId: (id: string | null) => void;
     setIdentity: (nickname: string, emoji: string) => void;
     setQueueId: (id: string | null) => void;
+    setIsRevenge: (isRevenge: boolean) => void;
     setGameMode: (mode: 'individual' | 'group', wheelId?: string) => void;
     setSelectedAnimals: (animals: number[]) => void;
     toggleAnimal: (id: number) => void;
@@ -44,11 +46,13 @@ export const useGameStore = create<GameState>()(
             idleSpeed: 4.0,
             gameMode: 'individual',
             activeWheelId: null,
+            isRevenge: false,
             selectedAnimals: [],
 
             setScreenId: (id) => set({ screenId: id }),
             setIdentity: (nickname, emoji) => set({ nickname, emoji }),
             setQueueId: (id) => set({ queueId: id }),
+            setIsRevenge: (isRevenge) => set({ isRevenge }),
 
             setGameMode: (mode, wheelId) => set({
                 gameMode: mode,
@@ -62,7 +66,8 @@ export const useGameStore = create<GameState>()(
                 if (isSelected) {
                     return { selectedAnimals: state.selectedAnimals.filter(a => a !== id) };
                 }
-                if (state.selectedAnimals.length < 3) {
+                const maxAnimals = state.isRevenge ? 6 : 3;
+                if (state.selectedAnimals.length < maxAnimals) {
                     return { selectedAnimals: [...state.selectedAnimals, id] };
                 }
                 return state;
@@ -76,6 +81,7 @@ export const useGameStore = create<GameState>()(
                 activeWheelId: null,
                 queueId: null,
                 currentQueueId: null,
+                isRevenge: false,
             }),
             resetIdentity: () => set({
                 nickname: 'Jugador',

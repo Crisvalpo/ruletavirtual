@@ -21,7 +21,16 @@ export default function PreSelectPage({
 
     const mode = useGameStore((state) => state.gameMode);
     const { selectedAnimals, activeWheelId, nickname, emoji, setQueueId, queueId } = useGameStore();
-    const isRevenge = searchParams.get('isRevenge') === 'true';
+    const storeIsRevenge = useGameStore((state) => state.isRevenge);
+    const isRevenge = searchParams.get('isRevenge') === 'true' || storeIsRevenge;
+    const maxAnimals = isRevenge ? 6 : 3;
+
+    useEffect(() => {
+        const urlIsRevenge = searchParams.get('isRevenge') === 'true';
+        if (urlIsRevenge && !storeIsRevenge) {
+            useGameStore.getState().setIsRevenge(true);
+        }
+    }, [searchParams, storeIsRevenge]);
 
     // Estado local para wheelId
     const [currentLocalWheelId, setCurrentLocalWheelId] = useState<string | null>(activeWheelId);
@@ -96,7 +105,7 @@ export default function PreSelectPage({
     }, [id, nickname, emoji, selectedAnimals]);
 
     const handleConfirmAndJoin = async () => {
-        if (selectedAnimals.length !== 3) return;
+        if (selectedAnimals.length !== maxAnimals) return;
         setIsSubmitting(true);
 
         try {
@@ -196,7 +205,7 @@ export default function PreSelectPage({
                             ¡Prepara tu Jugada!
                         </h1>
                         <p className="text-xs text-gray-400 font-medium tracking-wide">
-                            Elige 3 opciones antes de entrar
+                            Elige {maxAnimals} opciones antes de entrar
                         </p>
                     </div>
                 </div>
@@ -216,15 +225,15 @@ export default function PreSelectPage({
             <div className="flex-none p-4 bg-gray-900/95 backdrop-blur-md border-t border-gray-800 pb-8">
                 <button
                     onClick={handleConfirmAndJoin}
-                    disabled={selectedAnimals.length !== 3 || isSubmitting}
+                    disabled={selectedAnimals.length !== maxAnimals || isSubmitting}
                     className={`
                         w-full py-4 rounded-xl font-bold text-lg tracking-wide transition-all shadow-lg
-                        ${selectedAnimals.length === 3
+                        ${selectedAnimals.length === maxAnimals
                             ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transform active:scale-[0.98] shadow-blue-500/20'
                             : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'}
                     `}
                 >
-                    {isSubmitting ? 'Uniéndose...' : (selectedAnimals.length === 3 ? 'CONFIRMAR Y UNIRSE A LA COLA 🚀' : `Elige ${3 - selectedAnimals.length} más`)}
+                    {isSubmitting ? 'Uniéndose...' : (selectedAnimals.length === maxAnimals ? 'CONFIRMAR Y UNIRSE A LA COLA 🚀' : `Elige ${maxAnimals - selectedAnimals.length} más`)}
                 </button>
             </div>
         </div>

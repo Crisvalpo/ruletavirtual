@@ -18,6 +18,8 @@ export default function SelectionPage({
 
     const mode = useGameStore((state) => state.gameMode);
     const { queueId, selectedAnimals, activeWheelId } = useGameStore();
+    const isRevenge = useGameStore((state) => state.isRevenge);
+    const maxAnimals = isRevenge ? 6 : 3;
     const wheelId = activeWheelId;
     const supabase = createClient();
 
@@ -117,18 +119,25 @@ export default function SelectionPage({
                 useGameStore.getState().setGameMode('individual', resolvedWheelId ?? undefined);
             }
 
-            if (!queueId) {
-                console.warn("🚫 No active queue session found. Redirecting to ID page...");
-                router.push(`/individual/screen/${id}`);
-                return;
-            }
-
             setIsInitializing(false);
         };
 
         if (!isInitializing) setIsInitializing(true);
         init();
     }, [queueId, supabase, id, activeWheelId, router]);
+
+    // Redirect if no queueId (no active session) with a delay to allow Zustand hydration
+    React.useEffect(() => {
+        if (!queueId && !isInitializing) {
+            const timer = setTimeout(() => {
+                if (!queueId) {
+                    console.warn("🚫 No active queue session found after delay. Redirecting to ID page...");
+                    router.push(`/individual/screen/${id}`);
+                }
+            }, 800); // 800ms delay to accommodate hydration
+            return () => clearTimeout(timer);
+        }
+    }, [queueId, isInitializing, id, router]);
 
     // REALTIME: Listen for Queue Updates (Am I playing?)
     React.useEffect(() => {
@@ -285,7 +294,7 @@ export default function SelectionPage({
     }, [uiStatus, selectingTimeout, queueId, router, id, supabase]);
 
     const handleConfirm = async () => {
-        if (selectedAnimals.length === 3 && queueId) {
+        if (selectedAnimals.length === maxAnimals && queueId) {
 
             // 1. Submit Selection & Set to WAITING
             const { error } = await supabase
@@ -404,10 +413,10 @@ export default function SelectionPage({
                     <div className="flex items-center gap-3">
                         <div>
                             <h1 className="text-xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-                                Elige 3 {mode === 'group' ? 'Animales' : 'Opciones'}
+                                Elige {maxAnimals} {mode === 'group' ? 'Animales' : 'Opciones'}
                             </h1>
                             <p className="text-xs text-green-400 font-medium tracking-wide">
-                                {selectedAnimals.length}/3 SELECCIONADOS
+                                {selectedAnimals.length}/{maxAnimals} SELECCIONADOS
                             </p>
                         </div>
                     </div>
@@ -441,15 +450,15 @@ export default function SelectionPage({
                 {uiStatus === 'selecting' && (
                     <button
                         onClick={handleConfirm}
-                        disabled={selectedAnimals.length !== 3}
+                        disabled={selectedAnimals.length !== maxAnimals}
                         className={`
                         w-full py-4 rounded-xl font-bold text-lg tracking-wide transition-all shadow-lg
-                        ${selectedAnimals.length === 3
+                        ${selectedAnimals.length === maxAnimals
                                 ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white transform active:scale-[0.98] shadow-green-500/20'
                                 : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-gray-700'}
                     `}
                     >
-                        {selectedAnimals.length === 3 ? 'CONFIRMAR JUGADA' : `Selecciona ${3 - selectedAnimals.length} más`}
+                        {selectedAnimals.length === maxAnimals ? 'CONFIRMAR JUGADA' : `Selecciona ${maxAnimals - selectedAnimals.length} más`}
                     </button>
                 )}
 

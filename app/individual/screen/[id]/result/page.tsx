@@ -51,6 +51,7 @@ export default function ResultPage({
     const [rpsResult, setRpsResult] = useState<'win' | 'lose' | 'draw' | null>(null);
     const [rpsAnimating, setRpsAnimating] = useState(false);
     const [hasPlayedRps, setHasPlayedRps] = useState(false);
+    const [isNavigating, setIsNavigating] = useState(false);
 
     useEffect(() => {
         if (effectiveQueueId) {
@@ -199,6 +200,9 @@ export default function ResultPage({
                         {rpsResult === 'win' && (
                             <button
                                 onClick={() => {
+                                    setIsNavigating(true);
+                                    useGameStore.getState().setSelectedAnimals([]);
+                                    useGameStore.getState().setIsRevenge(true);
                                     useGameStore.getState().setQueueId(null);
                                     router.push(`/individual/screen/${id}/pre-select?wheelId=${activeWheelId || ''}&isRevenge=true`);
                                 }}
@@ -262,16 +266,16 @@ export default function ResultPage({
 
     // Redirect if no queueId (no active session)
     useEffect(() => {
-        if (!effectiveQueueId) {
+        if (!effectiveQueueId && !isNavigating) {
             // Give it a moment in case zustand is still hydrating
             const timer = setTimeout(() => {
-                if (!effectiveQueueId) {
+                if (!effectiveQueueId && !isNavigating) {
                     router.push(`/individual/screen/${id}`);
                 }
             }, 500);
             return () => clearTimeout(timer);
         }
-    }, [effectiveQueueId, id, router]);
+    }, [effectiveQueueId, id, router, isNavigating]);
 
     useEffect(() => {
         // If user just identified themselves while on this page, link the prize
@@ -679,6 +683,7 @@ export default function ResultPage({
             // NUEVO: Limpiar queueId anterior para permitir nueva entrada
             console.log("🔄 Limpiando queueId anterior antes de auto-rejoin");
             useGameStore.getState().setQueueId(null);
+            useGameStore.getState().setIsRevenge(false);
 
             // Create new queue entry
             const activeWheelId = useGameStore.getState().activeWheelId;
@@ -719,6 +724,8 @@ export default function ResultPage({
         useGameStore.getState().setSelectedAnimals([]);
         // Clear queueId to start a new session
         useGameStore.getState().setQueueId(null);
+        // Reset revenge flag
+        useGameStore.getState().setIsRevenge(false);
         // Return to entry page
         router.push(`/individual/screen/${id}`);
     };
