@@ -19,7 +19,7 @@ export default function ResultPage({
     const { id } = use(params);
     const router = useRouter();
     const supabase = createClient();
-    const { selectedAnimals, nickname, emoji, queueId, status: globalStatus } = useGameStore();
+    const { selectedAnimals, nickname, emoji, queueId, status: globalStatus, activeWheelId } = useGameStore();
 
     // Sync with global screen state to know when it's safe to play again
     useRealtimeGame(id);
@@ -42,6 +42,186 @@ export default function ResultPage({
 
     const [status, setStatus] = useState<'loading' | 'winning' | 'losing' | 'auto_rejoin'>(initialStatus);
     const [dbSelections, setDbSelections] = useState<number[]>([]);
+    const [isRevenge, setIsRevenge] = useState<boolean>(false);
+
+    // Piedra, Papel o Tijera (RPS) States
+    const [rpsPlaying, setRpsPlaying] = useState(false);
+    const [rpsUserChoice, setRpsUserChoice] = useState<'rock' | 'paper' | 'scissors' | null>(null);
+    const [rpsCompChoice, setRpsCompChoice] = useState<'rock' | 'paper' | 'scissors' | null>(null);
+    const [rpsResult, setRpsResult] = useState<'win' | 'lose' | 'draw' | null>(null);
+    const [rpsAnimating, setRpsAnimating] = useState(false);
+    const [hasPlayedRps, setHasPlayedRps] = useState(false);
+
+    useEffect(() => {
+        if (effectiveQueueId) {
+            const played = sessionStorage.getItem(`rps_played_${effectiveQueueId}`) === 'true';
+            setHasPlayedRps(played);
+        }
+    }, [effectiveQueueId]);
+
+    const playRPS = (userChoice: 'rock' | 'paper' | 'scissors') => {
+        if (rpsAnimating) return;
+        setRpsUserChoice(userChoice);
+        setRpsAnimating(true);
+        setRpsCompChoice(null);
+        setRpsResult(null);
+
+        setTimeout(() => {
+            const choices: ('rock' | 'paper' | 'scissors')[] = ['rock', 'paper', 'scissors'];
+            const compChoice = choices[Math.floor(Math.random() * 3)];
+            setRpsCompChoice(compChoice);
+
+            let result: 'win' | 'lose' | 'draw';
+            if (userChoice === compChoice) {
+                result = 'draw';
+            } else if (
+                (userChoice === 'rock' && compChoice === 'scissors') ||
+                (userChoice === 'paper' && compChoice === 'rock') ||
+                (userChoice === 'scissors' && compChoice === 'paper')
+            ) {
+                result = 'win';
+            } else {
+                result = 'lose';
+            }
+
+            setRpsResult(result);
+            setRpsAnimating(false);
+
+            if (result !== 'draw') {
+                setHasPlayedRps(true);
+                if (effectiveQueueId) {
+                    sessionStorage.setItem(`rps_played_${effectiveQueueId}`, 'true');
+                }
+            }
+        }, 1500);
+    };
+
+    const renderRpsGame = () => {
+        const choiceLabels = {
+            rock: { emoji: '✊', label: 'Piedra', color: 'from-pink-500 to-rose-600' },
+            paper: { emoji: '✋', label: 'Papel', color: 'from-yellow-400 to-amber-500' },
+            scissors: { emoji: '✌️', label: 'Tijera', color: 'from-cyan-400 to-blue-500' }
+        };
+
+        return (
+            <div className="text-center animate-in zoom-in duration-500 max-w-sm w-full bg-gray-800/80 backdrop-blur-md p-6 rounded-3xl border border-gray-700 shadow-2xl">
+                <h2 className="text-2xl font-black bg-gradient-to-r from-orange-400 to-yellow-300 bg-clip-text text-transparent mb-1 uppercase tracking-tight">
+                    ✊ ¡Revancha de Honor! ✌️
+                </h2>
+                <p className="text-xs text-gray-400 mb-6 font-medium">
+                    Gana la partida para obtener un Giro de Consuelo
+                </p>
+
+                {/* Battle Arena */}
+                <div className="flex justify-between items-center bg-gray-900/60 rounded-2xl p-4 mb-6 border border-white/5 relative overflow-hidden">
+                    {/* User choice */}
+                    <div className="flex-1 flex flex-col items-center">
+                        <span className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">Tú</span>
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl bg-gray-900 border-2 ${rpsAnimating ? 'animate-bounce border-blue-500' : rpsResult === 'win' ? 'border-green-500 shadow-lg shadow-green-500/20' : 'border-gray-700'}`}>
+                            {rpsUserChoice ? choiceLabels[rpsUserChoice].emoji : '❓'}
+                        </div>
+                        <span className="text-xs font-bold text-gray-400 mt-2">
+                            {rpsUserChoice ? choiceLabels[rpsUserChoice].label : 'Elige...'}
+                        </span>
+                    </div>
+
+                    {/* VS divider */}
+                    <div className="flex-none px-4 text-sm font-black text-gray-600 animate-pulse">
+                        VS
+                    </div>
+
+                    {/* Computer choice */}
+                    <div className="flex-1 flex flex-col items-center">
+                        <span className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">Oponente</span>
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl bg-gray-900 border-2 ${rpsAnimating ? 'animate-bounce border-pink-500' : rpsResult === 'lose' ? 'border-red-500 shadow-lg shadow-red-500/20' : 'border-gray-700'}`}>
+                            {rpsAnimating ? '⏳' : rpsCompChoice ? choiceLabels[rpsCompChoice].emoji : '🤖'}
+                        </div>
+                        <span className="text-xs font-bold text-gray-400 mt-2">
+                            {rpsAnimating ? 'Pensando...' : rpsCompChoice ? choiceLabels[rpsCompChoice].label : 'Esperando...'}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Game outcome message */}
+                <div className="h-12 flex items-center justify-center mb-6">
+                    {rpsAnimating && (
+                        <p className="text-sm font-black text-blue-400 animate-pulse uppercase tracking-wider">
+                            👊 ¡Preparando jugada...! 🖐️
+                        </p>
+                    )}
+                    {!rpsAnimating && rpsResult === 'draw' && (
+                        <p className="text-sm font-black text-yellow-500 animate-bounce uppercase tracking-wider">
+                            🤝 ¡Empate! Inténtalo de nuevo
+                        </p>
+                    )}
+                    {!rpsAnimating && rpsResult === 'win' && (
+                        <div className="text-center">
+                            <p className="text-base font-black text-green-400 uppercase tracking-widest animate-pulse">
+                                🎉 ¡GANASTE LA REVANCHA! 🎉
+                            </p>
+                        </div>
+                    )}
+                    {!rpsAnimating && rpsResult === 'lose' && (
+                        <p className="text-sm font-black text-red-500 uppercase tracking-widest">
+                            😢 Perdiste la oportunidad
+                        </p>
+                    )}
+                    {!rpsAnimating && !rpsResult && (
+                        <p className="text-xs font-bold text-gray-500 tracking-wider">
+                            Piedra vence a Tijera • Tijera vence a Papel • Papel vence a Piedra
+                        </p>
+                    )}
+                </div>
+
+                {/* RPS Choice Buttons */}
+                {!rpsResult || rpsResult === 'draw' ? (
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                        {(['rock', 'paper', 'scissors'] as const).map((choice) => {
+                            const info = choiceLabels[choice];
+                            return (
+                                <button
+                                    key={choice}
+                                    onClick={() => playRPS(choice)}
+                                    disabled={rpsAnimating}
+                                    className={`
+                                        flex flex-col items-center justify-center py-4 rounded-2xl bg-gradient-to-b ${info.color} 
+                                        text-white font-black transition-all transform active:scale-95 disabled:opacity-50 disabled:active:scale-100 shadow-md hover:shadow-lg
+                                    `}
+                                >
+                                    <span className="text-3xl mb-1">{info.emoji}</span>
+                                    <span className="text-xs uppercase tracking-tight font-black">{info.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-3 mt-2">
+                        {rpsResult === 'win' && (
+                            <button
+                                onClick={() => {
+                                    useGameStore.getState().setQueueId(null);
+                                    router.push(`/individual/screen/${id}/pre-select?wheelId=${activeWheelId || ''}&isRevenge=true`);
+                                }}
+                                className="w-full py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-black text-base uppercase tracking-wider shadow-lg shadow-green-500/20 transition-all transform active:scale-95"
+                            >
+                                Reclamar Giro de Revancha 🚀
+                            </button>
+                        )}
+                        {rpsResult === 'lose' && (
+                            <button
+                                onClick={() => {
+                                    setRpsPlaying(false);
+                                }}
+                                className="w-full py-4 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-black text-sm uppercase tracking-wide transition-all active:scale-95"
+                            >
+                                Continuar
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     const selectedAnimalsRef = React.useRef(selectedAnimals);
     const dbSelectionsRef = React.useRef(dbSelections);
@@ -95,10 +275,11 @@ export default function ResultPage({
 
     useEffect(() => {
         // If user just identified themselves while on this page, link the prize
-        if (isIdentified && effectiveQueueId && !isSaved) {
+        // Only trigger this if we have a definitive win status and we haven't saved yet
+        if (isIdentified && effectiveQueueId && !isSaved && status === 'winning') {
             handleSavePrize(user.email!);
         }
-    }, [isIdentified, effectiveQueueId]);
+    }, [isIdentified, effectiveQueueId, status, isSaved]);
 
     const handleSavePrize = async (userEmail: string) => {
         if (!effectiveQueueId) return;
@@ -108,7 +289,7 @@ export default function ResultPage({
             .update({
                 email: userEmail,
                 player_id: user?.id,
-                prize_won: 'PREMIO NIVEL 1' // Save prize so it appears in history
+                prize_won: isRevenge ? 'PREMIO NIVEL 2' : 'PREMIO NIVEL 1' // Save prize so it appears in history
             })
             .eq('id', effectiveQueueId);
 
@@ -161,7 +342,7 @@ export default function ResultPage({
             // 1. Fetch own queue record first (Session specific result)
             const { data: queueData, error: queueError } = await supabase
                 .from('player_queue')
-                .select('selected_animals, spin_result, status, package_code, player_name, player_emoji')
+                .select('selected_animals, spin_result, status, package_code, player_name, player_emoji, is_revenge')
                 .eq('id', effectiveQueueId)
                 .maybeSingle();
 
@@ -175,6 +356,8 @@ export default function ResultPage({
                 if (queueData.player_name) {
                     useGameStore.getState().setIdentity(queueData.player_name, queueData.player_emoji || '😎');
                 }
+
+                setIsRevenge(!!queueData.is_revenge);
 
                 const effectiveSelections = (queueData.selected_animals as number[]) || selectedAnimals;
                 if (effectiveSelections.length > 0 && isMounted) {
@@ -334,6 +517,7 @@ export default function ResultPage({
                         if (newResult !== null) {
                             const selections = (payload.new.selected_animals as number[]) || dbSelectionsRef.current || selectedAnimalsRef.current;
                             const isWin = selections.includes(newResult);
+                            setIsRevenge(!!payload.new.is_revenge);
                             setStatus(isWin ? 'winning' : 'losing');
                         }
                     }
@@ -410,8 +594,13 @@ export default function ResultPage({
                     });
 
                     // Only auto-rejoin on LOSS. On WIN, we stay to claim prize.
+                    // ALSO: Don't auto-rejoin if they can play RPS (not revenge yet, and not played RPS yet)
                     if (status === 'losing') {
-                        setStatus('auto_rejoin');
+                        if (!isRevenge && !hasPlayedRps) {
+                            console.log("✋ Delaying auto-rejoin because RPS option is available.");
+                        } else {
+                            setStatus('auto_rejoin');
+                        }
                     }
                 } else {
                     // Package complete, clear localStorage
@@ -425,7 +614,7 @@ export default function ResultPage({
         // Wait 3 seconds before checking (let user see result)
         const timer = setTimeout(checkPackageStatus, 3000);
         return () => clearTimeout(timer);
-    }, [status, supabase]);
+    }, [status, supabase, isRevenge, hasPlayedRps]);
 
     // Auto-rejoin countdown
     useEffect(() => {
@@ -549,14 +738,6 @@ export default function ResultPage({
                     )}
                     <span className="font-black text-xs uppercase tracking-tight">{displayName}</span>
                 </div>
-
-                <Link
-                    href="/"
-                    className="bg-white/5 border border-white/10 py-1.5 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2"
-                >
-                    <span>📺</span>
-                    Cambiar Pantalla
-                </Link>
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center p-4">
@@ -619,7 +800,9 @@ export default function ResultPage({
 
                         <div className="bg-white text-gray-900 p-6 rounded-xl mb-6 transform rotate-2 shadow-2xl border-4 border-yellow-400 flex flex-col justify-center">
                             <p className="font-bold text-sm text-gray-400 uppercase tracking-widest mb-1">CÓDIGO DE CANJE</p>
-                            <p className="text-3xl font-black text-green-600 tracking-tighter leading-tight">PREMIO NIVEL 1</p>
+                            <p className="text-3xl font-black text-green-600 tracking-tighter leading-tight">
+                                {isRevenge ? 'PREMIO NIVEL 2' : 'PREMIO NIVEL 1'}
+                            </p>
                         </div>
 
                         <div className="bg-white p-4 rounded-3xl inline-block shadow-2xl transform -rotate-1">
@@ -662,11 +845,28 @@ export default function ResultPage({
                     </div>
                 )}
 
-                {status === 'losing' && (
+                {status === 'losing' && rpsPlaying && renderRpsGame()}
+
+                {status === 'losing' && !rpsPlaying && (
                     <div className="text-center animate-in fade-in slide-in-from-bottom-10 duration-500 max-w-sm w-full">
                         <div className="text-6xl mb-4 grayscale opacity-50">😢</div>
                         <h1 className="text-3xl font-bold text-gray-300 mb-2">¡Casi!</h1>
                         <p className="text-xl mb-8 text-gray-400">Hoy no fue tu día de suerte.</p>
+
+                        {!isRevenge && !hasPlayedRps && (
+                            <div className="bg-gradient-to-r from-orange-600/20 to-red-600/20 border border-orange-500/30 p-6 rounded-2xl mb-6 shadow-lg animate-in zoom-in duration-300">
+                                <h3 className="text-lg font-black text-orange-400 mb-1 flex items-center justify-center gap-2">🔥 ¿Quieres una Revancha?</h3>
+                                <p className="text-xs text-gray-300 mb-4 font-medium leading-relaxed">
+                                    ¡Juega a Piedra, Papel o Tijera contra la ruleta! Si ganas, obtienes un giro gratis para jugar por un Premio Nivel 2 (Consuelo).
+                                </p>
+                                <button
+                                    onClick={() => setRpsPlaying(true)}
+                                    className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-bold py-3.5 rounded-xl text-sm transition-all transform active:scale-95 shadow-md shadow-orange-500/20"
+                                >
+                                    ¡Jugar Revancha! ✊✋✌️
+                                </button>
+                            </div>
+                        )}
 
                         <div className="bg-gray-800 p-8 rounded-2xl mb-8 border border-gray-700">
                             <p className="text-gray-400 italic">"El que la sigue la consigue"</p>

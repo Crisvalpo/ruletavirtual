@@ -303,14 +303,14 @@ export default function ScreenControlDashboard() {
                                         <label className="text-[9px] uppercase text-slate-400 font-black tracking-widest">
                                             Velocidad
                                         </label>
-                                        <span className="text-[10px] font-black text-indigo-600">{screen.idle_speed?.toFixed(1) || '1.0'}x</span>
+                                        <span className="text-[10px] font-black text-indigo-600">{screen.idle_speed?.toFixed(1) || '4.0'}x</span>
                                     </div>
                                     <input
                                         type="range"
                                         min="0.1"
                                         max="8.0"
                                         step="0.1"
-                                        value={screen.idle_speed || 1.0}
+                                        value={screen.idle_speed || 4.0}
                                         onChange={async (e) => {
                                             const val = parseFloat(e.target.value);
                                             // Optimistic update locally

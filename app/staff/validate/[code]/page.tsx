@@ -22,6 +22,7 @@ interface PrizeData {
     player_emoji: string;
     prize_payout_status: 'pending' | 'paid' | 'not_applicable';
     created_at: string;
+    prize_won: string | null;
 }
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -67,7 +68,7 @@ function ValidateContent({
             // 2. Fetch Prizes associated with this ticket (package_id in player_queue)
             const { data: prizesData } = await supabase
                 .from('player_queue')
-                .select('id, screen_number, player_name, player_emoji, prize_payout_status, created_at')
+                .select('id, screen_number, player_name, player_emoji, prize_payout_status, created_at, prize_won')
                 .eq('package_id', ticketData.id)
                 .order('created_at', { ascending: false });
 
@@ -209,7 +210,14 @@ function ValidateContent({
                                                 <span className="text-3xl flex-none">{prize.player_emoji}</span>
                                             )}
                                             <div>
-                                                <p className="font-bold text-white uppercase tracking-tight">{prize.player_name}</p>
+                                                <p className="font-bold text-white uppercase tracking-tight flex items-center gap-2">
+                                                    <span>{prize.player_name}</span>
+                                                    {prize.prize_won && (
+                                                        <span className="text-[9px] px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded border border-yellow-500/30 font-black">
+                                                            {prize.prize_won}
+                                                        </span>
+                                                    )}
+                                                </p>
                                                 <p className="text-[10px] text-gray-500 uppercase">Pantalla {prize.screen_number} • {new Date(prize.created_at).toLocaleTimeString()}</p>
                                             </div>
                                         </div>
@@ -242,7 +250,14 @@ function ValidateContent({
                                                 <span className="text-xl flex-none">{prize.player_emoji}</span>
                                             )}
                                             <div>
-                                                <p className="font-bold text-white text-xs">{prize.player_name}</p>
+                                                <p className="font-bold text-white text-xs flex items-center gap-1.5">
+                                                    <span>{prize.player_name}</span>
+                                                    {prize.prize_won && (
+                                                        <span className="text-[8px] px-1.5 py-0.2 bg-yellow-500/10 text-yellow-500/80 rounded border border-yellow-500/10 font-bold">
+                                                            {prize.prize_won}
+                                                        </span>
+                                                    )}
+                                                </p>
                                                 <p className="text-[8px] text-gray-500">PAGADO EL {new Date(prize.created_at).toLocaleDateString()}</p>
                                             </div>
                                         </div>

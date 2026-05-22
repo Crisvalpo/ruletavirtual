@@ -58,6 +58,59 @@ export default function HomePage() {
     const [activeScreens, setActiveScreens] = React.useState<number[]>([]);
     const supabase = React.useMemo(() => createClient(), []);
 
+    // Configuration of active screens (background image, category, name)
+    const [screensConfig, setScreensConfig] = React.useState<Record<number, {
+        screen_number: number;
+        current_wheel_id: string | null;
+        image_preview: string | null;
+        background_image: string | null;
+        wheel_name: string | null;
+    }>>({});
+
+    const fetchScreensConfig = React.useCallback(async () => {
+        try {
+            const { data, error } = await supabase
+                .from('screen_state')
+                .select(`
+                    screen_number,
+                    current_wheel_id,
+                    individual_wheels (
+                        name,
+                        image_preview,
+                        background_image
+                    )
+                `);
+
+            if (error) {
+                console.error("Error al obtener la configuración de pantallas:", error);
+                return;
+            }
+
+            if (data) {
+                const config: any = {};
+                data.forEach((row: any) => {
+                    const wheel = row.individual_wheels as any;
+                    config[row.screen_number] = {
+                        screen_number: row.screen_number,
+                        current_wheel_id: row.current_wheel_id,
+                        image_preview: wheel?.image_preview || null,
+                        background_image: wheel?.background_image || null,
+                        wheel_name: wheel?.name || null,
+                    };
+                });
+                setScreensConfig(config);
+            }
+        } catch (err) {
+            console.error("Excepción al obtener configuración de pantallas:", err);
+        }
+    }, [supabase]);
+
+    const getFullUrl = (path: string | null) => {
+        if (!path) return null;
+        const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+        return path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`;
+    };
+
     React.useEffect(() => {
         const channel = supabase.channel('global_presence_monitor');
 
@@ -82,6 +135,30 @@ export default function HomePage() {
             supabase.removeChannel(channel);
         };
     }, [supabase]);
+
+    React.useEffect(() => {
+        fetchScreensConfig();
+
+        const channel = supabase
+            .channel('screen_state_changes_home')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'screen_state'
+                },
+                () => {
+                    console.log('🔄 Cambios detectados en screen_state, recargando config de pantallas...');
+                    fetchScreensConfig();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [supabase, fetchScreensConfig]);
 
     React.useEffect(() => {
         if (isStandalone === true || isStaff) {
@@ -233,6 +310,10 @@ export default function HomePage() {
                 <div className="grid grid-cols-2 gap-4">
                     {[1, 2, 3, 4].map((id) => {
                         const isActive = activeScreens.includes(id);
+                        const screenConf = screensConfig[id];
+                        const previewPath = screenConf?.image_preview || 'mario/selector/1.jpg';
+                        const imageUrl = getFullUrl(previewPath);
+
                         return (
                             <Link
                                 key={id}
@@ -240,30 +321,48 @@ export default function HomePage() {
                                 className={`
                                     relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-500 group overflow-hidden border-2
                                     ${isActive
-                                        ? 'bg-white shadow-[0_20px_40px_rgba(255,255,255,0.1)] border-transparent hover:scale-[1.05] active:scale-95'
+                                        ? 'border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:scale-[1.05] active:scale-95 hover:border-white/20'
                                         : 'bg-white/5 border-white/5 grayscale pointer-events-none opacity-40'
                                     }
                                 `}
                             >
-                                {/* Active Glow */}
+                                {/* Background Image with Blur (Active screens) */}
+                                {isActive && imageUrl && (
+                                    <>
+                                        <img
+                                            src={imageUrl}
+                                            alt={`Pantalla ${id}`}
+                                            className="absolute inset-0 w-full h-full object-cover filter blur-[4px] scale-110 group-hover:scale-125 transition-transform duration-700 opacity-60"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
+                                    </>
+                                )}
+
+                                {/* Active Glow Effect */}
                                 {isActive && (
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                 )}
 
                                 {/* Number Icon/Text */}
                                 <span className={`
-                                    text-[10rem] font-black leading-none tracking-tighter transition-all duration-500
-                                    ${isActive ? 'text-primary' : 'text-white/10'}
+                                    text-[10rem] font-black leading-none tracking-tighter transition-all duration-500 select-none z-10
+                                    ${isActive 
+                                        ? 'text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] group-hover:scale-110' 
+                                        : 'text-white/10'
+                                    }
                                 `}>
                                     {id}
                                 </span>
 
                                 {/* Status Label */}
                                 <div className={`
-                                    absolute bottom-6 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md transition-all
-                                    ${isActive ? 'bg-primary/10 text-primary' : 'bg-white/5 text-white/20'}
+                                    absolute bottom-6 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md transition-all z-10 border
+                                    ${isActive 
+                                        ? 'bg-black/40 text-emerald-400 border-emerald-500/20 shadow-[0_4px_12px_rgba(0,0,0,0.25)]' 
+                                        : 'bg-white/5 text-white/20 border-white/5'
+                                    }
                                 `}>
-                                    <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-primary animate-pulse' : 'bg-white/20'}`} />
+                                    <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-white/20'}`} />
                                     <span className="text-[10px] font-black uppercase tracking-widest">
                                         {isActive ? 'En Línea' : 'Offline'}
                                     </span>

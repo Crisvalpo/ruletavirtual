@@ -25,7 +25,7 @@ export default function WheelCanvas({
     isIdle = false,
     targetIndex = null,
     segments,
-    idleSpeed = 1.0, // New Prop
+    idleSpeed = 4.0, // New Prop
     className = ""
 }: WheelCanvasProps & { className?: string; idleSpeed?: number }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);

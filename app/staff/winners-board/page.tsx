@@ -65,7 +65,7 @@ function WinnersBoardContent() {
 
                 return {
                     ...item,
-                    prize_won: didWin ? 'Premio Nivel 1' : null,
+                    prize_won: item.prize_won || (didWin ? 'PREMIO NIVEL 1' : null),
                     wheel_name: 'Ruleta Individual',
                     selected_animals: item.selected_animals || []
                 };

@@ -713,6 +713,20 @@ export default function DisplayScreenPage({
                     });
                 }
             }
+            // NEW CASE: Stuck on selecting (Player AWOL during animal selection)
+            else if (screenData?.status === 'selecting') {
+                const lastUpdate = new Date(screenData.updated_at).getTime();
+                const now = new Date().getTime();
+                const diffSeconds = (now - lastUpdate) / 1000;
+
+                if (diffSeconds > 120) { // 120s timeout
+                    console.warn('⚠️ TV Watchdog: Player taking too long to select! Advancing...');
+                    await supabase.rpc('force_advance_queue', {
+                        p_screen_number: screenIdNum,
+                        p_expected_queue_id: screenData.current_queue_id
+                    });
+                }
+            }
         };
 
         const interval = setInterval(checkPromotion, 5000); // Check every 5s
@@ -845,13 +859,12 @@ export default function DisplayScreenPage({
                     {/* Top Left Container: Info & Queue */}
                     <div className="absolute top-[3vh] left-[3vh] z-40 flex flex-col gap-[1.5vh] items-start max-w-[40%]">
                         {/* 1. Main Info Card */}
-                        <div className="bg-white/10 backdrop-blur-md px-[2vw] py-[1.5vh] rounded-[1.5vh] border border-white/20 flex items-center gap-[1.5vw] shadow-lg">
-                            <div>
-                                <h2 className="text-[2.2vh] font-bold text-white leading-tight">Pantalla {screen}</h2>
-                                <div className="flex items-center gap-[0.5vw] mt-[0.5vh]">
-                                    <div className="w-[1.2vh] h-[1.2vh] bg-green-500 rounded-full animate-pulse"></div>
-                                    <span className="text-[1.3vh] text-gray-300">Conectado</span>
-                                </div>
+                        <div className="bg-white/10 backdrop-blur-md px-[1.5vw] py-[1vh] rounded-[2vh] border border-white/20 flex items-center gap-[1.5vw] shadow-lg">
+                            {/* Número Grande Verde Parpadeante */}
+                            <div className="flex items-center justify-center bg-black/40 backdrop-blur-md w-[6.5vh] h-[6.5vh] rounded-xl border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.15)] flex-none">
+                                <span className="text-[4.5vh] font-black text-green-400 animate-pulse drop-shadow-[0_0_8px_rgba(74,222,128,0.6)] select-none leading-none">
+                                    {screen}
+                                </span>
                             </div>
 
                             {/* Player Identity Badge */}
@@ -922,7 +935,7 @@ export default function DisplayScreenPage({
                                     <WheelCanvas
                                         isSpinning={storeStatus === 'spinning'}
                                         isIdle={storeStatus === 'idle'}
-                                        idleSpeed={idleSpeed || 1.0}
+                                        idleSpeed={idleSpeed || 4.0}
                                         targetIndex={result}
                                         onSpinComplete={handleSpinComplete}
                                         segments={activeWheelAssets?.segments}

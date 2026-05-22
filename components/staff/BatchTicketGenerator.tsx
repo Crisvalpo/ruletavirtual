@@ -87,13 +87,12 @@ export default function BatchTicketGenerator({ generateCode }: BatchTicketGenera
     };
 
     const handleActivateBatch = async () => {
-        if (!batchTimestamp) return;
+        if (lastBatch.length === 0) return;
         setIsActivating(true);
         try {
-            // Updated RPC to handle sale_status change
+            // Se llama al nuevo RPC pasando el arreglo de códigos
             const { data, error } = await supabase.rpc('activate_ticket_batch', {
-                p_created_via: 'kiosk_batch',
-                p_created_at_after: batchTimestamp
+                p_codes: lastBatch
             });
 
             if (error) throw error;

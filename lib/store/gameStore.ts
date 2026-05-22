@@ -41,7 +41,7 @@ export const useGameStore = create<GameState>()(
             status: 'idle',
             lastSpinResult: null,
             isDemo: false,
-            idleSpeed: 1.0,
+            idleSpeed: 4.0,
             gameMode: 'individual',
             activeWheelId: null,
             selectedAnimals: [],

@@ -53,7 +53,7 @@ export function useRealtimeGame(screenId: string) {
                     useGameStore.setState({
                         status: 'spinning',
                         isDemo: data.is_demo || false,
-                        idleSpeed: data.idle_speed || 1.0,
+                        idleSpeed: data.idle_speed || 4.0,
                         currentQueueId: data.current_queue_id,
                         lastSpinResult: data.last_spin_result
                     });
@@ -61,7 +61,7 @@ export function useRealtimeGame(screenId: string) {
                     useGameStore.setState({
                         status: 'idle',
                         isDemo: data.is_demo || false,
-                        idleSpeed: data.idle_speed || 1.0,
+                        idleSpeed: data.idle_speed || 4.0,
                         currentQueueId: data.current_queue_id
                     });
                 }
@@ -108,7 +108,7 @@ export function useRealtimeGame(screenId: string) {
                         useGameStore.setState({
                             status: 'spinning',
                             isDemo: newState.is_demo || false,
-                            idleSpeed: newState.idle_speed || 1.0,
+                            idleSpeed: newState.idle_speed || 4.0,
                             currentQueueId: newState.current_queue_id,
                             lastSpinResult: newState.last_spin_result
                         });
@@ -116,7 +116,7 @@ export function useRealtimeGame(screenId: string) {
                         useGameStore.setState({
                             status: 'result',
                             isDemo: newState.is_demo || false,
-                            idleSpeed: newState.idle_speed || 1.0,
+                            idleSpeed: newState.idle_speed || 4.0,
                             currentQueueId: newState.current_queue_id,
                             lastSpinResult: newState.last_spin_result
                         });
@@ -124,7 +124,7 @@ export function useRealtimeGame(screenId: string) {
                         useGameStore.setState({
                             status: 'idle',
                             isDemo: newState.is_demo || false,
-                            idleSpeed: newState.idle_speed || 1.0,
+                            idleSpeed: newState.idle_speed || 4.0,
                             currentQueueId: newState.current_queue_id,
                             lastSpinResult: null
                         });

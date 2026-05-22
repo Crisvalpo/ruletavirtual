@@ -21,6 +21,7 @@ export default function PreSelectPage({
 
     const mode = useGameStore((state) => state.gameMode);
     const { selectedAnimals, activeWheelId, nickname, emoji, setQueueId, queueId } = useGameStore();
+    const isRevenge = searchParams.get('isRevenge') === 'true';
 
     // Estado local para wheelId
     const [currentLocalWheelId, setCurrentLocalWheelId] = useState<string | null>(activeWheelId);
@@ -140,6 +141,7 @@ export default function PreSelectPage({
                 status: 'waiting', // Entra directo a WAITING
                 selected_wheel_id: currentLocalWheelId || null,
                 selected_animals: selectedAnimals, // SELECCIÓN PREVIA!
+                is_revenge: isRevenge, // Flag de revancha
                 created_at: new Date().toISOString()
             };
 
@@ -198,6 +200,11 @@ export default function PreSelectPage({
                         </p>
                     </div>
                 </div>
+                {isRevenge && (
+                    <div className="mt-2 px-3 py-1.5 bg-gradient-to-r from-orange-600/20 to-red-600/20 border border-orange-500/30 rounded-lg text-center animate-in slide-in-from-top duration-300">
+                        <span className="text-xs font-bold text-orange-400">🔥 GIRO DE REVANCHA ACTIVADO (Premio Nivel 2)</span>
+                    </div>
+                )}
             </header>
 
             {/* Selector Reutilizable */}
