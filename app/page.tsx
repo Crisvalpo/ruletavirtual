@@ -332,10 +332,10 @@ export default function HomePage() {
                                         <img
                                             src={imageUrl}
                                             alt={`Pantalla ${id}`}
-                                            className={`absolute inset-0 w-full h-full object-cover filter blur-[3px] scale-110 group-hover:scale-125 transition-transform duration-700
-                                                ${isActive ? 'opacity-55' : 'opacity-20 grayscale-[40%]'}`}
+                                            className={`absolute inset-0 w-full h-full object-cover filter blur-[1.5px] scale-110 group-hover:scale-125 transition-transform duration-700
+                                                ${isActive ? 'opacity-80' : 'opacity-45 grayscale-[20%]'}`}
                                         />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/30" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
                                     </>
                                 )}
 
