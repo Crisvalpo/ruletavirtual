@@ -986,13 +986,15 @@ export default function DisplayScreenPage({
                         : 'w-[22vw] min-w-[260px] max-w-[340px] opacity-100 translate-x-0'
                     }`}
                 >
-                    {/* Header Text */}
-                    <h3 className="text-[3vh] font-black text-white leading-tight mb-[0.5vh] tracking-tight">¡Juega Ahora!</h3>
-                    <p className="text-[2vh] text-primary font-extrabold mb-[0.2vh] uppercase tracking-wide">Escanea para unirte</p>
-                    <p className="text-[1.5vh] text-gray-400 mb-[2vh]">Solo $1,000 por jugada</p>
+                    {/* Header Text Group */}
+                    <div className="flex flex-col items-center flex-none">
+                        <h3 className="text-[3vh] font-black text-white leading-tight mb-[0.5vh] tracking-tight">¡Juega Ahora!</h3>
+                        <p className="text-[2vh] text-primary font-extrabold mb-[0.2vh] uppercase tracking-wide">Escanea para unirte</p>
+                        <p className="text-[1.5vh] text-gray-400 mb-[2vh]">Solo $1,000 por jugada</p>
+                    </div>
 
                     {/* QR Code */}
-                    <div className="bg-white p-[1.5vh] rounded-[2vh] shadow-2xl mb-[2vh] transform hover:scale-105 transition-all w-[18vh] h-[18vh] max-w-[85%] max-h-[180px] flex items-center justify-center aspect-square">
+                    <div className="bg-white p-[1.5vh] rounded-[2vh] shadow-2xl transform hover:scale-105 transition-all w-[18vh] h-[18vh] max-w-[85%] max-h-[180px] flex items-center justify-center aspect-square flex-none">
                         {clientUrl && (
                             <QRCodeCanvas
                                 value={`${(baseUrl || clientUrl).trim()}/individual/screen/${screen}`}
@@ -1004,9 +1006,12 @@ export default function DisplayScreenPage({
                         )}
                     </div>
 
+                    {/* Spacer principal para separar QR de Historial (crece dinámicamente) */}
+                    <div className="flex-grow min-h-[3vh]" />
+
                     {/* History Grid */}
                     <div className="w-full max-w-[220px] flex-none">
-                        <h4 className="text-[1.3vh] uppercase tracking-wider text-gray-500 mb-[1vh] border-b border-white/10 pb-[0.5vh] leading-none">Últimos 9</h4>
+                        <h4 className="text-[1.3vh] uppercase tracking-wider text-gray-500 mb-[1.5vh] border-b border-white/10 pb-[0.5vh] leading-none">Últimos 9</h4>
                         <div className="grid grid-cols-3 gap-[0.8vh]">
                             {[...lastSpins, ...Array(9)].slice(0, 9).map((spin, i) => {
                                 let imageSrc = null;
@@ -1039,8 +1044,11 @@ export default function DisplayScreenPage({
                         </div>
                     </div>
 
+                    {/* Spacer secundario para separar Historial del Debug Info */}
+                    <div className="flex-grow min-h-[2vh]" />
+
                     {/* Staff Debug Info */}
-                    <div className="mt-auto opacity-30 hover:opacity-100 transition-opacity text-[1.1vh] text-gray-500 text-left w-full pt-[1.5vh] leading-normal flex-none">
+                    <div className="opacity-30 hover:opacity-100 transition-opacity text-[1.1vh] text-gray-500 text-left w-full pt-[1.5vh] leading-normal flex-none border-t border-white/5">
                         Mode: {venueMode} | Central: {centralScreenId} <br />
                         Evt: {isGroupEvent ? 'Yes' : 'No'} | St: {status}
                     </div>
