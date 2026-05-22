@@ -48,8 +48,15 @@ export default function PaymentPage({
     const { nickname, emoji, setQueueId } = useGameStore();
     const { user, profile, refreshProfile } = useAuth();
 
+    const [hasHydrated, setHasHydrated] = useState(false);
+
+    useEffect(() => {
+        setHasHydrated(true);
+    }, []);
+
     // Redirect to entry if no identity configured
     useEffect(() => {
+        if (!hasHydrated) return;
         if (nickname === 'Jugador') {
             const wheelId = searchParams.get('wheelId');
             const redirectUrl = wheelId
@@ -57,7 +64,7 @@ export default function PaymentPage({
                 : `/individual/screen/${id}`;
             router.push(redirectUrl);
         }
-    }, [nickname, id, searchParams, router]);
+    }, [nickname, id, searchParams, router, hasHydrated]);
 
     // Demo Mode State
     const demoSpins = Math.max(0, 2 - (profile?.demo_spins_used ?? 0));

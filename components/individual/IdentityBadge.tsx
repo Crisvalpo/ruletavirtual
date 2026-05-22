@@ -14,7 +14,20 @@ export default function IdentityBadge() {
         resetIdentity();
     };
 
-    if (isLoading || !user) return <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse" />;
+    if (isLoading) {
+        return <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse" />;
+    }
+
+    if (!user) {
+        return (
+            <Link
+                href="/auth/login"
+                className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg active:scale-95 flex items-center gap-1.5"
+            >
+                <span>🔑</span> Iniciar Sesión
+            </Link>
+        );
+    }
 
     return (
         <div className="flex items-center gap-2 bg-[#1a1a1a] border border-white/5 p-1.5 rounded-2xl shadow-xl">

@@ -12,6 +12,19 @@ export default function HomePage() {
     const router = useRouter();
     const [isStandalone, setIsStandalone] = React.useState<boolean | null>(null);
     const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
+    const [showInstallModal, setShowInstallModal] = React.useState(false);
+
+    const handleInstallPromptTrigger = async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                setDeferredPrompt(null);
+            }
+        } else {
+            setShowInstallModal(true);
+        }
+    };
 
     const isAdmin = profile?.role === 'admin' || user?.email === 'cristianluke@gmail.com' || user?.email === 'tortolasluke@gmail.com';
     const isStaff = profile?.role === 'staff' || isAdmin;
@@ -186,81 +199,8 @@ export default function HomePage() {
         return <div className="min-h-screen bg-[#050505]" />;
     }
 
-    // 2. Landing Page (Not PWA and Not Staff)
-    if (isStandalone === false && !isStaff) {
-        return (
-            <main className="min-h-screen flex flex-col items-center justify-center bg-[#050505] p-6 text-center space-y-8">
-                <div className="w-24 h-24 bg-white/5 backdrop-blur-xl rounded-3xl flex items-center justify-center shadow-2xl animate-bounce border border-white/10 overflow-hidden p-4">
-                    <img
-                        src="/icons/icon-512x512.png"
-                        alt="Ruleta Icon"
-                        className="w-full h-full object-contain"
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <h1 className="text-4xl font-black text-white tracking-tighter">RULETA ANIMALITOS</h1>
-                    <p className="text-gray-400 font-medium">Instala la aplicación para jugar</p>
-                </div>
-
-                <div className="w-full max-w-sm space-y-4">
-                    {/* iOS Instructions */}
-                    <div className="bg-white/5 border border-white/10 p-6 rounded-2xl text-left">
-                        <p className="text-white font-bold mb-2 flex items-center gap-2">
-                            <span>🍎</span> Usuarios iPhone (iOS)
-                        </p>
-                        <ol className="text-sm text-gray-400 space-y-2 list-decimal ml-4">
-                            <li>Presiona el botón <span className="text-blue-400 font-bold">Compartir</span> (cuadrado con flecha)</li>
-                            <li>Baja y elige <span className="text-white font-bold">"Agregar al inicio"</span></li>
-                        </ol>
-                    </div>
-
-                    {/* Android Instructions / APK / Native Install */}
-                    <div className="bg-white/5 border border-white/10 p-6 rounded-2xl text-left">
-                        <p className="text-white font-bold mb-2 flex items-center gap-2">
-                            <span>🤖</span> Usuarios Android
-                        </p>
-
-                        {deferredPrompt ? (
-                            <div className="space-y-3">
-                                <p className="text-sm text-gray-400">¡Tu dispositivo es compatible con la instalación directa!</p>
-                                <button
-                                    onClick={handleInstallClick}
-                                    className="w-full bg-yellow-500 hover:bg-yellow-400 text-black py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg shadow-yellow-500/20 active:scale-95 text-sm"
-                                >
-                                    📥 Instalar AHORA
-                                </button>
-                            </div>
-                        ) : (
-                            <>
-                                <p className="text-sm text-gray-400 mb-4">Instala directamente desde el menú de Chrome o descarga el acceso directo.</p>
-                                <button
-                                    disabled
-                                    className="w-full bg-white/10 text-white/30 py-3 rounded-xl font-bold cursor-not-allowed text-xs uppercase tracking-widest"
-                                >
-                                    APK Próximamente
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                <div className="pt-8 flex flex-col items-center gap-4">
-                    <p className="text-[10px] text-gray-600 uppercase font-black tracking-[0.3em]">Acceso Exclusivo App</p>
-                    {/* Subtle Staff Bypass */}
-                    <Link
-                        href="/auth/login"
-                        className="text-[9px] text-gray-800 hover:text-gray-400 transition-colors uppercase tracking-[0.3em] font-medium"
-                    >
-                        Acceso Staff
-                    </Link>
-                </div>
-            </main>
-        );
-    }
-
-    // 3. Security Layer (PWA or Staff) - Must be logged in to see the orange content
-    if (!user) {
+    // 2. Security Layer (PWA or Staff) - Must be logged in if in standalone or staff
+    if ((isStandalone === true || isStaff) && !user) {
         // Show black screen while redirecting to login
         return <div className="min-h-screen bg-[#050505]" />;
     }
@@ -306,6 +246,31 @@ export default function HomePage() {
                     </p>
                 </div>
 
+                {/* PWA Premium Promotion Banner */}
+                {isStandalone === false && (
+                    <div className="w-full mb-8 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/25 rounded-3xl p-6 relative overflow-hidden shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-500">
+                        {/* Decorative blur */}
+                        <div className="absolute -top-12 -right-12 w-24 h-24 bg-yellow-500/10 rounded-full blur-xl pointer-events-none" />
+                        <div className="flex items-center gap-4">
+                            <div className="text-4xl">📲</div>
+                            <div className="text-left">
+                                <h3 className="text-sm font-black text-yellow-500 uppercase tracking-wide">
+                                    ¡Juega con nuestra App Oficial!
+                                </h3>
+                                <p className="text-[10px] text-gray-400 font-medium max-w-xs leading-relaxed mt-1">
+                                    Instala la aplicación en tu celular para jugar sin interrupciones, guardar tus premios y participar en sorteos.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleInstallPromptTrigger}
+                            className="bg-yellow-500 hover:bg-yellow-400 text-black font-black px-5 py-3 rounded-xl text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-yellow-500/20 active:scale-95 flex-none text-center"
+                        >
+                            Instalar App 📥
+                        </button>
+                    </div>
+                )}
+
                 {/* 2x2 Premium Grid */}
                 <div className="grid grid-cols-2 gap-4">
                     {[1, 2, 3, 4].map((id) => {
@@ -314,26 +279,16 @@ export default function HomePage() {
                         const previewPath = screenConf?.image_preview || 'mario/selector/1.jpg';
                         const imageUrl = getFullUrl(previewPath);
 
-                        return (
-                            <Link
-                                key={id}
-                                href={`/individual/screen/${id}${scannedCode ? '?redeemCode=' + scannedCode : ''}`}
-                                className={`
-                                    relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-500 group overflow-hidden border-2
-                                    ${isActive
-                                        ? 'border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:scale-[1.05] active:scale-95 hover:border-white/20'
-                                        : 'bg-white/5 border-white/5 hover:scale-[1.02] active:scale-95 hover:border-white/10 opacity-70 hover:opacity-90'
-                                    }
-                                `}
-                            >
+                        const content = (
+                            <>
                                 {/* Background Image with Blur */}
                                 {imageUrl && (
                                     <>
                                         <img
                                             src={imageUrl}
                                             alt={`Pantalla ${id}`}
-                                            className={`absolute inset-0 w-full h-full object-cover filter blur-[1.5px] scale-110 group-hover:scale-125 transition-transform duration-700
-                                                ${isActive ? 'opacity-80' : 'opacity-45 grayscale-[20%]'}`}
+                                            className={`absolute inset-0 w-full h-full object-cover filter blur-[1.5px] scale-110 transition-transform duration-700
+                                                ${isActive ? 'group-hover:scale-125 opacity-80' : 'opacity-25 grayscale-[60%]'}`}
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
                                     </>
@@ -350,7 +305,7 @@ export default function HomePage() {
                                         absolute top-6 px-3.5 py-1.5 rounded-xl backdrop-blur-md border text-[9px] font-black uppercase tracking-widest z-10 transition-all duration-500
                                         ${isActive 
                                             ? 'bg-primary/25 text-primary border-primary/30 shadow-[0_4px_12px_rgba(249,115,22,0.15)] group-hover:scale-105' 
-                                            : 'bg-black/45 text-white/50 border-white/10 group-hover:text-white/70'
+                                            : 'bg-black/60 text-white/30 border-white/5'
                                         }
                                     `}>
                                         {screenConf.wheel_name}
@@ -362,7 +317,7 @@ export default function HomePage() {
                                     text-[10rem] font-black leading-none tracking-tighter transition-all duration-500 select-none z-10
                                     ${isActive 
                                         ? 'text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] group-hover:scale-105' 
-                                        : 'text-white/20 drop-shadow-[0_2px_6px_rgba(0,0,0,0.3)] group-hover:text-white/40 group-hover:scale-105'
+                                        : 'text-white/10 drop-shadow-[0_2px_6px_rgba(0,0,0,0.3)]'
                                     }
                                 `}>
                                     {id}
@@ -373,15 +328,36 @@ export default function HomePage() {
                                     absolute bottom-6 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md transition-all z-10 border
                                     ${isActive 
                                         ? 'bg-black/40 text-emerald-400 border-emerald-500/20 shadow-[0_4px_12px_rgba(0,0,0,0.25)]' 
-                                        : 'bg-black/40 text-white/30 border-white/5'
+                                        : 'bg-red-500/10 text-red-500 border-red-500/20 shadow-[0_4px_12px_rgba(239,68,68,0.15)]'
                                     }
                                 `}>
-                                    <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-white/20'}`} />
+                                    <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-red-500 animate-pulse'}`} />
                                     <span className="text-[10px] font-black uppercase tracking-widest">
                                         {isActive ? 'En Línea' : 'Offline'}
                                     </span>
                                 </div>
-                            </Link>
+                            </>
+                        );
+
+                        if (isActive) {
+                            return (
+                                <Link
+                                    key={id}
+                                    href={`/individual/screen/${id}${scannedCode ? '?redeemCode=' + scannedCode : ''}`}
+                                    className="relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-500 group overflow-hidden border-2 border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:scale-[1.05] active:scale-95 hover:border-white/20"
+                                >
+                                    {content}
+                                </Link>
+                            );
+                        }
+
+                        return (
+                            <div
+                                key={id}
+                                className="relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center border-2 bg-white/5 border-red-500/10 opacity-35 cursor-not-allowed select-none overflow-hidden"
+                            >
+                                {content}
+                            </div>
                         );
                     })}
                 </div>
@@ -428,6 +404,66 @@ export default function HomePage() {
             <div className="py-8 text-[8px] text-white/20 uppercase font-black tracking-[0.5em] z-0">
                 Premium Gaming Experience
             </div>
+
+            {/* Modal de Instrucciones de Instalación */}
+            {showInstallModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-[#111] border border-white/10 rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl relative overflow-hidden animate-in zoom-in duration-300">
+                        {/* Decorative glows */}
+                        <div className="absolute top-0 left-0 w-32 h-32 bg-primary/10 blur-2xl rounded-full" />
+                        <div className="absolute bottom-0 right-0 w-32 h-32 bg-indigo-500/10 blur-2xl rounded-full" />
+                        
+                        <button
+                            onClick={() => setShowInstallModal(false)}
+                            className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
+                                📥
+                            </div>
+                            <h2 className="text-xl font-black text-white uppercase tracking-tight">Instalar Aplicación</h2>
+                            <p className="text-xs text-gray-400 font-medium mt-1">Sigue estas instrucciones para guardar la app en tu celular</p>
+                        </div>
+
+                        <div className="space-y-4 mb-6">
+                            {/* iOS Instructions */}
+                            <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-left">
+                                <p className="text-white font-bold mb-2 flex items-center gap-2 text-xs uppercase tracking-wider">
+                                    <span>🍎</span> Dispositivos iOS (iPhone/iPad)
+                                </p>
+                                <ol className="text-xs text-gray-400 space-y-2 list-decimal ml-4">
+                                    <li>Abre esta web en el navegador <span className="text-white font-bold">Safari</span>.</li>
+                                    <li>Presiona el botón de <span className="text-blue-400 font-bold">Compartir</span> (icono de cuadro con flecha hacia arriba).</li>
+                                    <li>Desplázate hacia abajo y selecciona <span className="text-white font-bold">"Agregar al inicio"</span> o <span className="text-white font-bold">"Agregar a pantalla de inicio"</span>.</li>
+                                </ol>
+                            </div>
+
+                            {/* Android Instructions */}
+                            <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-left">
+                                <p className="text-white font-bold mb-2 flex items-center gap-2 text-xs uppercase tracking-wider">
+                                    <span>🤖</span> Dispositivos Android / PC
+                                </p>
+                                <ol className="text-xs text-gray-400 space-y-2 list-decimal ml-4">
+                                    <li>Abre el menú de tu navegador (los tres puntos arriba a la derecha).</li>
+                                    <li>Presiona <span className="text-white font-bold">"Instalar aplicación"</span> o <span className="text-white font-bold">"Agregar a pantalla de inicio"</span>.</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => setShowInstallModal(false)}
+                            className="w-full bg-white hover:bg-gray-100 text-gray-900 font-black py-4 rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95 shadow-lg"
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

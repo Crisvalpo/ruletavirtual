@@ -67,12 +67,19 @@ export default function PreSelectPage({
         }
     }, [searchParams]);
 
+    const [hasHydrated, setHasHydrated] = useState(false);
+
+    useEffect(() => {
+        setHasHydrated(true);
+    }, []);
+
     // Redirect to entry if no identity configured
     useEffect(() => {
+        if (!hasHydrated) return;
         if (nickname === 'Jugador') {
             router.push(`/individual/screen/${id}`);
         }
-    }, [nickname, id, router]);
+    }, [nickname, id, router, hasHydrated]);
 
     // 2. REALTIME BROADCAST (Restore visual magic)
     useEffect(() => {

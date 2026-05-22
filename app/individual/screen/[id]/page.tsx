@@ -20,6 +20,7 @@ export default function JoinScreenPage({
     const { nickname, emoji, resetGame, setScreenId, queueId, setQueueId } = useGameStore();
     const [hasIdentity, setHasIdentity] = useState(false);
     const [installStep, setInstallStep] = useState(true);
+    const [hasHydrated, setHasHydrated] = useState(false);
     const router = useRouter();
     const { user, isLoading } = useAuth();
     const searchParams = useSearchParams();
@@ -29,8 +30,9 @@ export default function JoinScreenPage({
     const [resolvingWheel, setResolvingWheel] = useState(true);
     const [checkingQueue, setCheckingQueue] = useState(!!queueId);
 
-    // Check for "continue in browser" preference
+    // Check for "continue in browser" preference and mounting
     useEffect(() => {
+        setHasHydrated(true);
         const skipped = localStorage.getItem('pwa_prompt_skipped') === 'true';
         if (skipped) {
             setInstallStep(false);
@@ -188,8 +190,8 @@ export default function JoinScreenPage({
 
     // --- FLOW STEPS ---
 
-    // 1. Initial Loading
-    if (isLoading || resolvingWheel || checkingQueue) {
+    // 1. Initial Loading or Hydrating
+    if (isLoading || resolvingWheel || checkingQueue || !hasHydrated) {
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-white space-y-6">
                 <div className="w-16 h-16 border-4 border-white/10 border-t-yellow-400 rounded-full animate-spin" />
@@ -201,8 +203,9 @@ export default function JoinScreenPage({
         );
     }
 
-    // 2. Install Prompt (if not in standalone and not skipped)
-    if (installStep) {
+    // 2. Install Prompt (only if not in standalone, not skipped, AND user has NO active identity)
+    const isPlayerDefault = nickname === 'Jugador';
+    if (installStep && isPlayerDefault) {
         return <PWAInstallPrompt onContinue={() => setInstallStep(false)} />;
     }
 
