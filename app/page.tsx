@@ -13,7 +13,7 @@ export default function HomePage() {
     const [isStandalone, setIsStandalone] = React.useState<boolean | null>(null);
     const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
 
-    const isAdmin = profile?.role === 'admin' || user?.email === 'cristianluke@gmail.com';
+    const isAdmin = profile?.role === 'admin' || user?.email === 'cristianluke@gmail.com' || user?.email === 'tortolasluke@gmail.com';
     const isStaff = profile?.role === 'staff' || isAdmin;
 
     // 0. Detect Standalone Mode & Capture Install Prompt

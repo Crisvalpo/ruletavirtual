@@ -12,6 +12,8 @@ import { useGameStore } from '@/lib/store/gameStore';
 import Confetti from 'react-confetti';
 import QueueList from '@/components/individual/QueueList';
 import { QRCodeCanvas } from 'qrcode.react';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
 // Remove useWindowSize if not strictly needed or ensure package is present.
 // The code used window.innerWidth directly inside the check, which is fine.
 
@@ -22,6 +24,21 @@ export default function DisplayScreenPage({
 }) {
     const { screen } = use(params);
     const screenIdNum = parseInt(screen);
+
+    // 0. Auth & Admin Security Check
+    const { user, profile, isLoading } = useAuth();
+    const router = useRouter();
+    const isAdmin = profile?.role === 'admin' || user?.email === 'cristianluke@gmail.com' || user?.email === 'tortolasluke@gmail.com';
+
+    useEffect(() => {
+        if (!isLoading) {
+            if (!user) {
+                router.push(`/auth/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+            } else if (!isAdmin) {
+                router.push('/not-authorized');
+            }
+        }
+    }, [user, isAdmin, isLoading, router]);
 
     // 1. Hooks
     useRealtimeGame(screen);
@@ -77,7 +94,7 @@ export default function DisplayScreenPage({
 
     // 2.5 Supabase Presence: Prevent Duplicate Screens (First One Wins)
     useEffect(() => {
-        if (!screenIdNum) return;
+        if (!screenIdNum || isLoading || !user || !isAdmin) return;
 
         const channel = supabase.channel('global_presence_monitor');
 
@@ -736,6 +753,15 @@ export default function DisplayScreenPage({
     // Derived Display Identity (Active or Preview)
     const displayNickname = (status === 'idle' && (!realNickname || realNickname === 'Jugador') && previewPlayer) ? previewPlayer.nickname : realNickname;
     const displayEmoji = (status === 'idle' && (!realNickname || realNickname === 'Jugador') && previewPlayer) ? previewPlayer.emoji : realEmoji;
+
+    if (isLoading || !user || !isAdmin) {
+        return (
+            <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center p-8 text-center font-sans">
+                <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4" />
+                <p className="text-slate-400 text-sm uppercase tracking-widest font-black">Verificando Credenciales de Administrador...</p>
+            </div>
+        );
+    }
 
     const isBlocked = isDuplicateScreen || isLocalDuplicate;
 

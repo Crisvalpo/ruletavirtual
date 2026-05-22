@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 email: currentUser.email,
                                 display_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || 'Jugador',
                                 avatar_url: currentUser.user_metadata?.avatar_url,
-                                role: emailToUse === 'cristianluke@gmail.com' ? 'admin' : 'player'
+                                role: (emailToUse === 'cristianluke@gmail.com' || emailToUse === 'tortolasluke@gmail.com') ? 'admin' : 'player'
                             });
 
                         if (!insertError) {
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (profileData && mounted) {
                 // FORCE ADMIN for specific user (Hard override)
                 const emailToUse = userEmail || user?.email;
-                if (emailToUse === 'cristianluke@gmail.com') {
+                if (emailToUse === 'cristianluke@gmail.com' || emailToUse === 'tortolasluke@gmail.com') {
                     profileData.role = 'admin';
                 }
                 setProfile(profileData);

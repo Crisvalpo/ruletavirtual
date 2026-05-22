@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
                 // No autenticado -> Enviar a Home
                 hasRedirected.current = true;
                 router.push('/');
-            } else if (user.email === 'cristianluke@gmail.com') {
+            } else if (user.email === 'cristianluke@gmail.com' || user.email === 'tortolasluke@gmail.com') {
                 // EXCEPCIÓN ADMIN: Permitir siempre
                 return;
             } else if (profile && !allowedRoles.includes(profile.role)) {
@@ -43,7 +43,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     }
 
     // Solo renderizar si el rol es válido o es el admin por email
-    const isExplicitAdmin = user?.email === 'cristianluke@gmail.com';
+    const isExplicitAdmin = user?.email === 'cristianluke@gmail.com' || user?.email === 'tortolasluke@gmail.com';
     if (user && (isExplicitAdmin || (profile && allowedRoles.includes(profile.role)))) {
         return <>{children}</>;
     }

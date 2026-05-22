@@ -3642,7 +3642,7 @@ BEGIN
     new.email,
     new.raw_user_meta_data->>'avatar_url',
     CASE 
-      WHEN new.email = 'cristianluke@gmail.com' THEN 'admin'
+      WHEN new.email = 'cristianluke@gmail.com' OR new.email = 'tortolasluke@gmail.com' THEN 'admin'
       ELSE 'player' 
     END
   )
