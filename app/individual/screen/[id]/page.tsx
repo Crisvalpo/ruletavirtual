@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import WheelSelector from '@/components/individual/WheelSelector';
 import NickEntry from '@/components/individual/NickEntry';
-import PWAInstallPrompt from '@/components/individual/PWAInstallPrompt';
 import IdentityBadge from '@/components/individual/IdentityBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { useGameStore } from '@/lib/store/gameStore';
@@ -19,7 +18,6 @@ export default function JoinScreenPage({
     const { id } = use(params);
     const { nickname, emoji, resetGame, setScreenId, queueId, setQueueId } = useGameStore();
     const [hasIdentity, setHasIdentity] = useState(false);
-    const [installStep, setInstallStep] = useState(true);
     const [hasHydrated, setHasHydrated] = useState(false);
     const router = useRouter();
     const { user, isLoading } = useAuth();
@@ -30,19 +28,10 @@ export default function JoinScreenPage({
     const [resolvingWheel, setResolvingWheel] = useState(true);
     const [checkingQueue, setCheckingQueue] = useState(!!queueId);
 
-    // Check for "continue in browser" preference and mounting
+    // Set hydrated state on mount
     useEffect(() => {
         setHasHydrated(true);
-        const skipped = localStorage.getItem('pwa_prompt_skipped') === 'true';
-        if (skipped) {
-            setInstallStep(false);
-        }
     }, []);
-
-    const handleSkipInstall = () => {
-        setInstallStep(false);
-        localStorage.setItem('pwa_prompt_skipped', 'true');
-    };
 
     // 0. Force Auth
     useEffect(() => {
@@ -203,11 +192,7 @@ export default function JoinScreenPage({
         );
     }
 
-    // 2. Install Prompt (only if not in standalone, not skipped, AND user has NO active identity)
-    const isPlayerDefault = nickname === 'Jugador';
-    if (installStep && isPlayerDefault) {
-        return <PWAInstallPrompt onContinue={() => setInstallStep(false)} />;
-    }
+
 
     // 3. Identity Setup
     if (!hasIdentity) {
