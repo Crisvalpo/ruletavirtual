@@ -78,11 +78,11 @@ function ValidateContent({
             if (ticketData) {
                 setTicket(ticketData as any);
 
-                // 2. Traer premios asociados con este combo
+                // 2. Traer premios asociados con este combo (buscando por package_id o por package_code)
                 const { data: prizesData } = await supabase
                     .from('player_queue')
                     .select('id, screen_number, player_name, player_emoji, prize_payout_status, created_at, prize_won, package_code')
-                    .eq('package_id', ticketData.id)
+                    .or(`package_id.eq.${ticketData.id},package_code.eq.${ticketData.code}`)
                     .order('created_at', { ascending: false });
 
                 if (prizesData) {
@@ -116,12 +116,12 @@ function ValidateContent({
                     setSinglePrize(prizeData as any);
                     setPrizes([prizeData as any]);
 
-                    // Si el premio tiene package_id, traer info del combo asociado
-                    if (prizeData.package_id) {
+                    // Si el premio tiene package_id o package_code, traer info del combo asociado
+                    if (prizeData.package_id || prizeData.package_code) {
                         const { data: assocTicket } = await supabase
                             .from('game_packages')
                             .select('*')
-                            .eq('id', prizeData.package_id)
+                            .or(`id.eq.${prizeData.package_id || '00000000-0000-0000-0000-000000000000'},code.eq.${prizeData.package_code || ''}`)
                             .maybeSingle();
                         if (assocTicket) {
                             setAssociatedTicket(assocTicket as any);
