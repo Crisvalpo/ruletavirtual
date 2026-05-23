@@ -95,12 +95,14 @@ export default function PreSelectPage({
                 }
             }
 
-            // 2. Si no hay ticket de pago activo en localStorage y no es una revancha activa en Zustand/URL,
-            // significa que la sesión expiró y volvió atrás. Redirigir a inicio.
+            // 2. Si no hay ticket de pago activo en localStorage, no es una revancha activa,
+            // y tampoco hay una autorización temporal de pago, significa que volvió atrás de forma ilegal.
             const storedPackage = localStorage.getItem('current_package');
             const isRev = searchParams.get('isRevenge') === 'true' || storeIsRevenge;
-            if (!storedPackage && !isRev) {
-                console.warn("🚫 No se detectó ticket de pago activo ni revancha. Redirigiendo al selector.");
+            const isPayAuth = sessionStorage.getItem('payment_authorized') === 'true';
+
+            if (!storedPackage && !isRev && !isPayAuth) {
+                console.warn("🚫 No se detectó ticket de pago activo, revancha ni autorización de pago. Redirigiendo al selector.");
                 router.push('/');
                 return;
             }
@@ -211,6 +213,9 @@ export default function PreSelectPage({
             if (data && !error) {
                 console.log("✅ Joined Queue with Selections:", data.id);
                 setQueueId(data.id);
+
+                // Consumir la autorización de pago
+                sessionStorage.removeItem('payment_authorized');
 
                 // Redirigir a página de espera (o select si falla algo, pero debería ir a waiting)
                 // Usamos la página 'select' actual del sistema que maneja el estado 'waiting' también

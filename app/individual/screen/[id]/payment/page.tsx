@@ -141,6 +141,8 @@ export default function PaymentPage({
         // Clear previous package info to distinguish Cash play
         if (method === 'cash' || method === 'mercadopago') {
             localStorage.removeItem('current_package');
+            // Marcar que hay un pago autorizado temporal en esta sesión
+            sessionStorage.setItem('payment_authorized', 'true');
         }
 
         // Redirect to Pre-Select directly
@@ -216,6 +218,8 @@ export default function PaymentPage({
                     totalSpins: data.total_spins,
                     code: cleanCode
                 }));
+                // Marcar que hay un pago autorizado temporal en esta sesión
+                sessionStorage.setItem('payment_authorized', 'true');
 
                 // REDIRECT TO PRE-SELECTION
                 console.log("✅ Code Validated. Redirecting to Pre-Selection.");
