@@ -35,7 +35,6 @@ function KioskContent() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [customPlays, setCustomPlays] = useState(1);
     const [customPrice, setCustomPrice] = useState(1000);
-    const [buyerName, setBuyerName] = useState('');
 
     // Dynamic settings for ticket
     const [settings, setSettings] = useState({
@@ -85,14 +84,13 @@ function KioskContent() {
                     total_plays: pkg.plays,
                     price_paid: pkg.price,
                     valid_until: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
-                    buyer_name: buyerName || 'Cliente',
+                    buyer_name: 'Cliente',
                     created_via: 'kiosk',
                     is_activated: true, // Individual sales are pre-activated
                     sale_status: 'sold' // Born as sale
                 });
             if (error) throw error;
             setGeneratedCode(code);
-            setBuyerName('');
         } catch (err) {
             console.error('Error generando ticket:', err);
             alert('Error al generar el ticket. Intenta de nuevo.');
@@ -113,14 +111,13 @@ function KioskContent() {
                     total_plays: customPlays,
                     price_paid: customPrice,
                     valid_until: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
-                    buyer_name: buyerName || 'Cliente',
+                    buyer_name: 'Cliente',
                     created_via: 'kiosk',
                     is_activated: true, // Individual sales are pre-activated
                     sale_status: 'sold' // Born as sale
                 });
             if (error) throw error;
             setGeneratedCode(code);
-            setBuyerName('');
             setCustomPlays(1);
             setCustomPrice(1000);
         } catch (err) {
@@ -218,19 +215,6 @@ function KioskContent() {
             )}
 
             <div className="max-w-5xl mx-auto grid gap-6">
-                <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl">
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-                        Nombre del Cliente (Opcional)
-                    </label>
-                    <input
-                        type="text"
-                        value={buyerName}
-                        onChange={(e) => setBuyerName(e.target.value)}
-                        placeholder="Ej: Juan Pérez"
-                        className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white focus:border-yellow-500 outline-none text-lg"
-                    />
-                </div>
-
                 <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl">
                     <h3 className="text-xl font-black text-white mb-6 uppercase tracking-tight">⚡ Packs Rápidos</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

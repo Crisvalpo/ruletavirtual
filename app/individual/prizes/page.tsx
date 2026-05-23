@@ -189,7 +189,7 @@ export default function MyPrizesPage() {
                         {/* QR Code Container */}
                         <div className="bg-white p-4 rounded-3xl inline-block shadow-2xl mb-6">
                             <QRCodeCanvas
-                                value={`${window.location.origin}/staff/validate/${activePrizeForQr.package_code || activePrizeForQr.id.slice(0, 8)}`}
+                                value={`${window.location.origin}/staff/validate/${activePrizeForQr.package_code || activePrizeForQr.id}`}
                                 size={180}
                                 level="H"
                                 includeMargin={false}

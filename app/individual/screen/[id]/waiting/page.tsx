@@ -5,6 +5,7 @@ import { use, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useGameStore } from '@/lib/store/gameStore';
 import ScreenSwitchNotification from '@/components/individual/ScreenSwitchNotification';
+import { safeRedirect } from '@/lib/navigation';
 
 export default function WaitingPage({
     params
@@ -38,7 +39,7 @@ export default function WaitingPage({
                 .single();
 
             if (data?.status === 'playing') {
-                router.push(`/individual/screen/${id}/spin`);
+                safeRedirect(router, `/individual/screen/${id}/spin`);
             }
         };
 
@@ -59,7 +60,7 @@ export default function WaitingPage({
                     const newStatus = payload.new.status;
                     if (newStatus === 'playing') {
                         console.log("🚀 Realtime Promotion! Moving to spin...");
-                        router.push(`/individual/screen/${id}/spin`);
+                        safeRedirect(router, `/individual/screen/${id}/spin`);
                     }
                 }
             )
@@ -130,7 +131,7 @@ export default function WaitingPage({
 
         if (!error && data) {
             // Redirect to new screen's waiting page
-            router.push(`/individual/screen/${currentOffer.targetScreen}/waiting`);
+            safeRedirect(router, `/individual/screen/${currentOffer.targetScreen}/waiting`);
         } else {
             console.error('Error switching screen:', error);
         }

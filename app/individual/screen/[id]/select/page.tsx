@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import React from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { safeRedirect } from '@/lib/navigation';
 
 export default function SelectionPage({
     params
@@ -132,7 +133,7 @@ export default function SelectionPage({
             const timer = setTimeout(() => {
                 if (!queueId) {
                     console.warn("🚫 No active queue session found after delay. Redirecting to ID page...");
-                    router.push(`/individual/screen/${id}`);
+                    safeRedirect(router, `/individual/screen/${id}`);
                 }
             }, 800); // 800ms delay to accommodate hydration
             return () => clearTimeout(timer);
@@ -149,7 +150,7 @@ export default function SelectionPage({
                 if (queueData && (queueData.status === 'completed' || queueData.status === 'abandoned' || queueData.status === 'cancelled')) {
                     console.warn("🚫 Sesión de juego ya finalizada detectada en select. Limpiando.");
                     useGameStore.getState().setQueueId(null);
-                    router.push('/');
+                    safeRedirect(router, '/');
                 }
             }
         };
@@ -308,7 +309,7 @@ export default function SelectionPage({
                 .update({ status: 'abandoned' })
                 .eq('id', queueId)
                 .then(() => {
-                    router.push(`/individual/screen/${id}`);
+                    safeRedirect(router, `/individual/screen/${id}`);
                 });
         }
     }, [uiStatus, selectingTimeout, queueId, router, id, supabase]);
@@ -369,7 +370,7 @@ export default function SelectionPage({
         }
 
         // 3. Navegar a resultado (feedback visual para el usuario móvil)
-        router.push(`/individual/screen/${id}/result`);
+        safeRedirect(router, `/individual/screen/${id}/result`);
     };
 
     if (isInitializing) {

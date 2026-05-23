@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useEffect, use, useState, useCallback } from 'react';
 import { useAvailableSpins } from '@/hooks/useAvailableSpins';
 import { getDeviceFingerprint } from '@/lib/deviceFingerprint';
+import { safeRedirect } from '@/lib/navigation';
 
 export default function JoinScreenPage({
     params
@@ -46,7 +47,7 @@ export default function JoinScreenPage({
         if (!isLoading && !user) {
             const currentUrl = window.location.href;
             localStorage.setItem('auth_return_url', currentUrl);
-            router.push('/auth/login');
+            safeRedirect(router, '/auth/login');
         }
     }, [user, isLoading, router]);
 
@@ -122,11 +123,11 @@ export default function JoinScreenPage({
                         if (withinWindow) {
                             if (data.status === 'waiting' || data.status === 'playing' || data.status === 'spinning') {
                                 isActiveQueue = true;
-                                router.push(`/individual/screen/${id}/select`);
+                                safeRedirect(router, `/individual/screen/${id}/select`);
                             }
                             else if (data.status === 'selecting') {
                                 isActiveQueue = true;
-                                router.push(`/individual/screen/${id}/select`);
+                                safeRedirect(router, `/individual/screen/${id}/select`);
                             }
                         }
                     }
@@ -180,20 +181,20 @@ export default function JoinScreenPage({
                         }));
                         sessionStorage.setItem('payment_authorized', 'true');
 
-                        router.push(`/individual/screen/${id}/pre-select?wheelId=${resolvedWheelId}`);
+                        safeRedirect(router, `/individual/screen/${id}/pre-select?wheelId=${resolvedWheelId}`);
                     } else {
                         console.error("Auto-redeem RPC failed:", data?.message);
                         // Fallback to normal flow if auto-redeem fails
-                        router.push(`/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
+                        safeRedirect(router, `/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
                     }
                 } catch (err) {
                     console.error("Error in spins bypass:", err);
                     // Fallback to normal flow on error
-                    router.push(`/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
+                    safeRedirect(router, `/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
                 }
             } else if (totalSpinsAvailable === 0 && !isBypassing) {
                 // Normal flow: no available spins, redirect to payment
-                router.push(`/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
+                safeRedirect(router, `/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
             }
         };
 

@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useVenueSettings } from '@/hooks/useVenueSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { QRCodeCanvas } from 'qrcode.react';
+import { safeRedirect } from '@/lib/navigation';
 import { getDeviceFingerprint } from '@/lib/deviceFingerprint';
 import { useRealtimeGame } from '@/hooks/useRealtimeGame';
 import Link from 'next/link';
@@ -204,7 +205,7 @@ export default function ResultPage({
                                     useGameStore.getState().setSelectedAnimals([]);
                                     useGameStore.getState().setIsRevenge(true);
                                     useGameStore.getState().setQueueId(null);
-                                    router.push(`/individual/screen/${id}/pre-select?wheelId=${activeWheelId || ''}&isRevenge=true`);
+                                    safeRedirect(router, `/individual/screen/${id}/pre-select?wheelId=${activeWheelId || ''}&isRevenge=true`);
                                 }}
                                 className="w-full py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-black text-base uppercase tracking-wider shadow-lg shadow-green-500/20 transition-all transform active:scale-95"
                             >
@@ -218,7 +219,7 @@ export default function ResultPage({
                                     useGameStore.getState().setSelectedAnimals([]);
                                     useGameStore.getState().setQueueId(null);
                                     useGameStore.getState().setIsRevenge(false);
-                                    router.push('/');
+                                    safeRedirect(router, '/');
                                 }}
                                 className="w-full py-4 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-black text-sm uppercase tracking-wide transition-all active:scale-95"
                             >
@@ -274,7 +275,7 @@ export default function ResultPage({
             // Give it a moment in case zustand is still hydrating
             const timer = setTimeout(() => {
                 if (!effectiveQueueId && !isNavigating) {
-                    router.push(`/individual/screen/${id}`);
+                    safeRedirect(router, `/individual/screen/${id}`);
                 }
             }, 500);
             return () => clearTimeout(timer);
@@ -712,7 +713,7 @@ export default function ResultPage({
                 console.log('✅ Auto-rejoin successful:', queueData.id);
                 useGameStore.getState().setQueueId(queueData.id);
                 useGameStore.getState().setSelectedAnimals([]);
-                router.push(`/individual/screen/${id}/select`);
+                safeRedirect(router, `/individual/screen/${id}/select`);
             } else {
                 console.error('❌ Queue create error:', queueError);
             }
@@ -731,7 +732,7 @@ export default function ResultPage({
         // Reset revenge flag
         useGameStore.getState().setIsRevenge(false);
         // Return directly to the main screen selector (root) to avoid loading loops
-        router.push('/');
+        safeRedirect(router, '/');
     };
 
     const displayName = profile?.display_name || nickname || 'Jugador';
@@ -818,7 +819,7 @@ export default function ResultPage({
 
                         <div className="bg-white p-4 rounded-3xl inline-block shadow-2xl transform -rotate-1">
                             <QRCodeCanvas
-                                value={`${(baseUrl || window.location.origin).trim()}/staff/validate/${ticketCode || queueId?.slice(0, 8)}`}
+                                value={`${(baseUrl || window.location.origin).trim()}/staff/validate/${ticketCode || queueId}`}
                                 size={180}
                                 level="H"
                                 includeMargin={false}

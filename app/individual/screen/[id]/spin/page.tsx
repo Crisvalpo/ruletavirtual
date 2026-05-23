@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { use, useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useGameStore } from '@/lib/store/gameStore';
+import { safeRedirect } from '@/lib/navigation';
 
 export default function SpinPage({
     params
@@ -24,7 +25,7 @@ export default function SpinPage({
             const timer = setTimeout(() => {
                 if (!queueId) {
                     console.warn("🚫 No active queue session. Redirecting...");
-                    router.push(`/individual/screen/${id}`);
+                    safeRedirect(router, `/individual/screen/${id}`);
                 }
             }, 500);
             return () => clearTimeout(timer);
@@ -40,7 +41,7 @@ export default function SpinPage({
             if (queueData && (queueData.status === 'completed' || queueData.status === 'abandoned' || queueData.status === 'cancelled')) {
                 console.warn("🚫 Sesión de juego ya finalizada detectada en spin. Limpiando.");
                 useGameStore.getState().setQueueId(null);
-                router.push('/');
+                safeRedirect(router, '/');
             }
         };
 
@@ -60,7 +61,7 @@ export default function SpinPage({
             (payload) => {
                 console.log("✅ Received spin_finished event:", payload);
                 const winnerIndex = payload.payload?.result || resultRef.current;
-                router.push(`/individual/screen/${id}/result?res=${winnerIndex}`);
+                safeRedirect(router, `/individual/screen/${id}/result?res=${winnerIndex}`);
             }
         ).subscribe();
 
@@ -103,7 +104,7 @@ export default function SpinPage({
         // If we don't hear back from the screen in 12 seconds, we force the redirect
         setTimeout(() => {
             console.warn("⏱️ Watchdog: Fallback redirect after 12s");
-            router.push(`/individual/screen/${id}/result?res=${data.result_index}`);
+            safeRedirect(router, `/individual/screen/${id}/result?res=${data.result_index}`);
         }, 12000);
     };
 
