@@ -137,7 +137,27 @@ export default function SelectionPage({
             }, 800); // 800ms delay to accommodate hydration
             return () => clearTimeout(timer);
         }
-    }, [queueId, isInitializing, id, router]);
+
+        const checkSessionValidity = async () => {
+            if (queueId) {
+                const { data: queueData } = await supabase
+                    .from('player_queue')
+                    .select('status')
+                    .eq('id', queueId)
+                    .single();
+
+                if (queueData && (queueData.status === 'completed' || queueData.status === 'abandoned' || queueData.status === 'cancelled')) {
+                    console.warn("🚫 Sesión de juego ya finalizada detectada en select. Limpiando.");
+                    useGameStore.getState().setQueueId(null);
+                    router.push('/');
+                }
+            }
+        };
+
+        if (queueId && !isInitializing) {
+            checkSessionValidity();
+        }
+    }, [queueId, isInitializing, id, router, supabase]);
 
     // REALTIME: Listen for Queue Updates (Am I playing?)
     React.useEffect(() => {

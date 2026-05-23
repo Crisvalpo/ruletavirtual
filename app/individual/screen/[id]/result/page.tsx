@@ -214,11 +214,15 @@ export default function ResultPage({
                         {rpsResult === 'lose' && (
                             <button
                                 onClick={() => {
-                                    setRpsPlaying(false);
+                                    // Limpiar sesión al perder definitivamente la revancha y volver al inicio
+                                    useGameStore.getState().setSelectedAnimals([]);
+                                    useGameStore.getState().setQueueId(null);
+                                    useGameStore.getState().setIsRevenge(false);
+                                    router.push('/');
                                 }}
                                 className="w-full py-4 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-black text-sm uppercase tracking-wide transition-all active:scale-95"
                             >
-                                Continuar
+                                Continuar al Inicio
                             </button>
                         )}
                     </div>
@@ -726,8 +730,8 @@ export default function ResultPage({
         useGameStore.getState().setQueueId(null);
         // Reset revenge flag
         useGameStore.getState().setIsRevenge(false);
-        // Return to entry page
-        router.push(`/individual/screen/${id}`);
+        // Return directly to the main screen selector (root) to avoid loading loops
+        router.push('/');
     };
 
     const displayName = profile?.display_name || nickname || 'Jugador';

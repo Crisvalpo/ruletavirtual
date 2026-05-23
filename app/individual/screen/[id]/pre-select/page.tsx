@@ -73,13 +73,46 @@ export default function PreSelectPage({
         setHasHydrated(true);
     }, []);
 
-    // Redirect to entry if no identity configured
+    // Validar si la sesión actual sigue siendo válida y no ha terminado
     useEffect(() => {
         if (!hasHydrated) return;
-        if (nickname === 'Jugador') {
-            router.push(`/individual/screen/${id}`);
-        }
-    }, [nickname, id, router, hasHydrated]);
+
+        const checkSessionValidity = async () => {
+            // 1. Si hay un queueId en Zustand, verificar su estado en BD
+            if (queueId) {
+                const { data: queueData } = await supabase
+                    .from('player_queue')
+                    .select('status')
+                    .eq('id', queueId)
+                    .single();
+
+                if (queueData && (queueData.status === 'completed' || queueData.status === 'abandoned' || queueData.status === 'cancelled')) {
+                    console.warn("🚫 Sesión de juego ya finalizada detectada en pre-select. Limpiando.");
+                    useGameStore.getState().setQueueId(null);
+                    useGameStore.getState().setIsRevenge(false);
+                    router.push('/');
+                    return;
+                }
+            }
+
+            // 2. Si no hay ticket de pago activo en localStorage y no es una revancha activa en Zustand/URL,
+            // significa que la sesión expiró y volvió atrás. Redirigir a inicio.
+            const storedPackage = localStorage.getItem('current_package');
+            const isRev = searchParams.get('isRevenge') === 'true' || storeIsRevenge;
+            if (!storedPackage && !isRev) {
+                console.warn("🚫 No se detectó ticket de pago activo ni revancha. Redirigiendo al selector.");
+                router.push('/');
+                return;
+            }
+
+            // 3. Redirigir a la pantalla de bienvenida si no tiene nickname establecido
+            if (nickname === 'Jugador') {
+                router.push(`/individual/screen/${id}`);
+            }
+        };
+
+        checkSessionValidity();
+    }, [hasHydrated, queueId, storeIsRevenge, searchParams, supabase, id, nickname, router]);
 
     // 2. REALTIME BROADCAST (Restore visual magic)
     useEffect(() => {

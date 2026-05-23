@@ -18,7 +18,7 @@ export default function SpinPage({
 
     const supabase = createClient();
 
-    // Redirect if no queueId (no active session)
+    // Redirect if no queueId (no active session) or if it's completed
     useEffect(() => {
         if (!queueId) {
             const timer = setTimeout(() => {
@@ -29,7 +29,23 @@ export default function SpinPage({
             }, 500);
             return () => clearTimeout(timer);
         }
-    }, [queueId, id, router]);
+
+        const checkSessionValidity = async () => {
+            const { data: queueData } = await supabase
+                .from('player_queue')
+                .select('status')
+                .eq('id', queueId)
+                .single();
+
+            if (queueData && (queueData.status === 'completed' || queueData.status === 'abandoned' || queueData.status === 'cancelled')) {
+                console.warn("🚫 Sesión de juego ya finalizada detectada en spin. Limpiando.");
+                useGameStore.getState().setQueueId(null);
+                router.push('/');
+            }
+        };
+
+        checkSessionValidity();
+    }, [queueId, id, router, supabase]);
 
     // Listener for result from TV screen
     useEffect(() => {
