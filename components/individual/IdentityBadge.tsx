@@ -5,9 +5,12 @@ import { useGameStore } from '@/lib/store/gameStore';
 
 import Link from 'next/link';
 
+import { useAvailableSpins } from '@/hooks/useAvailableSpins';
+
 export default function IdentityBadge() {
     const { user, profile, isLoading, signInWithGoogle, signOut } = useAuth();
     const resetIdentity = useGameStore(state => state.resetIdentity);
+    const { totalSpinsAvailable, loading: spinsLoading } = useAvailableSpins();
 
     const handleSignOut = async () => {
         await signOut();
@@ -35,7 +38,7 @@ export default function IdentityBadge() {
                 href="/individual/profile"
                 className="flex items-center gap-3 px-2 hover:opacity-80 transition-opacity cursor-pointer"
             >
-                <div className="relative">
+                <div className="relative flex-shrink-0">
                     <img
                         src={profile?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.id}`}
                         alt="Avatar"
@@ -43,6 +46,18 @@ export default function IdentityBadge() {
                     />
                     <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-[#1a1a1a] rounded-full" title="Conectado" />
                 </div>
+
+                {/* Badge de Giros Disponibles */}
+                {!spinsLoading && totalSpinsAvailable > 0 && (
+                    <div
+                        className="flex items-center gap-1 bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border border-yellow-500/30 text-yellow-400 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider animate-pulse shadow-md"
+                        title={`${totalSpinsAvailable} giro(s) disponible(s)`}
+                    >
+                        <span>⚡</span>
+                        <span>{totalSpinsAvailable}</span>
+                    </div>
+                )}
+
                 <div className="hidden sm:block">
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest leading-none">
                         Jugador

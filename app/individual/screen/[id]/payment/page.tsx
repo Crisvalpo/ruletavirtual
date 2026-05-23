@@ -7,6 +7,7 @@ import React from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getDeviceFingerprint } from '@/lib/deviceFingerprint';
+import { useAvailableSpins } from '@/hooks/useAvailableSpins';
 
 import VirtualKeyboard from '@/components/individual/VirtualKeyboard';
 
@@ -49,10 +50,77 @@ export default function PaymentPage({
     const { user, profile, refreshProfile } = useAuth();
 
     const [hasHydrated, setHasHydrated] = useState(false);
+    const { totalSpinsAvailable, availablePackages, loading: spinsLoading } = useAvailableSpins();
+    const [isBypassing, setIsBypassing] = useState(false);
 
     useEffect(() => {
         setHasHydrated(true);
     }, []);
+
+    // Handle bypass if user has available spins
+    useEffect(() => {
+        const handleSpinsBypass = async () => {
+            if (!hasHydrated || nickname === 'Jugador' || spinsLoading || isBypassing) return;
+
+            if (totalSpinsAvailable > 0 && availablePackages.length > 0) {
+                setIsBypassing(true);
+                try {
+                    const firstPkg = availablePackages[0];
+                    console.log("⚡ [PaymentPage] Auto-redeeming/continuing package:", firstPkg.code);
+
+                    const deviceFingerprint = getDeviceFingerprint();
+
+                    const { data, error } = await supabase.rpc('redeem_or_continue_package', {
+                        p_code: firstPkg.code,
+                        p_device_fingerprint: deviceFingerprint,
+                        p_screen_number: parseInt(id),
+                        p_player_name: nickname || profile?.display_name || 'Jugador',
+                        p_player_emoji: emoji || '😎',
+                        p_player_id: user?.id || null
+                    });
+
+                    if (error) throw error;
+
+                    if (data && data.success) {
+                        console.log("✅ [PaymentPage] Auto-redeemed/continued successfully:", data);
+                        
+                        localStorage.setItem('current_package', JSON.stringify({
+                            packageId: data.package_id,
+                            spinNumber: data.spin_number,
+                            totalSpins: data.total_spins,
+                            code: firstPkg.code
+                        }));
+                        sessionStorage.setItem('payment_authorized', 'true');
+
+                        const wheelId = searchParams.get('wheelId');
+                        router.push(`/individual/screen/${id}/pre-select?wheelId=${wheelId || ''}`);
+                    } else {
+                        console.error("[PaymentPage] Auto-redeem RPC failed:", data?.message);
+                        setIsBypassing(false);
+                    }
+                } catch (err) {
+                    console.error("[PaymentPage] Error in spins bypass:", err);
+                    setIsBypassing(false);
+                }
+            }
+        };
+
+        handleSpinsBypass();
+    }, [
+        hasHydrated,
+        nickname,
+        id,
+        router,
+        spinsLoading,
+        totalSpinsAvailable,
+        availablePackages,
+        isBypassing,
+        supabase,
+        emoji,
+        user,
+        profile,
+        searchParams
+    ]);
 
     // Redirect to entry if no identity configured
     useEffect(() => {
@@ -237,6 +305,18 @@ export default function PaymentPage({
             setIsRedeeming(false);
         }
     };
+
+    if (isBypassing || spinsLoading) {
+        return (
+            <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-white space-y-6">
+                <div className="w-16 h-16 border-4 border-white/10 border-t-yellow-400 rounded-full animate-spin" />
+                <div className="text-center animate-pulse">
+                    <p className="text-lg font-bold tracking-widest text-white/50 uppercase">Verificando Giros</p>
+                    <p className="text-xs text-white/30">Comprobando tus giros disponibles...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 p-4">

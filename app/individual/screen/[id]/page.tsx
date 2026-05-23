@@ -9,6 +9,8 @@ import { useGameStore } from '@/lib/store/gameStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, use, useState, useCallback } from 'react';
+import { useAvailableSpins } from '@/hooks/useAvailableSpins';
+import { getDeviceFingerprint } from '@/lib/deviceFingerprint';
 
 export default function JoinScreenPage({
     params
@@ -30,6 +32,9 @@ export default function JoinScreenPage({
     const [resolvedWheelId, setResolvedWheelId] = useState<string | null>(null);
     const [resolvingWheel, setResolvingWheel] = useState(true);
     const [checkingQueue, setCheckingQueue] = useState(!!queueId);
+
+    const { totalSpinsAvailable, availablePackages, loading: spinsLoading } = useAvailableSpins();
+    const [isBypassing, setIsBypassing] = useState(false);
 
     // Set hydrated state on mount
     useEffect(() => {
@@ -137,56 +142,95 @@ export default function JoinScreenPage({
         }
 
     }, [id, setScreenId, queueId, supabase, router, user, setQueueId]);
-
-    // Check for active package on device
+    // Handle bypass of payment if user has available spins
     useEffect(() => {
-        const checkActivePackage = async () => {
-            const stored = localStorage.getItem('current_package');
-            if (!stored || !hasIdentity || resolvingWheel || !resolvedWheelId) return;
+        const handleSpinsBypass = async () => {
+            // Wait for everything to be loaded
+            if (!hasIdentity || nickname === 'Jugador' || resolvingWheel || !resolvedWheelId || checkingQueue || spinsLoading || isLoading) {
+                return;
+            }
 
-            try {
-                const packageData = JSON.parse(stored);
+            if (totalSpinsAvailable > 0 && availablePackages.length > 0 && !isBypassing) {
+                setIsBypassing(true);
+                try {
+                    const firstPkg = availablePackages[0];
+                    console.log("⚡ Auto-redeeming/continuing package:", firstPkg.code);
 
-                const { data, error } = await supabase
-                    .from('package_tracking')
-                    .select('total_spins, spins_consumed')
-                    .eq('id', packageData.packageId)
-                    .single();
+                    const deviceFingerprint = getDeviceFingerprint();
 
-                if (!error && data) {
-                    const spinsRemaining = data.total_spins - data.spins_consumed;
+                    const { data, error } = await supabase.rpc('redeem_or_continue_package', {
+                        p_code: firstPkg.code,
+                        p_device_fingerprint: deviceFingerprint,
+                        p_screen_number: parseInt(id),
+                        p_player_name: nickname || profile?.display_name || 'Jugador',
+                        p_player_emoji: emoji || '😎',
+                        p_player_id: user?.id || null
+                    });
 
-                    if (spinsRemaining > 0) {
-                        router.push(`/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
+                    if (error) throw error;
+
+                    if (data && data.success) {
+                        console.log("✅ Auto-redeemed/continued successfully:", data);
+                        
+                        localStorage.setItem('current_package', JSON.stringify({
+                            packageId: data.package_id,
+                            spinNumber: data.spin_number,
+                            totalSpins: data.total_spins,
+                            code: firstPkg.code
+                        }));
+                        sessionStorage.setItem('payment_authorized', 'true');
+
+                        router.push(`/individual/screen/${id}/pre-select?wheelId=${resolvedWheelId}`);
                     } else {
-                        localStorage.removeItem('current_package');
+                        console.error("Auto-redeem RPC failed:", data?.message);
+                        // Fallback to normal flow if auto-redeem fails
+                        router.push(`/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
                     }
+                } catch (err) {
+                    console.error("Error in spins bypass:", err);
+                    // Fallback to normal flow on error
+                    router.push(`/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
                 }
-            } catch (e) {
-                console.error('Error checking package:', e);
+            } else if (totalSpinsAvailable === 0 && !isBypassing) {
+                // Normal flow: no available spins, redirect to payment
+                router.push(`/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
             }
         };
 
-        checkActivePackage();
-    }, [hasIdentity, id, router, resolvedWheelId, resolvingWheel, supabase]);
-
-    // Handle redirect to payment directly
-    useEffect(() => {
-        if (hasIdentity && nickname !== 'Jugador' && !resolvingWheel && resolvedWheelId && !checkingQueue) {
-            router.push(`/individual/screen/${id}/payment?wheelId=${resolvedWheelId}`);
-        }
-    }, [hasIdentity, nickname, id, router, resolvingWheel, resolvedWheelId, checkingQueue]);
+        handleSpinsBypass();
+    }, [
+        hasIdentity,
+        nickname,
+        id,
+        router,
+        resolvingWheel,
+        resolvedWheelId,
+        checkingQueue,
+        spinsLoading,
+        isLoading,
+        totalSpinsAvailable,
+        availablePackages,
+        isBypassing,
+        supabase,
+        emoji,
+        user,
+        profile
+    ]);
 
     // --- FLOW STEPS ---
 
     // 1. Initial Loading or Hydrating
-    if (isLoading || resolvingWheel || checkingQueue || !hasHydrated) {
+    if (isLoading || resolvingWheel || checkingQueue || !hasHydrated || spinsLoading || isBypassing) {
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-white space-y-6">
                 <div className="w-16 h-16 border-4 border-white/10 border-t-yellow-400 rounded-full animate-spin" />
                 <div className="text-center animate-pulse">
-                    <p className="text-lg font-bold tracking-widest text-white/50 uppercase">Conectando</p>
-                    <p className="text-xs text-white/30">Cargando la configuración de la pantalla...</p>
+                    <p className="text-lg font-bold tracking-widest text-white/50 uppercase">
+                        {isBypassing ? 'Cargando tus Giros' : 'Conectando'}
+                    </p>
+                    <p className="text-xs text-white/30">
+                        {isBypassing ? 'Preparando tu juego directo...' : 'Cargando la configuración de la pantalla...'}
+                    </p>
                 </div>
             </div>
         );
