@@ -17,10 +17,13 @@ export default function JoinScreenPage({
 }) {
     const { id } = use(params);
     const { nickname, emoji, resetGame, setScreenId, queueId, setQueueId } = useGameStore();
-    const [hasIdentity, setHasIdentity] = useState(false);
     const [hasHydrated, setHasHydrated] = useState(false);
     const router = useRouter();
-    const { user, isLoading } = useAuth();
+    const { user, profile, isLoading } = useAuth();
+
+    // Derivar de forma síncrona y reactiva si el usuario ya cuenta con un apodo/identidad establecido.
+    // Esto evita estados asíncronos duplicados y parpadeos molestos de la vista de personalización.
+    const hasIdentity = !!(nickname && nickname !== 'Jugador') || !!(profile?.display_name && profile.display_name !== 'Jugador');
     const searchParams = useSearchParams();
     const supabase = createClient();
 
@@ -133,10 +136,7 @@ export default function JoinScreenPage({
             setCheckingQueue(false);
         }
 
-        if (nickname && nickname !== 'Jugador') {
-            setHasIdentity(true);
-        }
-    }, [id, setScreenId, nickname, queueId, supabase, router, user, setQueueId]);
+    }, [id, setScreenId, queueId, supabase, router, user, setQueueId]);
 
     // Check for active package on device
     useEffect(() => {
@@ -196,7 +196,7 @@ export default function JoinScreenPage({
 
     // 3. Identity Setup
     if (!hasIdentity) {
-        return <NickEntry screenId={id} onComplete={() => setHasIdentity(true)} />;
+        return <NickEntry screenId={id} onComplete={() => {}} />;
     }
 
     // Fallback UI (usually redirected before this point)
