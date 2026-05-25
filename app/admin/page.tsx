@@ -9,6 +9,7 @@ import BatchTicketGenerator from '@/components/staff/BatchTicketGenerator';
 import WheelManager from '@/components/admin/WheelManager';
 import WheelUploader from '@/components/admin/WheelUploader';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import RaffleManager from '@/components/admin/RaffleManager';
 
 export default function AdminDashboardPage() {
     return (
@@ -19,7 +20,7 @@ export default function AdminDashboardPage() {
 }
 
 function AdminContent() {
-    const [activeTab, setActiveTab] = useState<'monitoring' | 'tickets' | 'wheels'>('monitoring');
+    const [activeTab, setActiveTab] = useState<'monitoring' | 'tickets' | 'wheels' | 'raffles'>('monitoring');
 
     const generateCode = () => {
         const letters = 'ABCDEF';
@@ -34,7 +35,8 @@ function AdminContent() {
     const tabs = [
         { id: 'monitoring', label: 'Monitorización', icon: '🖥️', description: 'Estado de pantallas y control maestro' },
         { id: 'tickets', label: 'Tickets & Seguridad', icon: '🎫', description: 'Configuración, activación y lotes' },
-        { id: 'wheels', label: 'Temas de Ruleta', icon: '🎰', description: 'Gestión y carga de mundos' }
+        { id: 'wheels', label: 'Temas de Ruleta', icon: '🎰', description: 'Gestión y carga de mundos' },
+        { id: 'raffles', label: 'Sorteos (Raffles)', icon: '🎟️', description: 'Creación y control de sorteos' }
     ] as const;
 
     return (
@@ -110,6 +112,12 @@ function AdminContent() {
                             <div className="xl:col-span-3">
                                 <WheelManager />
                             </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'raffles' && (
+                        <div className="grid gap-4">
+                            <RaffleManager />
                         </div>
                     )}
                 </main>

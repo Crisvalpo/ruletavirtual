@@ -23,10 +23,10 @@ export default function QueueList({ screenId, assets: screenAssets }: { screenId
 
     useEffect(() => {
         const fetchQueue = async () => {
-            // Fetch Waiting
+            // Fetch Waiting (with selected_animals)
             const { data: waitingData } = await supabase
                 .from('player_queue')
-                .select('id, player_name, player_emoji, created_at, status, selected_wheel_id')
+                .select('id, player_name, player_emoji, created_at, status, selected_animals, selected_wheel_id')
                 .eq('screen_number', screenId)
                 .eq('status', 'waiting')
                 .order('created_at', { ascending: true });
@@ -41,41 +41,40 @@ export default function QueueList({ screenId, assets: screenAssets }: { screenId
                 .eq('status', 'selecting')
                 .order('created_at', { ascending: true });
 
-            if (selectingData) {
-                setActiveSelectors(selectingData);
+            if (selectingData) setActiveSelectors(selectingData);
 
-                // Fetch segments for unique wheel IDs in the queue
-                const uniqueWheelIds = Array.from(new Set(
-                    selectingData
-                        .map(p => p.selected_wheel_id)
-                        .filter(id => id && !wheelAssetsMap[id])
-                )) as string[];
+            // Combine both datasets to extract unique wheel IDs in the entire active queue
+            const allItems = [...(selectingData || []), ...(waitingData || [])];
+            const uniqueWheelIds = Array.from(new Set(
+                allItems
+                    .map(p => p.selected_wheel_id)
+                    .filter(id => id && !wheelAssetsMap[id])
+            )) as string[];
 
-                if (uniqueWheelIds.length > 0) {
-                    const { data: segmentsData } = await supabase
-                        .from('individual_wheel_segments')
-                        .select('wheel_id, position, selector_image, segment_image')
-                        .in('wheel_id', uniqueWheelIds);
+            if (uniqueWheelIds.length > 0) {
+                const { data: segmentsData } = await supabase
+                    .from('individual_wheel_segments')
+                    .select('wheel_id, position, selector_image, segment_image')
+                    .in('wheel_id', uniqueWheelIds);
 
-                    if (segmentsData) {
-                        const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
-                        const getFullUrl = (path: string | null) => {
-                            if (!path) return null;
-                            return path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`;
-                        };
+                if (segmentsData) {
+                    const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+                    const getFullUrl = (path: string | null) => {
+                        if (!path) return null;
+                        return path.startsWith('http') ? path : `${STORAGE_BASE}/${path}`;
+                    };
 
-                        const newMap = { ...wheelAssetsMap };
-                        uniqueWheelIds.forEach(wid => {
-                            newMap[wid] = segmentsData
-                                .filter(s => s.wheel_id === wid)
-                                .map(s => ({
-                                    id: s.position,
-                                    imageResult: getFullUrl(s.selector_image),
-                                    imageWheel: getFullUrl(s.segment_image)
-                                }));
-                        });
-                        setWheelAssetsMap(newMap);
-                    }
+                    const newMap = { ...wheelAssetsMap };
+                    uniqueWheelIds.forEach(wid => {
+                        newMap[wid] = segmentsData
+                            .filter(s => s.wheel_id === wid)
+                            .map(s => ({
+                                id: s.position,
+                                imageResult: getFullUrl(s.selector_image),
+                                imageWheel: getFullUrl(s.segment_image)
+                            }));
+                    });
+                    setWheelAssetsMap(newMap);
                 }
             }
         };
@@ -177,18 +176,54 @@ export default function QueueList({ screenId, assets: screenAssets }: { screenId
 
                     {/* 2. Show Waiting Queue */}
                     {queue.map((player, index) => (
-                        <div key={player.id} className="flex items-center gap-2 text-white/80">
-                            <span className="text-xs font-mono opacity-50 w-4">
-                                {String(index + 1).padStart(2, '0')}
-                            </span>
-                            <span className="text-sm italic font-medium truncate flex items-center gap-2">
-                                {player.player_emoji?.startsWith('http') ? (
-                                    <img src={player.player_emoji} alt="P" className="w-4 h-4 rounded-full border border-white/20 object-cover flex-none opacity-70" />
+                        <div key={player.id} className="flex flex-col gap-1 border-b border-white/5 pb-2 mb-1 last:border-b-0 last:pb-0 last:mb-0">
+                            <div className="flex items-center gap-2 text-white/80">
+                                <span className="text-xs font-mono opacity-50 w-4">
+                                    {String(index + 1).padStart(2, '0')}
+                                </span>
+                                <span className="text-sm font-medium truncate flex items-center gap-2">
+                                    {player.player_emoji?.startsWith('http') ? (
+                                        <img src={player.player_emoji} alt="P" className="w-4 h-4 rounded-full border border-white/20 object-cover flex-none opacity-70" />
+                                    ) : (
+                                        <span className="flex-none opacity-70">{player.player_emoji}</span>
+                                    )}
+                                    <span className="truncate">{player.player_name}</span>
+                                </span>
+                            </div>
+                            {/* Pre-selected Animals Preview for Waiting Players */}
+                            <div className="flex gap-1 pl-6">
+                                {player.selected_animals && Array.isArray(player.selected_animals) && player.selected_animals.length > 0 ? (
+                                    player.selected_animals.map((idx, i) => {
+                                        let imgSrc: string | null = null;
+                                        const playerAssets = player.selected_wheel_id ? wheelAssetsMap[player.selected_wheel_id] : null;
+                                        const relevantSegments = playerAssets || screenAssets?.segments;
+
+                                        if (relevantSegments) {
+                                            const seg = relevantSegments.find((s: any) => s.id === idx);
+                                            if (seg) imgSrc = seg.imageResult || seg.imageWheel;
+                                        }
+
+                                        if (!imgSrc) {
+                                            const animal = ANIMAL_LIST.find(a => a.id === idx);
+                                            if (animal) imgSrc = animal.imageSelector || animal.imageWheel;
+                                        }
+
+                                        return (
+                                            <div key={i} className="relative w-6 h-6 rounded-full bg-white/5 border border-white/10 overflow-hidden shadow-sm">
+                                                {imgSrc ? (
+                                                    <Image src={imgSrc} alt={`${idx}`} fill className="object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-gray-400">
+                                                        {idx}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
                                 ) : (
-                                    <span className="flex-none opacity-70">{player.player_emoji}</span>
+                                    <span className="text-[10px] text-gray-500 italic ml-1">Sin animales</span>
                                 )}
-                                <span className="truncate">{player.player_name}</span>
-                            </span>
+                            </div>
                         </div>
                     ))}
                 </div>

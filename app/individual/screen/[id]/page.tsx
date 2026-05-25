@@ -26,7 +26,7 @@ export default function JoinScreenPage({
 
     // Derivar de forma síncrona y reactiva si el usuario ya cuenta con un apodo/identidad establecido.
     // Esto evita estados asíncronos duplicados y parpadeos molestos de la vista de personalización.
-    const hasIdentity = !!(nickname && nickname !== 'Jugador') || !!(profile?.display_name && profile.display_name !== 'Jugador');
+    const hasIdentity = !!nickname || !!profile?.display_name;
     const searchParams = useSearchParams();
     const supabase = createClient();
 
@@ -147,7 +147,7 @@ export default function JoinScreenPage({
     useEffect(() => {
         const handleSpinsBypass = async () => {
             // Wait for everything to be loaded
-            if (!hasIdentity || nickname === 'Jugador' || resolvingWheel || !resolvedWheelId || checkingQueue || spinsLoading || isLoading) {
+            if (!hasIdentity || resolvingWheel || !resolvedWheelId || checkingQueue || spinsLoading || isLoading) {
                 return;
             }
 

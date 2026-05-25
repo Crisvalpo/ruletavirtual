@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import IdentityBadge from '@/components/individual/IdentityBadge';
+import RaffleList from '@/components/individual/RaffleList';
 import { createClient } from '@/lib/supabase/client';
 
 export default function HomePage() {
@@ -360,6 +361,11 @@ export default function HomePage() {
                             </div>
                         );
                     })}
+                </div>
+
+                {/* Sorteos en Curso */}
+                <div className="mt-8 w-full">
+                    <RaffleList />
                 </div>
 
                 {/* Mis Premios Section - Integrated below the grid */}

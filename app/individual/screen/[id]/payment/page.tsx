@@ -60,7 +60,7 @@ export default function PaymentPage({
     // Handle bypass if user has available spins
     useEffect(() => {
         const handleSpinsBypass = async () => {
-            if (!hasHydrated || nickname === 'Jugador' || spinsLoading || isBypassing) return;
+            if (!hasHydrated || (!nickname && !profile?.display_name) || spinsLoading || isBypassing) return;
 
             if (totalSpinsAvailable > 0 && availablePackages.length > 0) {
                 setIsBypassing(true);
@@ -74,8 +74,8 @@ export default function PaymentPage({
                         p_code: firstPkg.code,
                         p_device_fingerprint: deviceFingerprint,
                         p_screen_number: parseInt(id),
-                        p_player_name: nickname || profile?.display_name || 'Jugador',
-                        p_player_emoji: emoji || '😎',
+                        p_player_name: nickname || profile?.display_name || 'Jugador Anónimo',
+                        p_player_emoji: emoji || profile?.avatar_url || '😎',
                         p_player_id: user?.id || null
                     });
 
@@ -125,14 +125,14 @@ export default function PaymentPage({
     // Redirect to entry if no identity configured
     useEffect(() => {
         if (!hasHydrated) return;
-        if (nickname === 'Jugador') {
+        if (!nickname && !profile?.display_name) {
             const wheelId = searchParams.get('wheelId');
             const redirectUrl = wheelId
                 ? `/individual/screen/${id}?returnTo=payment&wheelId=${wheelId}`
                 : `/individual/screen/${id}`;
             router.push(redirectUrl);
         }
-    }, [nickname, id, searchParams, router, hasHydrated]);
+    }, [nickname, profile, id, searchParams, router, hasHydrated]);
 
     // Demo Mode State
     const demoSpins = Math.max(0, 2 - (profile?.demo_spins_used ?? 0));

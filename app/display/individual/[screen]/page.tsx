@@ -54,7 +54,7 @@ export default function DisplayScreenPage({
 
     // 1. Hooks
     useRealtimeGame(screen);
-    const { venueMode, centralScreenId, baseUrl } = useVenueSettings();
+    const { venueMode, centralScreenId, baseUrl, activeRaffleId, raffleBillboardId } = useVenueSettings();
 
     // 2. Read from store (Individual Mode State)
     const mode = useGameStore((state) => state.gameMode);
@@ -238,8 +238,23 @@ export default function DisplayScreenPage({
                 // If in group event mode, we use the default 36 animals, so no specific wheel assets are needed.
                 // effectiveActiveWheelId will be null in this case.
                 if (venueMode === 'group_event') {
-                    console.log("🎨 [Assets] Group Mode detected, clearing specific wheel assets (using default 36 animals)");
-                    setActiveWheelAssets(null);
+                    console.log("🎨 [Assets] Group Mode detected, setting up raffle wheel (36 segments)");
+                    const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+                    const segments = Array.from({ length: 36 }, (_, i) => {
+                        const num = i + 1;
+                        return {
+                            id: num,
+                            label: `${num}`,
+                            color: 'transparent',
+                            imageWheel: `${STORAGE_BASE}/group_sorteo/segments/${num}.png`,
+                            imageResult: `${STORAGE_BASE}/group_sorteo/selector/${num}.jpg`
+                        };
+                    });
+
+                    setActiveWheelAssets({
+                        background: `${STORAGE_BASE}/group_sorteo/background.jpg`,
+                        segments: segments
+                    });
                     return;
                 }
 
@@ -356,8 +371,7 @@ export default function DisplayScreenPage({
 
     useEffect(() => {
         // Start Spin
-        // Start Spin
-        if (storeStatus === 'spinning' && status === 'idle') {
+        if ((storeStatus === 'spinning' || storeStatus === 'result') && status === 'idle') {
             console.log('📱 Mobile Spin triggered - Server Authority Mode');
             setStatus('spinning');
             setResult(null); // Clear previous result locally
@@ -475,13 +489,13 @@ export default function DisplayScreenPage({
     // Fetch Active Player Selections (OR USE PREVIEW)
     useEffect(() => {
         // Priority: 1. Active Playing (DB) 2. Preview (Broadcast)
-        if (status === 'idle' && (!realNickname || realNickname === 'Jugador') && previewPlayer) {
+        if (status === 'idle' && !realNickname && previewPlayer) {
             console.log("👀 Using Preview Selections");
             setCurrentSelections(previewPlayer.selections);
             return;
         }
 
-        if (status === 'idle' && (!realNickname || realNickname === 'Jugador')) {
+        if (status === 'idle' && !realNickname) {
             console.log("🤷 No Active Player, clearing selections");
             setCurrentSelections([]);
             return;
@@ -526,7 +540,7 @@ export default function DisplayScreenPage({
                     setCurrentSelections([]);
 
                     // Optional Retry for lag
-                    if (realNickname && realNickname !== 'Jugador') {
+                    if (realNickname) {
                         setTimeout(async () => {
                             const { data: retry } = await supabase
                                 .from('player_queue')
@@ -597,7 +611,58 @@ export default function DisplayScreenPage({
         // --- 1. Background Logic (Do not block visuals) ---
         (async () => {
             try {
-                // 1a. Determine Win/Loss
+                if (isGroupEvent) {
+                    // Sorteo Grupal: Buscar el ticket ganador y mostrarlo
+                    const { data: raffleData, error: raffleError } = await supabase
+                        .from('raffles')
+                        .select('winning_number, winner_ticket_id')
+                        .eq('id', activeRaffleId)
+                        .maybeSingle();
+
+                    if (!raffleError && raffleData) {
+                        let winnerName = null;
+                        if (raffleData.winner_ticket_id) {
+                            const { data: ticketData } = await supabase
+                                .from('raffle_tickets')
+                                .select('buyer_name')
+                                .eq('id', raffleData.winner_ticket_id)
+                                .maybeSingle();
+                            if (ticketData) winnerName = ticketData.buyer_name;
+                        }
+
+                        if (winnerName) {
+                            useGameStore.setState({
+                                nickname: winnerName,
+                                emoji: '🎉'
+                            });
+                            setIsWin(true);
+                            setShowConfetti(true);
+                        } else {
+                            useGameStore.setState({
+                                nickname: 'Acumulado',
+                                emoji: '🪙'
+                            });
+                            setIsWin(false);
+                            setShowConfetti(false);
+                        }
+                    }
+
+                    // Resetear la TV central a estado idle tras 15 segundos
+                    setTimeout(async () => {
+                        await supabase
+                            .from('screen_state')
+                            .update({
+                                status: 'idle',
+                                last_spin_result: null,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('screen_number', screenIdNum);
+                    }, 15000);
+
+                    return;
+                }
+
+                // Modo Individual Tradicional
                 let playerWon = false;
 
                 // Fetch current active player from queue safely
@@ -624,7 +689,6 @@ export default function DisplayScreenPage({
                     setShowConfetti(true);
                 }
 
-                // 1b. Update Screen State AND Complete Queue Item (Server Authority)
                 // 1b. Update Screen State AND Complete Queue Item (Server Authority)
                 // We use the existing RPC that handles package deduction + state update
                 const { error: finishError } = await supabase.rpc('complete_spin_and_check_package', {
@@ -763,8 +827,8 @@ export default function DisplayScreenPage({
     }, [screenIdNum, supabase]);
 
     // Derived Display Identity (Active or Preview)
-    const displayNickname = (status === 'idle' && (!realNickname || realNickname === 'Jugador') && previewPlayer) ? previewPlayer.nickname : realNickname;
-    const displayEmoji = (status === 'idle' && (!realNickname || realNickname === 'Jugador') && previewPlayer) ? previewPlayer.emoji : realEmoji;
+    const displayNickname = (status === 'idle' && !realNickname && previewPlayer) ? previewPlayer.nickname : realNickname;
+    const displayEmoji = (status === 'idle' && !realNickname && previewPlayer) ? previewPlayer.emoji : realEmoji;
 
     if (checkingAuth) {
         return (
@@ -823,78 +887,86 @@ export default function DisplayScreenPage({
                 </div>
             )}
 
-            {/* CASO 1: MODO EVENTO - PANTALLA LATERAL (CARTELERA / ESTADÍSTICAS) */}
+            {/* CASO 1: MODO EVENTO - PANTALLA LATERAL (CARTELERA / ESTADÍSTICAS / GRILLA SORTEO) */}
             {isBillboardScreen && (
-                <div className="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-start text-center p-0 overflow-hidden font-sans">
-                    {/* Header Publicitario */}
-                    <div className="w-full bg-indigo-600 py-8 shadow-2xl z-20">
-                        <h1 className="text-6xl font-black text-white uppercase tracking-tighter animate-pulse">
-                            🔥 ¡Gran Sorteo en Vivo! 🔥
-                        </h1>
-                        <p className="text-indigo-200 text-xl font-bold mt-2 uppercase tracking-widest">
-                            Atentos a la Pantalla Principal
-                        </p>
-                    </div>
+                screenIdNum === raffleBillboardId ? (
+                    <AnimatorRaffleBillboard
+                        activeRaffleId={activeRaffleId}
+                        baseUrl={baseUrl || clientUrl}
+                        supabase={supabase}
+                    />
+                ) : (
+                    <div className="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-start text-center p-0 overflow-hidden font-sans">
+                        {/* Header Publicitario */}
+                        <div className="w-full bg-indigo-600 py-8 shadow-2xl z-20">
+                            <h1 className="text-6xl font-black text-white uppercase tracking-tighter animate-pulse">
+                                🔥 ¡Gran Sorteo en Vivo! 🔥
+                            </h1>
+                            <p className="text-indigo-200 text-xl font-bold mt-2 uppercase tracking-widest">
+                                Atentos a la Pantalla Principal
+                            </p>
+                        </div>
 
-                    <div className="flex-1 w-full grid grid-cols-2 gap-8 p-12 bg-gradient-to-br from-slate-900 to-indigo-950">
-                        {/* Estadísticas / Últimos Resultados */}
-                        <div className="bg-white/5 backdrop-blur-xl rounded-[3rem] border border-white/10 p-10 flex flex-col shadow-inner">
-                            <h3 className="text-3xl font-black text-indigo-400 mb-8 uppercase tracking-widest text-left flex items-center gap-4">
-                                <span className="w-3 h-3 rounded-full bg-indigo-500 animate-ping" />
-                                Últimos Ganadores
-                            </h3>
-                            <div className="space-y-4 flex-1">
-                                {[1, 2, 3, 4, 5].map((i) => (
-                                    <div key={i} className="flex justify-between items-center bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center text-2xl">🎟️</div>
-                                            <span className="text-2xl font-black text-white uppercase">Ticket #{4592 - i * 4}</span>
+                        <div className="flex-1 w-full grid grid-cols-2 gap-8 p-12 bg-gradient-to-br from-slate-900 to-indigo-950">
+                            {/* Estadísticas / Últimos Resultados */}
+                            <div className="bg-white/5 backdrop-blur-xl rounded-[3rem] border border-white/10 p-10 flex flex-col shadow-inner">
+                                <h3 className="text-3xl font-black text-indigo-400 mb-8 uppercase tracking-widest text-left flex items-center gap-4">
+                                    <span className="w-3 h-3 rounded-full bg-indigo-500 animate-ping" />
+                                    Últimos Ganadores
+                                </h3>
+                                <div className="space-y-4 flex-1">
+                                    {[1, 2, 3, 4, 5].map((i) => (
+                                        <div key={i} className="flex justify-between items-center bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center text-2xl">🎟️</div>
+                                                <span className="text-2xl font-black text-white uppercase">Ticket #{4592 - i * 4}</span>
+                                            </div>
+                                            <span className="text-3xl font-black text-emerald-400 font-mono tracking-tighter">${(10000 * (6 - i)).toLocaleString()}</span>
                                         </div>
-                                        <span className="text-3xl font-black text-emerald-400 font-mono tracking-tighter">${(10000 * (6 - i)).toLocaleString()}</span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Espacio Publicitario / Promo */}
+                            <div className="flex flex-col gap-8">
+                                <div className="flex-1 bg-gradient-to-tr from-amber-500 to-orange-600 rounded-[3rem] p-10 flex flex-col items-center justify-center text-white shadow-2xl relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 rounded-full -mr-32 -mt-32 blur-3xl transition-transform group-hover:scale-110" />
+                                    <span className="text-8xl mb-6 transform group-hover:scale-110 transition-transform">🍿</span>
+                                    <h2 className="text-5xl font-black uppercase italic tracking-tighter leading-none mb-4">¡Combo Ruleta!</h2>
+                                    <p className="text-2xl font-bold opacity-90 max-w-xs uppercase leading-tight">
+                                        Pide tu combo y recibe <span className="text-yellow-300 font-black">2 TIROS GRATIS</span>
+                                    </p>
+                                </div>
+                                <div className="h-1/3 bg-white/5 backdrop-blur-md rounded-[3rem] border border-white/10 p-8 flex items-center justify-center gap-6">
+                                    <div className="text-left flex-1">
+                                        <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">Próximo Sorteo</p>
+                                        <p className="text-3xl font-black text-white uppercase italic">En Instantes</p>
                                     </div>
-                                ))}
+                                    <div className="w-20 h-20 rounded-full border-4 border-indigo-500/30 flex items-center justify-center text-2xl font-black text-indigo-400">
+                                        VS
+                                    </div>
+                                    <div className="text-right flex-1">
+                                        <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">Premio Mayor</p>
+                                        <p className="text-3xl font-black text-emerald-400 uppercase italic">$1.000.000</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Espacio Publicitario / Promo */}
-                        <div className="flex flex-col gap-8">
-                            <div className="flex-1 bg-gradient-to-tr from-amber-500 to-orange-600 rounded-[3rem] p-10 flex flex-col items-center justify-center text-white shadow-2xl relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 rounded-full -mr-32 -mt-32 blur-3xl transition-transform group-hover:scale-110" />
-                                <span className="text-8xl mb-6 transform group-hover:scale-110 transition-transform">🍿</span>
-                                <h2 className="text-5xl font-black uppercase italic tracking-tighter leading-none mb-4">¡Combo Ruleta!</h2>
-                                <p className="text-2xl font-bold opacity-90 max-w-xs uppercase leading-tight">
-                                    Pide tu combo y recibe <span className="text-yellow-300 font-black">2 TIROS GRATIS</span>
-                                </p>
+                        {/* Footer con QR */}
+                        <div className="w-full bg-white/5 border-t border-white/10 py-6 px-12 flex justify-between items-center">
+                            <div className="flex items-center gap-6">
+                                <span className="text-slate-400 font-bold uppercase tracking-widest">Sigue participando:</span>
+                                <span className="text-2xl font-black text-white tracking-widest">RULETA.LUKEAPP.ME</span>
                             </div>
-                            <div className="h-1/3 bg-white/5 backdrop-blur-md rounded-[3rem] border border-white/10 p-8 flex items-center justify-center gap-6">
-                                <div className="text-left flex-1">
-                                    <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">Próximo Sorteo</p>
-                                    <p className="text-3xl font-black text-white uppercase italic">En Instantes</p>
-                                </div>
-                                <div className="w-20 h-20 rounded-full border-4 border-indigo-500/30 flex items-center justify-center text-2xl font-black text-indigo-400">
-                                    VS
-                                </div>
-                                <div className="text-right flex-1">
-                                    <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">Premio Mayor</p>
-                                    <p className="text-3xl font-black text-emerald-400 uppercase italic">$1.000.000</p>
-                                </div>
+                            <div className="flex gap-4">
+                                <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                                <div className="w-3 h-3 rounded-full bg-emerald-500 opacity-50" />
+                                <div className="w-3 h-3 rounded-full bg-emerald-500 opacity-20" />
                             </div>
                         </div>
                     </div>
-
-                    {/* Footer con QR */}
-                    <div className="w-full bg-white/5 border-t border-white/10 py-6 px-12 flex justify-between items-center">
-                        <div className="flex items-center gap-6">
-                            <span className="text-slate-400 font-bold uppercase tracking-widest">Sigue participando:</span>
-                            <span className="text-2xl font-black text-white tracking-widest">RULETA.LUKEAPP.ME</span>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                            <div className="w-3 h-3 rounded-full bg-emerald-500 opacity-50" />
-                            <div className="w-3 h-3 rounded-full bg-emerald-500 opacity-20" />
-                        </div>
-                    </div>
-                </div>
+                )
             )}
 
             {/* ZONA DE JUEGO: Ruleta ocupa todo el fondo, Info Card flotante */}
@@ -912,10 +984,10 @@ export default function DisplayScreenPage({
                             </div>
 
                             {/* Player Identity Badge */}
-                            {displayNickname && (displayNickname !== 'Jugador' || status !== 'idle' || previewPlayer) && (
+                            {displayNickname && (status !== 'idle' || previewPlayer) && (
                                 <div className="border-l border-white/20 pl-[1.5vw] animate-in fade-in slide-in-from-left-4 duration-500">
                                     <p className="text-[1vh] text-gray-400 uppercase tracking-widest leading-none mb-[0.5vh]">
-                                        {previewPlayer && status === 'idle' && (!realNickname || realNickname === 'Jugador') ? 'Preparando...' : 'Jugando ahora'}
+                                        {previewPlayer && status === 'idle' && !realNickname ? 'Preparando...' : 'Jugando ahora'}
                                     </p>
                                     <div className="flex items-center gap-[0.5vw]">
                                         {displayEmoji?.startsWith('http') ? (
@@ -1205,3 +1277,218 @@ function PasswordPrompt({ screenId, onUnlock }: { screenId: string, onUnlock: ()
         </div>
     );
 }
+
+interface RaffleTicket {
+    id: string;
+    ticket_number: number;
+    buyer_name: string;
+    status: 'confirmed' | 'cancelled';
+}
+
+function AnimatorRaffleBillboard({
+    activeRaffleId,
+    baseUrl,
+    supabase
+}: {
+    activeRaffleId: string | null;
+    baseUrl: string;
+    supabase: any;
+}) {
+    const [raffle, setRaffle] = useState<any>(null);
+    const [tickets, setTickets] = useState<RaffleTicket[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!activeRaffleId) {
+            setRaffle(null);
+            setTickets([]);
+            setLoading(false);
+            return;
+        }
+
+        async function fetchRaffleDetails() {
+            setLoading(true);
+            const { data: raffleData } = await supabase
+                .from('raffles')
+                .select('*')
+                .eq('id', activeRaffleId)
+                .single();
+            if (raffleData) {
+                setRaffle(raffleData);
+            }
+
+            const { data: ticketsData } = await supabase
+                .from('raffle_tickets')
+                .select('*')
+                .eq('raffle_id', activeRaffleId)
+                .neq('status', 'cancelled');
+            if (ticketsData) {
+                setTickets(ticketsData as RaffleTicket[]);
+            }
+            setLoading(false);
+        }
+
+        fetchRaffleDetails();
+
+        // Subscribe to raffle changes (e.g. status)
+        const raffleSub = supabase
+            .channel('raffle_billboard_details')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'raffles', filter: `id=eq.${activeRaffleId}` }, (payload: any) => {
+                if (payload.new) {
+                    setRaffle(payload.new);
+                }
+            })
+            .subscribe();
+
+        // Subscribe to tickets changes (when someone buys a ticket)
+        const ticketsSub = supabase
+            .channel('raffle_billboard_tickets')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'raffle_tickets', filter: `raffle_id=eq.${activeRaffleId}` }, () => {
+                // Refetch tickets
+                supabase
+                    .from('raffle_tickets')
+                    .select('*')
+                    .eq('raffle_id', activeRaffleId)
+                    .neq('status', 'cancelled')
+                    .then(({ data }: any) => {
+                        if (data) setTickets(data as RaffleTicket[]);
+                    });
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(raffleSub);
+            supabase.removeChannel(ticketsSub);
+        };
+    }, [activeRaffleId]);
+
+    if (!activeRaffleId) {
+        return (
+            <div className="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center text-center p-8 font-sans">
+                <div className="text-6xl mb-6">🎟️</div>
+                <h1 className="text-4xl font-black text-white mb-2 uppercase tracking-tighter">Esperando Sorteo...</h1>
+                <p className="text-slate-400 text-lg max-w-md font-medium leading-relaxed">
+                    El administrador aún no ha activado ningún sorteo en el panel de control.
+                </p>
+            </div>
+        );
+    }
+
+    if (loading) {
+        return (
+            <div className="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center text-center p-8 font-sans">
+                <div className="w-16 h-16 border-4 border-white/10 border-t-indigo-500 rounded-full animate-spin mb-4" />
+                <h2 className="text-xl font-bold text-white uppercase tracking-widest animate-pulse">Cargando Tablero...</h2>
+            </div>
+        );
+    }
+
+    const soldCount = tickets.length;
+    const availableCount = 36 - soldCount;
+
+    return (
+        <div className="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-between text-center p-0 overflow-hidden font-sans select-none">
+            {/* Header section */}
+            <div className="w-full bg-gradient-to-r from-indigo-900 via-indigo-850 to-purple-900 py-6 px-12 shadow-2xl flex justify-between items-center z-20 border-b border-indigo-500/20">
+                <div className="text-left">
+                    <span className="bg-yellow-500 text-black font-black px-3 py-1 rounded-full text-xs uppercase tracking-widest shadow-md">
+                        Sorteo #{raffle?.code || '---'}
+                    </span>
+                    <h1 className="text-4xl font-black text-white uppercase tracking-tight mt-1">
+                        🏆 {raffle?.name || 'Cargando Sorteo...'}
+                    </h1>
+                </div>
+                <div className="flex gap-6 items-center">
+                    <div className="bg-black/35 backdrop-blur-md px-6 py-2 rounded-2xl border border-white/10 text-right">
+                        <p className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest">DISPONIBLES</p>
+                        <p className="text-3xl font-black text-emerald-400 font-mono tracking-tighter">{availableCount} / 36</p>
+                    </div>
+                    <div className="bg-black/35 backdrop-blur-md px-6 py-2 rounded-2xl border border-white/10 text-right">
+                        <p className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest">VENDIDOS</p>
+                        <p className="text-3xl font-black text-yellow-400 font-mono tracking-tighter">{soldCount} / 36</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Grid of 36 animals */}
+            <div className="flex-1 w-full grid grid-cols-6 gap-3 p-6 bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950/60 overflow-y-auto">
+                {Array.from({ length: 36 }, (_, i) => {
+                    const num = i + 1;
+                    const ticket = tickets.find(t => t.ticket_number === num);
+                    const isSold = !!ticket;
+                    const animal = ANIMAL_LIST.find(a => a.id === num);
+                    const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
+                    const imageSrc = `${STORAGE_BASE}/group_sorteo/segments/${num}.png`;
+
+                    return (
+                        <div
+                            key={num}
+                            className={`relative rounded-2xl border transition-all duration-500 overflow-hidden flex flex-col items-center justify-center p-3 shadow-md ${
+                                isSold
+                                    ? 'bg-slate-950/85 border-rose-500/30 grayscale opacity-60 scale-95'
+                                    : 'bg-indigo-950/20 border-white/10 hover:border-indigo-500/50 hover:scale-102 cursor-default'
+                            }`}
+                        >
+                            {/* Animal Image */}
+                            <div className="w-16 h-16 relative mb-2">
+                                <Image
+                                    src={imageSrc}
+                                    alt={animal?.name || `Animal ${num}`}
+                                    fill
+                                    className={`object-contain ${!isSold ? 'animate-pulse duration-3000' : ''}`}
+                                />
+                            </div>
+
+                            {/* Badge with number */}
+                            <div className={`absolute top-2 left-2 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black border ${
+                                isSold
+                                    ? 'bg-rose-950/80 border-rose-500/30 text-rose-400'
+                                    : 'bg-indigo-900/80 border-indigo-500/30 text-indigo-300'
+                            }`}>
+                                {num}
+                            </div>
+
+                            {/* Owner info or 'Disponible' */}
+                            <div className="w-full text-center">
+                                {isSold ? (
+                                    <div className="bg-rose-950/50 border border-rose-500/20 py-1 px-2 rounded-lg truncate">
+                                        <p className="text-[9px] text-rose-300 font-bold uppercase tracking-wider leading-none">VENDIDO</p>
+                                        <p className="text-xs font-black text-white truncate mt-0.5">{ticket.buyer_name}</p>
+                                    </div>
+                                ) : (
+                                    <div className="bg-emerald-950/40 border border-emerald-500/20 py-1 px-2 rounded-lg animate-pulse">
+                                        <p className="text-[9px] text-emerald-400 font-black uppercase tracking-wider leading-none">DISPONIBLE</p>
+                                        <p className="text-xs font-bold text-white truncate mt-0.5">{animal?.name || `Nº ${num}`}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Footer QR scanner promotion */}
+            <div className="w-full bg-black/60 border-t border-white/5 py-4 px-12 flex justify-between items-center no-print backdrop-blur-md">
+                <div className="flex items-center gap-6 text-left">
+                    <span className="text-slate-400 text-xs font-black uppercase tracking-widest">¿Quieres participar?</span>
+                    <span className="text-2xl font-black text-indigo-400 tracking-wider">¡COMPRA TU CRÉDITO EN EL KIOSKO Y ESCANEA EL QR!</span>
+                </div>
+                <div className="flex gap-4 items-center bg-white/5 p-2 px-4 rounded-xl border border-white/10">
+                    <div className="text-right">
+                        <p className="text-[10px] text-slate-400 font-bold leading-tight">ESCANEA AHORA</p>
+                        <p className="text-[10px] text-indigo-300 font-black tracking-widest font-mono uppercase leading-tight">RULETA.LUKEAPP.ME</p>
+                    </div>
+                    <div className="bg-white p-1 rounded-lg w-12 h-12 flex items-center justify-center">
+                        <QRCodeCanvas
+                            value={baseUrl}
+                            size={40}
+                            level="H"
+                            className="w-full h-full"
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+

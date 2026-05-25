@@ -31,7 +31,9 @@ export default function KioskPage() {
 
 function KioskContent() {
     const supabase = createClient();
+    const [kioskMode, setKioskMode] = useState<'individual' | 'raffle'>('individual');
     const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+    const [isRaffleCode, setIsRaffleCode] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [customPlays, setCustomPlays] = useState(1);
     const [customPrice, setCustomPrice] = useState(1000);
@@ -72,8 +74,16 @@ function KioskContent() {
         return res;
     };
 
+    const generateRaffleCode = () => {
+        const chars = '0123456789ABCDEF';
+        let res = 'SF-';
+        for (let i = 0; i < 4; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+        return res;
+    };
+
     const handleQuickSale = async (pkg: Package) => {
         setIsGenerating(true);
+        setIsRaffleCode(false);
         const code = generateCode();
         try {
             const { error } = await supabase
@@ -99,8 +109,41 @@ function KioskContent() {
         }
     };
 
+    const handleRaffleSale = async (plays: number, price: number) => {
+        setIsGenerating(true);
+        setIsRaffleCode(true);
+        const code = generateRaffleCode();
+        try {
+            const { error } = await supabase
+                .from('raffle_packages')
+                .insert({
+                    code,
+                    total_options: plays,
+                    remaining_options: plays,
+                    price_paid: price,
+                    valid_until: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
+                    status: 'active'
+                });
+            if (error) throw error;
+            setGeneratedCode(code);
+        } catch (err) {
+            console.error('Error generando ticket de sorteo:', err);
+            alert('Error al generar el ticket de sorteo.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     const handleCustomSale = async () => {
         setIsGenerating(true);
+        if (kioskMode === 'raffle') {
+            await handleRaffleSale(customPlays, customPrice);
+            setCustomPlays(1);
+            setCustomPrice(1000);
+            return;
+        }
+
+        setIsRaffleCode(false);
         const code = generateCode();
         try {
             const { error } = await supabase
@@ -163,20 +206,23 @@ function KioskContent() {
                             <p className="text-sm text-gray-400">Entrega este código al cliente</p>
                         </div>
 
-                        <div className="bg-yellow-500 text-black p-6 rounded-xl mb-6 text-center shadow-xl print:bg-white print:border-2 print:border-black print:p-8 print:shadow-none min-h-[400px] flex flex-col items-center justify-center">
+                        <div className={`p-6 rounded-xl mb-6 text-center shadow-xl print:border-2 print:border-black print:p-8 print:shadow-none min-h-[400px] flex flex-col items-center justify-center ${isRaffleCode ? 'bg-indigo-600 text-white print:bg-white print:text-black' : 'bg-yellow-500 text-black print:bg-white'}`}>
                             <div className="hidden print:block mb-4">
                                 <h4 className="text-[14px] font-black uppercase text-center mb-1">
-                                    {settings.ticket_header}<br />
-                                    <span className="text-[10px]">{settings.ticket_subheader}</span>
+                                    {isRaffleCode ? 'Sorteo LukeApp' : settings.ticket_header}<br />
+                                    <span className="text-[10px]">{isRaffleCode ? 'Valparaíso 2026' : settings.ticket_subheader}</span>
                                 </h4>
                             </div>
 
-                            <p className="text-xs font-bold uppercase tracking-widest mb-2 print:text-black print:text-[10px]">CÓDIGO DE JUEGO</p>
+                            <p className="text-xs font-bold uppercase tracking-widest mb-2 print:text-black print:text-[10px]">{isRaffleCode ? 'CÓDIGO DE SORTEO' : 'CÓDIGO DE JUEGO'}</p>
                             <p className="text-4xl font-black tracking-tight font-mono mb-6 print:text-5xl print:text-black">{generatedCode}</p>
 
                             <div className="bg-white p-3 rounded-xl mb-6 shadow-inner print:shadow-none print:border print:border-black">
                                 <QRCodeCanvas
-                                    value={`${(settings.base_url || window.location.origin).trim()}/ticket/view/${generatedCode}`}
+                                    value={isRaffleCode 
+                                        ? `${(settings.base_url || window.location.origin).trim()}/individual?redeem=${generatedCode}`
+                                        : `${(settings.base_url || window.location.origin).trim()}/ticket/view/${generatedCode}`
+                                    }
                                     size={150}
                                     level="H"
                                 />
@@ -184,13 +230,13 @@ function KioskContent() {
 
                             <div className="flex flex-col items-center">
                                 <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-4 print:text-black print:opacity-100">
-                                    Escanea para ver tus jugadas
+                                    {isRaffleCode ? 'Escanea para elegir tus animales' : 'Escanea para ver tus jugadas'}
                                 </p>
 
                                 <div className="hidden print:block text-black">
                                     <div className="text-[10px] font-bold text-center border-t border-black/20 pt-4 px-4 leading-tight">
-                                        {settings.ticket_terms_line1}<br />
-                                        {settings.ticket_terms_line2}
+                                        {isRaffleCode ? 'SELECCIONA TUS NÚMEROS EN LA APP' : settings.ticket_terms_line1}<br />
+                                        {isRaffleCode ? 'PRESENTA EL TICKET PARA COBRAR EL PREMIO' : settings.ticket_terms_line2}
                                     </div>
                                 </div>
                             </div>
@@ -214,50 +260,101 @@ function KioskContent() {
                 </div>
             )}
 
+            {/* Selector de Modo de Venta */}
+            <div className="max-w-5xl mx-auto mb-6 flex bg-[#111] p-1 rounded-2xl border border-white/10 no-print">
+                <button
+                    onClick={() => setKioskMode('individual')}
+                    className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${kioskMode === 'individual' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-gray-400 hover:text-white'}`}
+                >
+                    🎮 JUEGOS INDIVIDUALES
+                </button>
+                <button
+                    onClick={() => setKioskMode('raffle')}
+                    className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${kioskMode === 'raffle' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-gray-400 hover:text-white'}`}
+                >
+                    🎟️ CRÉDITOS DE SORTEOS
+                </button>
+            </div>
+
             <div className="max-w-5xl mx-auto grid gap-6">
                 <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl">
-                    <h3 className="text-xl font-black text-white mb-6 uppercase tracking-tight">⚡ Packs Rápidos</h3>
+                    <h3 className="text-xl font-black text-white mb-6 uppercase tracking-tight">
+                        {kioskMode === 'raffle' ? '⚡ Packs Rápidos de Sorteo' : '⚡ Packs Rápidos'}
+                    </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {PACKAGES.map((pkg) => (
-                            <div
-                                key={pkg.name}
-                                className={`relative bg-black border-2 rounded-2xl p-6 transition-all group ${pkg.popular ? 'border-yellow-500 shadow-lg shadow-yellow-500/10' : 'border-white/10'
-                                    }`}
-                            >
-                                {pkg.popular && (
-                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-500 text-black text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-tighter">
-                                        POPULAR
-                                    </div>
-                                )}
-                                <div className="text-center mb-6">
-                                    <p className="text-2xl font-black text-white mb-1">{pkg.name}</p>
-                                    <p className="text-4xl font-black text-yellow-500 tracking-tighter">${pkg.price.toLocaleString()}</p>
-                                </div>
-                                <button
-                                    onClick={() => handleQuickSale(pkg)}
-                                    disabled={isGenerating}
-                                    className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                        {kioskMode === 'raffle' ? (
+                            // Sorteo Packs
+                            [
+                                { name: '1 Animalito', plays: 1, price: 1000 },
+                                { name: '3 Animalitos', plays: 3, price: 2500, popular: true },
+                                { name: '5 Animalitos', plays: 5, price: 4000 },
+                            ].map((pkg) => (
+                                <div
+                                    key={pkg.name}
+                                    className={`relative bg-black border-2 rounded-2xl p-6 transition-all group ${pkg.popular ? 'border-indigo-500 shadow-lg shadow-indigo-500/10' : 'border-white/10'}`}
                                 >
-                                    {isGenerating ? '...' : 'GENERAR TICKET'}
-                                </button>
-                            </div>
-                        ))}
+                                    {pkg.popular && (
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-tighter">
+                                            POPULAR
+                                        </div>
+                                    )}
+                                    <div className="text-center mb-6">
+                                        <p className="text-2xl font-black text-white mb-1">{pkg.name}</p>
+                                        <p className="text-4xl font-black text-indigo-400 tracking-tighter">${pkg.price.toLocaleString()}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleRaffleSale(pkg.plays, pkg.price)}
+                                        disabled={isGenerating}
+                                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                                    >
+                                        {isGenerating ? '...' : 'GENERAR TICKET SORTEO'}
+                                    </button>
+                                </div>
+                            ))
+                        ) : (
+                            // Individual Packs
+                            PACKAGES.map((pkg) => (
+                                <div
+                                    key={pkg.name}
+                                    className={`relative bg-black border-2 rounded-2xl p-6 transition-all group ${pkg.popular ? 'border-yellow-500 shadow-lg shadow-yellow-500/10' : 'border-white/10'}`}
+                                >
+                                    {pkg.popular && (
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-500 text-black text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-tighter">
+                                            POPULAR
+                                        </div>
+                                    )}
+                                    <div className="text-center mb-6">
+                                        <p className="text-2xl font-black text-white mb-1">{pkg.name}</p>
+                                        <p className="text-4xl font-black text-yellow-500 tracking-tighter">${pkg.price.toLocaleString()}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleQuickSale(pkg)}
+                                        disabled={isGenerating}
+                                        className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                                    >
+                                        {isGenerating ? '...' : 'GENERAR TICKET'}
+                                    </button>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
 
                 <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl">
-                    <h3 className="text-xl font-black text-white mb-6 uppercase tracking-tight">🛠️ Pack Personalizado</h3>
+                    <h3 className="text-xl font-black text-white mb-6 uppercase tracking-tight">
+                        {kioskMode === 'raffle' ? '🛠️ Pack Sorteo Personalizado' : '🛠️ Pack Personalizado'}
+                    </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         <div>
                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-                                Cantidad de Jugadas
+                                {kioskMode === 'raffle' ? 'Cantidad de Animalitos (Créditos)' : 'Cantidad de Jugadas'}
                             </label>
                             <input
                                 type="number"
                                 min="1"
                                 value={customPlays}
                                 onChange={(e) => setCustomPlays(parseInt(e.target.value) || 1)}
-                                className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white focus:border-yellow-500 outline-none text-lg"
+                                className={`w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white outline-none text-lg ${kioskMode === 'raffle' ? 'focus:border-indigo-650' : 'focus:border-yellow-500'}`}
                             />
                         </div>
                         <div>
@@ -270,16 +367,16 @@ function KioskContent() {
                                 step="100"
                                 value={customPrice}
                                 onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
-                                className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white focus:border-yellow-500 outline-none text-lg"
+                                className={`w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white outline-none text-lg ${kioskMode === 'raffle' ? 'focus:border-indigo-650' : 'focus:border-yellow-500'}`}
                             />
                         </div>
                     </div>
                     <button
                         onClick={handleCustomSale}
                         disabled={isGenerating}
-                        className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20 font-black py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                        className={`w-full font-black py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50 ${kioskMode === 'raffle' ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'}`}
                     >
-                        {isGenerating ? 'GENERANDO...' : 'GENERAR TICKET PERSONALIZADO'}
+                        {isGenerating ? 'GENERANDO...' : kioskMode === 'raffle' ? 'GENERAR TICKET SORTEO PERSONALIZADO' : 'GENERAR TICKET PERSONALIZADO'}
                     </button>
                 </div>
 

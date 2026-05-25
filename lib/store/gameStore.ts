@@ -35,7 +35,7 @@ export const useGameStore = create<GameState>()(
     persist(
         (set) => ({
             screenId: null,
-            nickname: 'Jugador',
+            nickname: '',
             emoji: '😎',
             queueId: null,
             currentQueueId: null,
@@ -84,7 +84,7 @@ export const useGameStore = create<GameState>()(
                 isRevenge: false,
             }),
             resetIdentity: () => set({
-                nickname: 'Jugador',
+                nickname: '',
                 emoji: '😎'
             }),
         }),

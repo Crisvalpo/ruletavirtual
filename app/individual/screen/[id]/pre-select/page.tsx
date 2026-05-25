@@ -17,7 +17,7 @@ export default function PreSelectPage({
     const router = useRouter();
     const searchParams = useSearchParams();
     const supabase = createClient();
-    const { user } = useAuth(); // Identidad del usuario autenticado (si hay)
+    const { user, profile } = useAuth(); // Identidad del usuario autenticado (si hay)
 
     const mode = useGameStore((state) => state.gameMode);
     const { selectedAnimals, activeWheelId, nickname, emoji, setQueueId, queueId } = useGameStore();
@@ -108,7 +108,7 @@ export default function PreSelectPage({
             }
 
             // 3. Redirigir a la pantalla de bienvenida si no tiene nickname establecido
-            if (nickname === 'Jugador') {
+            if (!nickname && !profile?.display_name) {
                 router.push(`/individual/screen/${id}`);
             }
         };
@@ -186,8 +186,8 @@ export default function PreSelectPage({
             // Preparar objeto de inseción
             const insertPayload: any = {
                 screen_number: parseInt(id),
-                player_name: nickname || 'Jugador',
-                player_emoji: emoji || '😎',
+                player_name: nickname || profile?.display_name || 'Jugador Anónimo',
+                player_emoji: emoji || profile?.avatar_url || '😎',
                 player_id: user?.id || null, // VINCULACIÓN DE IDENTIDAD CLAVE
                 status: 'waiting', // Entra directo a WAITING
                 selected_wheel_id: currentLocalWheelId || null,
