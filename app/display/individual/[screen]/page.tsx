@@ -1055,6 +1055,7 @@ export default function DisplayScreenPage({
                                         targetIndex={result}
                                         onSpinComplete={handleSpinComplete}
                                         segments={activeWheelAssets?.segments}
+                                        drawMode={isGroupEvent ? 'segmentImage' : undefined}
                                         className="w-full h-full"
                                     />
                                 </div>

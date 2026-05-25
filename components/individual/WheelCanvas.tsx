@@ -17,6 +17,7 @@ interface WheelCanvasProps {
     isIdle?: boolean; // New prop for attract mode
     targetIndex?: number | null; // 1-36
     segments?: WheelSegment[]; // Optional: if provided, overrides default ANIMAL_LIST
+    drawMode?: 'code' | 'segmentImage'; // Added to distinguish full-segment image drawing
 }
 
 export default function WheelCanvas({
@@ -26,6 +27,7 @@ export default function WheelCanvas({
     targetIndex = null,
     segments,
     idleSpeed = 4.0, // New Prop
+    drawMode,
     className = ""
 }: WheelCanvasProps & { className?: string; idleSpeed?: number }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -99,6 +101,7 @@ export default function WheelCanvas({
         const totalSegments = items.length;
         const segmentAngle = (2 * Math.PI) / totalSegments;
         const isFanMode = totalSegments <= 20;
+        const isFullSegmentImage = drawMode === 'segmentImage' || isFanMode;
 
         // Start Spin Logic
         if (isSpinning && targetIndex === null) {
@@ -196,7 +199,7 @@ export default function WheelCanvas({
                     const aspect = img.naturalWidth / img.naturalHeight;
                     let imgHeight, imgWidth, dist;
 
-                    if (isFanMode) {
+                    if (isFullSegmentImage) {
                         imgHeight = radius;
                         imgWidth = imgHeight * aspect * 1.0;
                         dist = radius / 2;
