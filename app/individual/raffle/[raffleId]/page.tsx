@@ -318,6 +318,10 @@ export default function RaffleSelectionPage({
     const activePkg = packages.find(p => p.code === selectedPackageCode);
     const credits = activePkg ? activePkg.remaining_options : 0;
 
+    // Tickets already purchased by this user for the current raffle
+    const myTickets = soldTickets.filter(t => t.player_id === user?.id).map(t => t.ticket_number);
+    const myNumbersSorted = [...myTickets].sort((a, b) => a - b);
+
     if (isLoading || loading) {
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-white space-y-6">
@@ -364,6 +368,27 @@ export default function RaffleSelectionPage({
                     <p className="text-xs text-slate-400 font-medium mt-1">
                         📅 Sorteo programado: {new Date(raffle?.start_time).toLocaleString()}
                     </p>
+
+                    {myNumbersSorted.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-indigo-500/20 space-y-2">
+                            <p className="text-[10px] text-indigo-300 font-black uppercase tracking-widest flex items-center gap-1">
+                                🎟️ Estás participando con ({myNumbersSorted.length}):
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {myNumbersSorted.map(num => {
+                                    const animal = ANIMAL_LIST.find(a => a.id === num);
+                                    return (
+                                        <span 
+                                            key={num} 
+                                            className="bg-indigo-950/60 text-indigo-200 border border-indigo-500/25 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wide flex items-center gap-1 shadow-sm"
+                                        >
+                                            <span className="text-yellow-400 font-mono">#{num}</span> {animal?.name}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Messages Banner */}
