@@ -1527,45 +1527,44 @@ function AnimatorRaffleBillboard({
                     return (
                         <div
                             key={num}
-                            className={`relative rounded-2xl border transition-all duration-500 overflow-hidden flex flex-col items-center justify-center p-3 shadow-md ${
+                            className={`relative rounded-[1.5rem] aspect-square border transition-all duration-500 overflow-hidden shadow-lg ${
                                 isSold
-                                    ? 'bg-slate-950/85 border-rose-500/30 grayscale opacity-60 scale-95'
-                                    : 'bg-indigo-950/20 border-white/10 hover:border-indigo-500/50 hover:scale-102 cursor-default'
+                                    ? 'border-rose-500/40 grayscale opacity-75 scale-95'
+                                    : 'border-white/10 hover:border-indigo-500/50 hover:scale-105 cursor-default'
                             }`}
                         >
-                            {/* Animal Image */}
-                            <div className="w-16 h-16 relative mb-2">
+                            {/* Animal Image (Fills 100% of the square cell) */}
+                            <div className="absolute inset-0 w-full h-full">
                                 <Image
                                     src={imageSrc}
                                     alt={animal?.name || `Animal ${num}`}
                                     fill
-                                    className={`object-contain ${!isSold ? 'animate-pulse duration-3000' : ''}`}
+                                    className="object-cover"
+                                    sizes="(max-width: 1200px) 15vw, 200px"
+                                    priority={num <= 12}
                                 />
                             </div>
 
-                            {/* Badge with number */}
-                            <div className={`absolute top-2 left-2 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black border ${
+                            {/* Badge with number (Sutil, translucido) */}
+                            <div className={`absolute top-2.5 left-2.5 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black border backdrop-blur-md z-15 ${
                                 isSold
-                                    ? 'bg-rose-950/80 border-rose-500/30 text-rose-400'
-                                    : 'bg-indigo-900/80 border-indigo-500/30 text-indigo-300'
+                                    ? 'bg-rose-950/80 border-rose-500/30 text-rose-450'
+                                    : 'bg-black/60 border-white/10 text-white'
                             }`}>
                                 {num}
                             </div>
 
-                            {/* Owner info or 'Disponible' */}
-                            <div className="w-full text-center">
-                                {isSold ? (
-                                    <div className="bg-rose-950/50 border border-rose-500/20 py-1 px-2 rounded-lg truncate">
-                                        <p className="text-[9px] text-rose-300 font-bold uppercase tracking-wider leading-none">VENDIDO</p>
-                                        <p className="text-xs font-black text-white truncate mt-0.5">{ticket.buyer_name}</p>
-                                    </div>
-                                ) : (
-                                    <div className="bg-emerald-950/40 border border-emerald-500/20 py-1 px-2 rounded-lg animate-pulse">
-                                        <p className="text-[9px] text-emerald-400 font-black uppercase tracking-wider leading-none">DISPONIBLE</p>
-                                        <p className="text-xs font-bold text-white truncate mt-0.5">{animal?.name || `Nº ${num}`}</p>
-                                    </div>
-                                )}
-                            </div>
+                            {/* Sold Overlay */}
+                            {isSold && (
+                                <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center p-3 z-10 animate-in fade-in duration-300">
+                                    <span className="bg-rose-600 text-white font-black px-2.5 py-0.5 rounded-lg text-[9px] uppercase tracking-widest shadow-md">
+                                        VENDIDO
+                                    </span>
+                                    <span className="text-[12px] font-black text-white truncate w-full text-center mt-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
+                                        {ticket.buyer_name}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     );
                 })}
