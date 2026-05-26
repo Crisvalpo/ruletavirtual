@@ -49,6 +49,14 @@ export default function RaffleManager() {
             })
             .subscribe();
 
+        // Subscribe to changes in raffle_tickets
+        const ticketsChannel = supabase
+            .channel('tickets_realtime_admin')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'raffle_tickets' }, () => {
+                fetchRaffles();
+            })
+            .subscribe();
+
         // Subscribe to changes in venue_settings
         const settingsChannel = supabase
             .channel('settings_realtime_admin')
@@ -60,6 +68,7 @@ export default function RaffleManager() {
 
         return () => {
             supabase.removeChannel(rafflesChannel);
+            supabase.removeChannel(ticketsChannel);
             supabase.removeChannel(settingsChannel);
         };
     }, []);
@@ -144,15 +153,20 @@ export default function RaffleManager() {
     }
 
     async function handleUpdateStatus(id: string, newStatus: 'open' | 'closed_for_sales' | 'cancelled') {
-        const { error } = await supabase
-            .from('raffles')
-            .update({ status: newStatus })
-            .eq('id', id);
+        const { data, error } = await supabase.rpc('update_raffle_status', {
+            p_raffle_id: id,
+            p_status: newStatus
+        });
 
         if (error) {
             alert('Error al cambiar estado: ' + error.message);
         } else {
-            fetchRaffles();
+            const res = data as { success: boolean; message: string };
+            if (res.success) {
+                fetchRaffles();
+            } else {
+                alert('No se pudo cambiar el estado: ' + res.message);
+            }
         }
     }
 
