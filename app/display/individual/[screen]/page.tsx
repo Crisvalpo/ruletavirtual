@@ -1522,8 +1522,7 @@ function AnimatorRaffleBillboard({
                     const ticket = tickets.find(t => t.ticket_number === num);
                     const isSold = !!ticket;
                     const animal = ANIMAL_LIST.find(a => a.id === num);
-                    const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
-                    const imageSrc = `${STORAGE_BASE}/group_sorteo/segments/${num}.png`;
+                    const imageSrc = `/animals/${num}.jpg`;
 
                     return (
                         <div
@@ -1757,7 +1756,7 @@ function RaffleStatsBillboard({
     const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
     
     const getAnimalImage = (num: number) => {
-        return `${STORAGE_BASE}/group_sorteo/segments/${num}.png`;
+        return `/animals/${num}.jpg`;
     };
 
     return (
