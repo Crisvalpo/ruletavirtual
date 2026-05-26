@@ -1080,8 +1080,8 @@ export default function DisplayScreenPage({
                                 In Fan Mode, it overflows the container (bottom cropped). */}
                                 <div className={`relative w-full aspect-square`}>
                                     <WheelCanvas
-                                        isSpinning={storeStatus === 'spinning'}
-                                        isIdle={storeStatus === 'idle'}
+                                        isSpinning={status === 'spinning'}
+                                        isIdle={status === 'idle'}
                                         idleSpeed={idleSpeed || 4.0}
                                         targetIndex={result}
                                         onSpinComplete={handleSpinComplete}
