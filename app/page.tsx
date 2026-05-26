@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import IdentityBadge from '@/components/individual/IdentityBadge';
 import RaffleList from '@/components/individual/RaffleList';
 import { createClient } from '@/lib/supabase/client';
+import { ANIMAL_LIST } from '@/lib/constants/animals';
 
 export default function HomePage() {
     const { profile, isLoading, user } = useAuth();
@@ -209,7 +210,7 @@ export default function HomePage() {
     // 4. Main Content (Authenticated PWA or Staff)
 
     return (
-        <main className="min-h-screen flex flex-col items-center justify-start bg-[#050505] relative pwa-mode overflow-hidden selection:bg-primary/30">
+        <main className="min-h-screen flex flex-col items-center justify-start bg-[#050505] relative pwa-mode overflow-y-auto selection:bg-primary/30">
             {/* Premium Background Blobs */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full animate-pulse" />
@@ -367,6 +368,13 @@ export default function HomePage() {
                 <div className="mt-8 w-full">
                     <RaffleList />
                 </div>
+
+                {/* Mis Apuestas de Sorteo */}
+                {user?.id && (
+                    <div className="mt-8 w-full">
+                        <PlayerRaffles userId={user.id} />
+                    </div>
+                )}
 
                 {/* Mis Premios Section - Integrated below the grid */}
                 {!isAdmin && user?.email && (
@@ -541,6 +549,158 @@ function PlayerPrizes({ userEmail }: { userEmail: string }) {
             <p className="mt-4 text-[9px] text-amber-500/50 text-center uppercase tracking-widest font-bold">
                 Muestra el código QR al encargado para cobrar
             </p>
+        </div>
+    );
+}
+
+function PlayerRaffles({ userId }: { userId: string }) {
+    const [tickets, setTickets] = React.useState<any[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const supabase = React.useMemo(() => createClient(), []);
+
+    React.useEffect(() => {
+        const fetchTickets = async () => {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('raffle_tickets')
+                .select(`
+                    id,
+                    ticket_number,
+                    amount_paid,
+                    created_at,
+                    raffles!inner (
+                        id,
+                        code,
+                        name,
+                        status,
+                        winning_number
+                    )
+                `)
+                .eq('player_id', userId)
+                .order('created_at', { ascending: false });
+
+            if (!error && data) {
+                setTickets(data);
+            }
+            setLoading(false);
+        };
+
+        fetchTickets();
+
+        // Subscribe to ticket changes
+        const channel = supabase
+            .channel(`player_tickets_${userId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'raffle_tickets', filter: `player_id=eq.${userId}` }, () => {
+                fetchTickets();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [userId, supabase]);
+
+    if (loading) return null;
+    if (tickets.length === 0) return null;
+
+    // Agrupar los tickets por sorteo
+    const grouped: Record<string, {
+        raffleCode: string;
+        raffleName: string;
+        raffleStatus: string;
+        winningNumber: number | null;
+        numbers: { number: number; isWinner: boolean }[];
+    }> = {};
+
+    tickets.forEach(ticket => {
+        const r = ticket.raffles;
+        if (!grouped[r.id]) {
+            grouped[r.id] = {
+                raffleCode: r.code,
+                raffleName: r.name,
+                raffleStatus: r.status,
+                winningNumber: r.winning_number,
+                numbers: []
+            };
+        }
+        const isWinner = r.status === 'completed' && r.winning_number === ticket.ticket_number;
+        // Evitar duplicar números en la vista
+        const exists = grouped[r.id].numbers.some(n => n.number === ticket.ticket_number);
+        if (!exists) {
+            grouped[r.id].numbers.push({
+                number: ticket.ticket_number,
+                isWinner
+            });
+        }
+    });
+
+    return (
+        <div className="bg-[#111]/30 backdrop-blur-md rounded-3xl p-6 border border-white/5 shadow-xl space-y-4">
+            <h2 className="text-xs font-bold text-indigo-400 font-mono uppercase tracking-[0.25em] opacity-80 flex items-center gap-2">
+                🎟️ Mis Apuestas de Sorteo
+            </h2>
+            <div className="space-y-3">
+                {Object.entries(grouped).map(([raffleId, g]) => {
+                    const hasWinner = g.numbers.some(n => n.isWinner);
+                    return (
+                        <div 
+                            key={raffleId}
+                            className={`p-4 rounded-2xl border transition-all ${
+                                hasWinner 
+                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-left font-sans' 
+                                    : 'bg-white/5 border-white/5 text-left font-sans'
+                            }`}
+                        >
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="text-left">
+                                    <span className="bg-indigo-900/65 text-indigo-300 border border-indigo-500/25 font-black px-2 py-0.5 rounded text-[8px] uppercase tracking-wider">
+                                        Sorteo #{g.raffleCode}
+                                    </span>
+                                    <h3 className="text-sm font-black text-white mt-1 leading-tight">{g.raffleName}</h3>
+                                </div>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                                    g.raffleStatus === 'completed' 
+                                        ? 'bg-slate-800 text-slate-400 border border-white/5' 
+                                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse'
+                                }`}>
+                                    {g.raffleStatus === 'completed' ? 'Finalizado' : 'En Curso'}
+                                </span>
+                            </div>
+
+                            {/* Números jugados */}
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                                {g.numbers.map((n, idx) => {
+                                    const animal = ANIMAL_LIST.find(a => a.id === n.number);
+                                    return (
+                                        <span 
+                                            key={idx}
+                                            className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wide flex items-center gap-1 border ${
+                                                n.isWinner
+                                                    ? 'bg-emerald-500 text-black border-emerald-400 shadow-md'
+                                                    : g.raffleStatus === 'completed'
+                                                    ? 'bg-black/40 text-gray-500 border-white/5 line-through'
+                                                    : 'bg-indigo-950/40 text-indigo-200 border-indigo-500/20'
+                                            }`}
+                                        >
+                                            #{n.number} {animal?.name} {n.isWinner && '🏆'}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Resultado del sorteo si ya terminó */}
+                            {g.raffleStatus === 'completed' && (
+                                <div className="mt-3 pt-2.5 border-t border-white/5 flex justify-between items-center text-[10px]">
+                                    <span className="text-gray-500 font-bold">Número Ganador:</span>
+                                    <span className="text-yellow-400 font-black font-mono">
+                                        #{g.winningNumber} {ANIMAL_LIST.find(a => a.id === g.winningNumber)?.name}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }

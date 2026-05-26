@@ -531,6 +531,9 @@ export default function RaffleSelectionPage({
                     </div>
                 </div>
 
+                {/* Espacio para evitar que el botón flotante inferior tape la última fila de animales */}
+                <div className="h-28" />
+
                 {/* Purchase Button */}
                 {selectedNumbers.length > 0 && (
                     <div className="fixed bottom-6 left-4 right-4 z-50 animate-in slide-in-from-bottom-full duration-500">
