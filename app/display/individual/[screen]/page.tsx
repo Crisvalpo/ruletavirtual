@@ -1209,7 +1209,7 @@ export default function DisplayScreenPage({
                     <div
                         className="h-full bg-gradient-to-r from-yellow-500 to-red-500 origin-left"
                         style={{
-                            animation: `progress-fill ${isDemo ? '5s' : '10s'} linear forwards`
+                            animation: `progress-fill ${isDemo ? '5s' : '15s'} linear forwards`
                         }}
                     />
 

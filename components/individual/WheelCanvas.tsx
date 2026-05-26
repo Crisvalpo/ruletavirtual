@@ -159,7 +159,7 @@ export default function WheelCanvas({
                     startRotation: currentRot,
                     targetRotation: targetRot,
                     startTime: performance.now(),
-                    duration: 4000 // 4 seconds deceleration
+                    duration: 8000 // 8 seconds deceleration
                 };
             }
         }

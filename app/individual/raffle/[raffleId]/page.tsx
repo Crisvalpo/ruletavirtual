@@ -128,11 +128,11 @@ export default function RaffleSelectionPage({
             setAnimationOffset(targetOffset);
         }, 100);
 
-        // Transition takes 6.2s to match the central wheel spin and finish smoothly
+        // Transition takes 8.2s to match the central wheel spin and finish smoothly
         setTimeout(() => {
             setIsSpinning(false);
             setHasEnded(true);
-        }, 6500);
+        }, 8500);
     };
 
     // Fetch initial raffle details, sold tickets and player packages
@@ -604,7 +604,7 @@ export default function RaffleSelectionPage({
                                 <div
                                     style={{
                                         transform: `translateX(${animationOffset}px)`,
-                                        transition: isSpinning ? 'transform 6.2s cubic-bezier(0.05, 0.9, 0.15, 1)' : 'none'
+                                        transition: isSpinning ? 'transform 8.2s cubic-bezier(0.05, 0.9, 0.15, 1)' : 'none'
                                     }}
                                     className="flex gap-2"
                                 >
