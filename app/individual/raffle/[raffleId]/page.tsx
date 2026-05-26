@@ -12,6 +12,7 @@ import Link from 'next/link';
 interface RaffleTicket {
     ticket_number: number;
     buyer_name: string;
+    player_id?: string;
 }
 
 interface RafflePackage {
@@ -47,6 +48,15 @@ export default function RaffleSelectionPage({
     const [purchasing, setPurchasing] = useState(false);
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
+    // Slot machine animation states
+    const [showSlotMachine, setShowSlotMachine] = useState(false);
+    const [slotWinner, setSlotWinner] = useState<number | null>(null);
+    const [animationOffset, setAnimationOffset] = useState(0);
+    const [isSpinning, setIsSpinning] = useState(false);
+    const [slotItems, setSlotItems] = useState<number[]>([]);
+    const [hasEnded, setHasEnded] = useState(false);
+    const [userWon, setUserWon] = useState(false);
+
     // Get URL redeem code
     useEffect(() => {
         const codeParam = searchParams.get('redeem');
@@ -61,6 +71,63 @@ export default function RaffleSelectionPage({
             router.push(`/auth/login?returnUrl=/individual/raffle/${raffleId}`);
         }
     }, [user, isLoading, router, raffleId]);
+
+    // Function to trigger slot machine animation on the mobile view
+    const triggerSlotMachineAnimation = (winnerNum: number) => {
+        const items: number[] = [];
+        
+        // Add 3 rounds of all 36 animals (108 items total) to simulate fast spinning
+        for (let round = 0; round < 3; round++) {
+            for (let a = 1; a <= 36; a++) {
+                items.push(a);
+            }
+        }
+        
+        // The index of the winner in our list
+        const winnerIndex = items.length + 15;
+        
+        // Fill up to that index
+        for (let a = 1; a <= 15; a++) {
+            const nextNum = ((a - 1) % 36) + 1;
+            if (a === 15) {
+                items.push(winnerNum);
+            } else {
+                items.push(nextNum);
+            }
+        }
+        
+        // Add 5 extra items past the winner so it stops perfectly centered with items on the right too
+        for (let a = 1; a <= 5; a++) {
+            items.push(((winnerNum + a - 1) % 36) + 1);
+        }
+
+        setSlotItems(items);
+        setSlotWinner(winnerNum);
+        setShowSlotMachine(true);
+        setIsSpinning(true);
+        setHasEnded(false);
+        setAnimationOffset(0);
+
+        // Check if the current user purchased the winning ticket
+        const myTickets = soldTickets.filter(t => t.player_id === user?.id).map(t => t.ticket_number);
+        const won = myTickets.includes(winnerNum);
+        setUserWon(won);
+
+        // Animate the slide on the next event loop tick
+        setTimeout(() => {
+            const cardWidthWithGap = 108; // w-[100px] = 100px + gap-2 = 8px
+            const cardWidth = 100;
+            const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 375;
+            const targetOffset = - (winnerIndex * cardWidthWithGap) + (screenWidth / 2) - (cardWidth / 2);
+            setAnimationOffset(targetOffset);
+        }, 100);
+
+        // Transition takes 6.2s to match the central wheel spin and finish smoothly
+        setTimeout(() => {
+            setIsSpinning(false);
+            setHasEnded(true);
+        }, 6500);
+    };
 
     // Fetch initial raffle details, sold tickets and player packages
     useEffect(() => {
@@ -84,11 +151,24 @@ export default function RaffleSelectionPage({
             })
             .subscribe();
 
+        // Subscribe to raffle changes to detect when it's drawn
+        const raffleChannel = supabase
+            .channel(`raffle_changes_${raffleId}`)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'raffles', filter: `id=eq.${raffleId}` }, (payload) => {
+                const updatedRaffle = payload.new;
+                setRaffle(updatedRaffle);
+                if (updatedRaffle.status === 'completed' && updatedRaffle.winning_number) {
+                    triggerSlotMachineAnimation(updatedRaffle.winning_number);
+                }
+            })
+            .subscribe();
+
         return () => {
             supabase.removeChannel(ticketsChannel);
             supabase.removeChannel(packagesChannel);
+            supabase.removeChannel(raffleChannel);
         };
-    }, [user, raffleId]);
+    }, [user, raffleId, soldTickets]);
 
     async function fetchData() {
         setLoading(true);
@@ -110,7 +190,7 @@ export default function RaffleSelectionPage({
     async function fetchSoldTickets() {
         const { data, error } = await supabase
             .from('raffle_tickets')
-            .select('ticket_number, buyer_name')
+            .select('ticket_number, buyer_name, player_id')
             .eq('raffle_id', raffleId)
             .neq('status', 'cancelled');
         if (!error && data) {
@@ -434,6 +514,138 @@ export default function RaffleSelectionPage({
                 )}
             </div>
 
+            {/* Slot Machine / Tragamonedas Horizontal Modal Overlay */}
+            {showSlotMachine && (
+                <div className="fixed inset-0 bg-[#030303]/95 backdrop-blur-md z-[100] flex flex-col items-center justify-center p-4 overflow-hidden animate-in fade-in duration-300">
+                    
+                    {/* Confetti if User Won */}
+                    {hasEnded && userWon && (
+                        <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
+                            {Array.from({ length: 25 }, (_, idx) => {
+                                const left = Math.random() * 100;
+                                const delay = Math.random() * 4;
+                                const duration = 3 + Math.random() * 2;
+                                const color = ['bg-yellow-400', 'bg-red-400', 'bg-blue-400', 'bg-emerald-400', 'bg-pink-400', 'bg-indigo-400'][idx % 6];
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={`absolute w-3.5 h-3.5 rounded-sm ${color} animate-confetti`}
+                                        style={{
+                                            left: `${left}%`,
+                                            animationDelay: `${delay}s`,
+                                            animationDuration: `${duration}s`,
+                                            top: `-20px`
+                                        }}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    <div className="max-w-md w-full text-center space-y-6 relative z-10 px-4">
+                        <div className="space-y-2">
+                            <span className="bg-indigo-900/60 text-indigo-300 border border-indigo-500/30 font-black px-3 py-1 rounded-xl text-xs uppercase tracking-widest animate-pulse">
+                                Sorteo en Vivo 🎰
+                            </span>
+                            <h2 className="text-3xl font-black text-white uppercase tracking-tight">
+                                {isSpinning ? '¡Girando la Ruleta!' : hasEnded ? 'Resultado' : 'Preparando Giro'}
+                            </h2>
+                            <p className="text-xs text-slate-400">
+                                {isSpinning 
+                                    ? 'Espera a que se detenga el tragamonedas...' 
+                                    : 'Los animales a color son tus elecciones, en gris las de otros.'}
+                            </p>
+                        </div>
+
+                        {/* Slot Machine Horizontal Window */}
+                        <div className="relative w-full bg-black/80 rounded-3xl border border-white/10 p-1 shadow-2xl overflow-hidden py-8">
+                            {/* Central Selector Lines (Golden border and arrows) */}
+                            <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-[108px] border-x-2 border-yellow-400 pointer-events-none z-20 bg-yellow-400/5 shadow-[0_0_20px_rgba(234,179,8,0.15)] flex flex-col justify-between py-1">
+                                <div className="text-yellow-400 text-[10px] font-black tracking-widest text-center animate-bounce">▼ GANADOR</div>
+                                <div className="text-yellow-400 text-[10px] font-black tracking-widest text-center animate-bounce">▲ GANADOR</div>
+                            </div>
+
+                            {/* Carousel items strip */}
+                            <div className="w-full overflow-hidden">
+                                <div
+                                    style={{
+                                        transform: `translateX(${animationOffset}px)`,
+                                        transition: isSpinning ? 'transform 6.2s cubic-bezier(0.05, 0.9, 0.15, 1)' : 'none'
+                                    }}
+                                    className="flex gap-2"
+                                >
+                                    {slotItems.map((num, idx) => {
+                                        const animal = ANIMAL_LIST.find(a => a.id === num);
+                                        const myTickets = soldTickets.filter(t => t.player_id === user?.id).map(t => t.ticket_number);
+                                        const isMyChoice = myTickets.includes(num);
+                                        
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className={`w-[100px] h-[100px] flex-shrink-0 relative rounded-2xl overflow-hidden border transition-all duration-300 ${
+                                                    isMyChoice
+                                                        ? 'border-indigo-500/50 shadow-md shadow-indigo-500/10'
+                                                        : 'border-white/5'
+                                                }`}
+                                            >
+                                                <Image
+                                                    src={`/animals/${num}.jpg`}
+                                                    alt={animal?.name || `Nº ${num}`}
+                                                    fill
+                                                    className={`object-cover transition-all duration-500 ${
+                                                        isMyChoice
+                                                            ? 'grayscale-0 brightness-110 contrast-110'
+                                                            : 'grayscale opacity-35 brightness-50'
+                                                    }`}
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Detened/End Info */}
+                        {hasEnded && (
+                            <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+                                {userWon ? (
+                                    <div className="space-y-2">
+                                        <div className="text-4xl text-yellow-400 font-extrabold uppercase animate-pulse drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]">
+                                            ¡Felicidades! 🎉
+                                        </div>
+                                        <p className="text-lg font-bold text-emerald-400">
+                                            ¡El número ganador es el {ANIMAL_LIST.find(a => a.id === slotWinner)?.name || `#${slotWinner}`} y es tu boleto!
+                                        </p>
+                                        <p className="text-xs text-slate-400">Tus créditos han sido actualizados con tu jugada ganadora.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <div className="text-2xl text-slate-300 font-extrabold uppercase">
+                                            Resultado del Sorteo
+                                        </div>
+                                        <p className="text-sm text-rose-400 font-bold">
+                                            El número ganador es el {ANIMAL_LIST.find(a => a.id === slotWinner)?.name || `#${slotWinner}`}.
+                                        </p>
+                                        <p className="text-xs text-slate-500">Esta vez no ganaste, ¡pero sigue intentando en el próximo sorteo! 🍀</p>
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={() => {
+                                        setShowSlotMachine(false);
+                                        // Refetch status to show updated view
+                                        fetchData();
+                                    }}
+                                    className="bg-indigo-650 hover:bg-indigo-600 text-white font-black px-8 py-3.5 rounded-2xl text-xs uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-600/30"
+                                >
+                                    Volver al Juego
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             <style jsx global>{`
                 @keyframes shake {
                     0%, 100% { transform: translateX(0); }
@@ -442,6 +654,13 @@ export default function RaffleSelectionPage({
                 }
                 .animate-shake {
                     animation: shake 0.3s ease-in-out;
+                }
+                @keyframes confetti-fall {
+                    0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+                    100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+                }
+                .animate-confetti {
+                    animation: confetti-fall 4s linear infinite;
                 }
             `}</style>
         </main>
