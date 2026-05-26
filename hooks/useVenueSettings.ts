@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export function useVenueSettings() {
-    const [venueMode, setVenueMode] = useState<'individual' | 'group_event'>('individual');
+    const [venueMode, setVenueMode] = useState<'individual' | 'group_event' | null>(null);
     const [centralScreenId, setCentralScreenId] = useState<number>(1);
     const [baseUrl, setBaseUrl] = useState<string | null>(null);
     const [activeRaffleId, setActiveRaffleId] = useState<string | null>(null);

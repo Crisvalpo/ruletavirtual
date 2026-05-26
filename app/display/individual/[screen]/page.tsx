@@ -94,6 +94,31 @@ export default function DisplayScreenPage({
         setClientUrl(window.location.origin);
     }, []);
 
+    // Desbloqueo proactivo de Audio para políticas de Autoplay de navegadores
+    useEffect(() => {
+        const unlockAudio = () => {
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            // Reproducir un sonido silencioso de prueba para autorizar el elemento HTML5 Audio
+            const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAAA');
+            silentAudio.play().catch(() => {});
+
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+            window.removeEventListener('keydown', unlockAudio);
+        };
+        window.addEventListener('click', unlockAudio);
+        window.addEventListener('touchstart', unlockAudio);
+        window.addEventListener('keydown', unlockAudio);
+        return () => {
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+            window.removeEventListener('keydown', unlockAudio);
+        };
+    }, []);
+
     // Missing State Definitions
     const [activeWheelAssets, setActiveWheelAssets] = useState<any>(null);
     const [assetsLoading, setAssetsLoading] = useState<boolean>(false);
@@ -836,7 +861,7 @@ export default function DisplayScreenPage({
     const displayNickname = (status === 'idle' && !realNickname && previewPlayer) ? previewPlayer.nickname : realNickname;
     const displayEmoji = (status === 'idle' && !realNickname && previewPlayer) ? previewPlayer.emoji : realEmoji;
 
-    if (checkingAuth) {
+    if (checkingAuth || venueMode === null) {
         return (
             <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center p-8 text-center font-sans">
                 <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4" />
