@@ -134,7 +134,7 @@ export default function WheelCanvas({
 
                 // So Target Rotation = Math.PI/2 - (idx * segAngle + segAngle/2) + 2PI*k.
 
-                const pointerAngle = isFanMode ? Math.PI / 2 : 0;
+                const pointerAngle = isFanMode ? Math.PI / 2 : -Math.PI / 2;
 
                 // Current Rotation
                 const currentRot = rotationRef.current;
@@ -233,9 +233,9 @@ export default function WheelCanvas({
                 ctx.lineTo(centerX + 15, ptrY + 20);
             } else {
                 ctx.beginPath();
-                ctx.moveTo(centerX + radius + 10, centerY);
-                ctx.lineTo(centerX + radius - 20, centerY - 10);
-                ctx.lineTo(centerX + radius - 20, centerY + 10);
+                ctx.moveTo(centerX, centerY - radius); // Punta que toca la rueda
+                ctx.lineTo(centerX - 15, centerY - radius - 25); // Vértice superior izquierdo de la base
+                ctx.lineTo(centerX + 15, centerY - radius - 25); // Vértice superior derecho de la base
             }
             ctx.fillStyle = 'red';
             ctx.fill();

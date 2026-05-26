@@ -608,6 +608,12 @@ export default function DisplayScreenPage({
             payload: { result: winnerIndex }
         });
 
+        // --- 0c. PLAY WINNING SOUND (Raffles / Group Event) ---
+        if (isGroupEvent) {
+            const audio = new Audio(`/audio/win${winnerIndex}.mp3`);
+            audio.play().catch(err => console.error("Error playing winner sound:", err));
+        }
+
         // --- 1. Background Logic (Do not block visuals) ---
         (async () => {
             try {
