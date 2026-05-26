@@ -41,6 +41,12 @@ export default function RaffleSelectionPage({
     const [selectedPackageCode, setSelectedPackageCode] = useState<string>('');
     const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
 
+    // Ref to avoid dependency loop in useEffect
+    const soldTicketsRef = React.useRef<RaffleTicket[]>([]);
+    useEffect(() => {
+        soldTicketsRef.current = soldTickets;
+    }, [soldTickets]);
+
     // UI states
     const [loading, setLoading] = useState(true);
     const [redeemCode, setRedeemCode] = useState('');
@@ -108,8 +114,8 @@ export default function RaffleSelectionPage({
         setHasEnded(false);
         setAnimationOffset(0);
 
-        // Check if the current user purchased the winning ticket
-        const myTickets = soldTickets.filter(t => t.player_id === user?.id).map(t => t.ticket_number);
+        // Check if the current user purchased the winning ticket (using the Ref to prevent React closure stale values)
+        const myTickets = soldTicketsRef.current.filter(t => t.player_id === user?.id).map(t => t.ticket_number);
         const won = myTickets.includes(winnerNum);
         setUserWon(won);
 
@@ -168,7 +174,7 @@ export default function RaffleSelectionPage({
             supabase.removeChannel(packagesChannel);
             supabase.removeChannel(raffleChannel);
         };
-    }, [user, raffleId, soldTickets]);
+    }, [user, raffleId]);
 
     async function fetchData() {
         setLoading(true);
