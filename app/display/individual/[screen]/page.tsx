@@ -24,6 +24,7 @@ export default function DisplayScreenPage({
 }) {
     const { screen } = use(params);
     const screenIdNum = parseInt(screen);
+    const supabase = createClient();
 
     // 0. Auth & Simple Password Check
     const { user, profile, isLoading } = useAuth();
@@ -94,6 +95,59 @@ export default function DisplayScreenPage({
         setClientUrl(window.location.origin);
     }, []);
 
+    // 1.5 Sorteo Activo info
+    const [currentRaffle, setCurrentRaffle] = useState<{ code: string; name: string } | null>(null);
+
+    useEffect(() => {
+        if (!isGroupEvent || !activeRaffleId) {
+            setCurrentRaffle(null);
+            return;
+        }
+
+        async function fetchCurrentRaffle() {
+            try {
+                const { data, error } = await supabase
+                    .from('raffles')
+                    .select('code, name')
+                    .eq('id', activeRaffleId)
+                    .maybeSingle();
+
+                if (!error && data) {
+                    setCurrentRaffle(data);
+                }
+            } catch (err) {
+                console.error("Error al obtener datos del sorteo en display:", err);
+            }
+        }
+
+        fetchCurrentRaffle();
+
+        const channel = supabase
+            .channel(`raffle_display_info_${activeRaffleId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'raffles',
+                    filter: `id=eq.${activeRaffleId}`
+                },
+                (payload: any) => {
+                    if (payload.new) {
+                        setCurrentRaffle({
+                            code: payload.new.code,
+                            name: payload.new.name
+                        });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [activeRaffleId, isGroupEvent, supabase]);
+
     // Desbloqueo proactivo de Audio para políticas de Autoplay de navegadores
     useEffect(() => {
         const unlockAudio = () => {
@@ -125,7 +179,6 @@ export default function DisplayScreenPage({
     const [showConfetti, setShowConfetti] = useState(false);
     const [showBigWin, setShowBigWin] = useState(false);
     const [currentSelections, setCurrentSelections] = useState<number[]>([]);
-    const supabase = createClient();
     const instanceId = useRef(Math.random().toString(36).substring(7));
     const joinedAt = useRef(Date.now());
 
@@ -1014,25 +1067,40 @@ export default function DisplayScreenPage({
                                 </span>
                             </div>
 
-                            {/* Player Identity Badge */}
-                            {displayNickname && (status !== 'idle' || previewPlayer) && (
-                                <div className="border-l border-white/20 pl-[1.5vw] animate-in fade-in slide-in-from-left-4 duration-500">
-                                    <p className="text-[1vh] text-gray-400 uppercase tracking-widest leading-none mb-[0.5vh]">
-                                        {previewPlayer && status === 'idle' && !realNickname ? 'Preparando...' : 'Jugando ahora'}
-                                    </p>
-                                    <div className="flex items-center gap-[0.5vw]">
-                                        {displayEmoji?.startsWith('http') ? (
-                                            <img src={displayEmoji} alt="P" className="w-[4.5vh] h-[4.5vh] rounded-full border border-white/20 object-cover shadow-lg" />
-                                        ) : (
-                                            <span className="text-[2.5vh]">{displayEmoji}</span>
-                                        )}
-                                        <span className="text-[2.2vh] font-bold text-yellow-400">{displayNickname}</span>
+                            {/* Player Identity Badge / Raffle Info Badge */}
+                            {isGroupEvent ? (
+                                currentRaffle && (
+                                    <div className="border-l border-white/20 pl-[1.5vw] animate-in fade-in slide-in-from-left-4 duration-500 text-left">
+                                        <p className="text-[1vh] text-indigo-400 font-black uppercase tracking-widest leading-none mb-[0.5vh]">
+                                            Sorteo en curso #{currentRaffle.code}
+                                        </p>
+                                        <div className="flex items-center gap-[0.5vw]">
+                                            <span className="text-[2.2vh] font-bold text-yellow-400 uppercase tracking-tight truncate max-w-[250px] leading-tight select-none">
+                                                {currentRaffle.name}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
+                                )
+                            ) : (
+                                displayNickname && (status !== 'idle' || previewPlayer) && (
+                                    <div className="border-l border-white/20 pl-[1.5vw] animate-in fade-in slide-in-from-left-4 duration-500 text-left">
+                                        <p className="text-[1vh] text-gray-400 uppercase tracking-widest leading-none mb-[0.5vh]">
+                                            {previewPlayer && status === 'idle' && !realNickname ? 'Preparando...' : 'Jugando ahora'}
+                                        </p>
+                                        <div className="flex items-center gap-[0.5vw]">
+                                            {displayEmoji?.startsWith('http') ? (
+                                                <img src={displayEmoji} alt="P" className="w-[4.5vh] h-[4.5vh] rounded-full border border-white/20 object-cover shadow-lg" />
+                                            ) : (
+                                                <span className="text-[2.5vh]">{displayEmoji}</span>
+                                            )}
+                                            <span className="text-[2.2vh] font-bold text-yellow-400">{displayNickname}</span>
+                                        </div>
+                                    </div>
+                                )
                             )}
 
-                            {/* Active Selections Visualization */}
-                            {currentSelections.length > 0 && (
+                            {/* Active Selections Visualization (Solo modo individual) */}
+                            {!isGroupEvent && currentSelections.length > 0 && (
                                 <div className="flex items-center gap-[0.5vw] border-l border-white/20 pl-[1.5vw] animate-in fade-in slide-in-from-right-4 duration-700 delay-200">
                                     <div className="flex -space-x-[1.2vh]">
                                         {currentSelections.map((selId, idx) => {
