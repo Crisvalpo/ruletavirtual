@@ -366,8 +366,7 @@ export default function RaffleSelectionPage({
                             const isSold = !!ticket;
                             const isSelected = selectedNumbers.includes(num);
                             const animal = ANIMAL_LIST.find(a => a.id === num);
-                            const STORAGE_BASE = `https://umimqlybmqivowsshtkt.supabase.co/storage/v1/object/public/individual-wheels`;
-                            const imageSrc = `${STORAGE_BASE}/group_sorteo/segments/${num}.png`;
+                            const imageSrc = `/animals/${num}.jpg`;
 
                             return (
                                 <button
@@ -375,37 +374,46 @@ export default function RaffleSelectionPage({
                                     type="button"
                                     onClick={() => !isSold && handleSelectNumber(num)}
                                     disabled={isSold || purchasing}
-                                    className={`relative rounded-2xl aspect-square border transition-all duration-300 flex flex-col items-center justify-center p-2 overflow-hidden ${
+                                    className={`relative rounded-2xl aspect-square border transition-all duration-300 overflow-hidden ${
                                         isSold
-                                            ? 'bg-slate-950/90 border-white/5 opacity-25 grayscale cursor-not-allowed scale-95'
+                                            ? 'border-white/5 opacity-30 grayscale cursor-not-allowed scale-95'
                                             : isSelected
-                                            ? 'bg-indigo-600/30 border-indigo-500 scale-102 shadow-lg shadow-indigo-500/20'
-                                            : 'bg-white/5 border-white/10 hover:border-white/20 active:scale-95'
+                                            ? 'border-indigo-500 scale-[1.02] shadow-[0_0_15px_rgba(99,102,241,0.5)] ring-2 ring-indigo-500/50'
+                                            : 'border-white/10 hover:border-white/20 hover:scale-[1.02] active:scale-95'
                                     }`}
                                 >
-                                    {/* Number Badge */}
-                                    <div className={`absolute top-1.5 left-1.5 w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black border ${
-                                        isSelected
-                                            ? 'bg-indigo-900 border-indigo-500 text-indigo-300'
-                                            : 'bg-black/60 border-white/5 text-gray-400'
-                                    }`}>
-                                        {num}
-                                    </div>
-
-                                    {/* Animal Image */}
-                                    <div className="w-10 h-10 relative mb-1 mt-2">
+                                    {/* Animal Image (Fills the entire button square) */}
+                                    <div className="absolute inset-0 w-full h-full">
                                         <Image
                                             src={imageSrc}
                                             alt={animal?.name || `Nº ${num}`}
                                             fill
-                                            className="object-contain"
+                                            className="object-cover"
+                                            sizes="(max-width: 768px) 25vw, 150px"
+                                            priority={num <= 12}
                                         />
                                     </div>
 
-                                    {/* Animal name */}
-                                    <span className="text-[8px] font-black uppercase tracking-wider text-gray-300 truncate w-full text-center">
-                                        {animal?.name}
-                                    </span>
+                                    {/* Selection Checkmark Overlay */}
+                                    {isSelected && (
+                                        <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-indigo-600 border border-indigo-400 flex items-center justify-center text-white shadow-md animate-in zoom-in-50 duration-200 z-10">
+                                            <span className="text-[10px] font-black">✓</span>
+                                        </div>
+                                    )}
+
+                                    {/* Sold Overlay */}
+                                    {isSold && (
+                                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-1 z-10">
+                                            <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 font-black px-1.5 py-0.5 rounded-md text-[7px] uppercase tracking-wider">
+                                                Vendido
+                                            </span>
+                                            {ticket.buyer_name && (
+                                                <span className="text-[7px] font-black text-gray-300 truncate w-full text-center mt-1 px-0.5 drop-shadow-md">
+                                                    {ticket.buyer_name}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                 </button>
                             );
                         })}
