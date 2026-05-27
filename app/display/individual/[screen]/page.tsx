@@ -1493,28 +1493,6 @@ function AnimatorRaffleBillboard({
 
     return (
         <div className="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-between text-center p-0 overflow-hidden font-sans select-none">
-            {/* Header section */}
-            <div className="w-full bg-gradient-to-r from-indigo-900 via-indigo-850 to-purple-900 py-6 px-12 shadow-2xl flex justify-between items-center z-20 border-b border-indigo-500/20">
-                <div className="text-left">
-                    <span className="bg-yellow-500 text-black font-black px-3 py-1 rounded-full text-xs uppercase tracking-widest shadow-md">
-                        Sorteo #{raffle?.code || '---'}
-                    </span>
-                    <h1 className="text-4xl font-black text-white uppercase tracking-tight mt-1">
-                        🏆 {raffle?.name || 'Cargando Sorteo...'}
-                    </h1>
-                </div>
-                <div className="flex gap-6 items-center">
-                    <div className="bg-black/35 backdrop-blur-md px-6 py-2 rounded-2xl border border-white/10 text-right">
-                        <p className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest">DISPONIBLES</p>
-                        <p className="text-3xl font-black text-emerald-400 font-mono tracking-tighter">{availableCount} / 36</p>
-                    </div>
-                    <div className="bg-black/35 backdrop-blur-md px-6 py-2 rounded-2xl border border-white/10 text-right">
-                        <p className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest">VENDIDOS</p>
-                        <p className="text-3xl font-black text-yellow-400 font-mono tracking-tighter">{soldCount} / 36</p>
-                    </div>
-                </div>
-            </div>
-
             {/* Grid of 36 animals */}
             <div className="flex-1 w-full grid grid-cols-6 gap-3 p-6 bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950/60 overflow-y-auto">
                 {Array.from({ length: 36 }, (_, i) => {
