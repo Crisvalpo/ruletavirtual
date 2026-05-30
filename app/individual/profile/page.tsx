@@ -140,7 +140,18 @@ export default function ProfileDashboardPage() {
                 .eq('player_id', user.id)
                 .order('created_at', { ascending: false });
 
-            if (raffleData) setRaffleTickets(raffleData as any);
+            if (raffleData) {
+                // Filtrar para conservar únicamente:
+                // 1. Sorteos activos/en curso.
+                // 2. Sorteos finalizados donde el boleto resultó ganador (victoria).
+                const filteredTickets = (raffleData as any[]).filter(t => {
+                    if (!t.raffles) return false;
+                    const isRaffleActive = t.raffles.status === 'active';
+                    const isWinner = t.raffles.winning_number !== null && t.raffles.winning_number === t.ticket_number;
+                    return isRaffleActive || isWinner;
+                });
+                setRaffleTickets(filteredTickets);
+            }
 
         } catch (e) {
             console.error('Error fetching dashboard data:', e);
