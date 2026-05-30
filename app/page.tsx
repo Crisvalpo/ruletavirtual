@@ -210,7 +210,7 @@ export default function HomePage() {
     // 4. Main Content (Authenticated PWA or Staff)
 
     return (
-        <main className="min-h-screen flex flex-col items-center justify-start bg-[#050505] relative pwa-mode overflow-y-auto selection:bg-primary/30">
+        <main className="min-h-screen flex flex-col items-center justify-start bg-[#050505] relative pwa-mode selection:bg-primary/30">
             {/* Premium Background Blobs */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full animate-pulse" />
