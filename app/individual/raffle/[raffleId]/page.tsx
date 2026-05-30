@@ -49,7 +49,7 @@ export default function RaffleSelectionPage({
 
     // UI states
     const [loading, setLoading] = useState(true);
-    const [redeemCode, setRedeemCode] = useState('');
+    const [redeemCode, setRedeemCode] = useState('SF-');
     const [redeeming, setRedeeming] = useState(false);
     const [purchasing, setPurchasing] = useState(false);
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
@@ -244,7 +244,7 @@ export default function RaffleSelectionPage({
             const res = data as { success: boolean; message: string; remaining_options?: number };
             if (res.success) {
                 setMessage({ text: res.message, type: 'success' });
-                setRedeemCode('');
+                setRedeemCode('SF-');
                 // Refetch packages
                 await fetchPlayerPackages();
                 // Select the redeemed code
@@ -448,7 +448,16 @@ export default function RaffleSelectionPage({
                             type="text"
                             placeholder="Código SF-XXXX"
                             value={redeemCode}
-                            onChange={(e) => setRedeemCode(e.target.value)}
+                            onChange={(e) => {
+                                const val = e.target.value.toUpperCase();
+                                if (val.startsWith('SF-')) {
+                                    setRedeemCode(val);
+                                } else if (val.length < 3) {
+                                    setRedeemCode('SF-');
+                                } else {
+                                    setRedeemCode(`SF-${val}`);
+                                }
+                            }}
                             disabled={redeeming}
                             className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-white font-bold placeholder-slate-600 outline-none text-sm focus:border-indigo-500 transition-all uppercase"
                         />

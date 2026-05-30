@@ -220,7 +220,7 @@ function KioskContent() {
                             <div className="bg-white p-3 rounded-xl mb-6 shadow-inner print:shadow-none print:border print:border-black">
                                 <QRCodeCanvas
                                     value={isRaffleCode 
-                                        ? `${(settings.base_url || window.location.origin).trim()}/individual?redeem=${generatedCode}`
+                                        ? `${(settings.base_url || window.location.origin).trim()}/?redeemCode=${generatedCode}`
                                         : `${(settings.base_url || window.location.origin).trim()}/ticket/view/${generatedCode}`
                                     }
                                     size={150}
