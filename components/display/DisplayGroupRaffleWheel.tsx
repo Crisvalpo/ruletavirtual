@@ -284,7 +284,7 @@ export default function DisplayGroupRaffleWheel({
                 </div>
 
                 {/* Ruleta Canvas en formato Sorteo (36 animales) */}
-                <div className="relative w-full aspect-square flex items-center justify-center max-w-[90vh]">
+                <div className="relative w-full aspect-square flex items-center justify-center">
                     <div className="relative w-full aspect-square">
                         <WheelCanvas
                             isSpinning={status === 'spinning'}

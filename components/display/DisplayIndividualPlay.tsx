@@ -543,7 +543,7 @@ export default function DisplayIndividualPlay({
                 </div>
 
                 {/* Ruleta */}
-                <div className={`relative w-full transition-all duration-500 flex items-start justify-center max-w-[90vh]
+                <div className={`relative w-full transition-all duration-500 flex items-start justify-center
                     ${isFanMode ? 'aspect-[2/1] overflow-hidden' : 'aspect-square items-center'}
                     ${assetsLoading ? 'opacity-0' : 'opacity-100'}
                 `}>
