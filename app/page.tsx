@@ -238,130 +238,116 @@ export default function HomePage() {
                 </div>
             )}
 
-            <div className="flex-1 w-full max-w-lg flex flex-col justify-center px-6 z-10">
-                <div className="text-center mb-12">
-                    <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase italic leading-none">
-                        Escoge tu <span className="text-primary">pantalla</span>
-                    </h1>
-                    <p className="text-gray-500 text-xs font-bold uppercase tracking-[0.4em] mt-4 opacity-50">
-                        Fiestas Patrias 2026
-                    </p>
-                </div>
+            <div className="flex-1 w-full max-w-lg flex flex-col justify-start px-6 z-10">
+                {/* Tarjeta de Pantallas Presenciales */}
+                <div className="w-full bg-white/5 border border-white/10 rounded-[2.5rem] p-6 shadow-2xl relative overflow-hidden mb-8">
+                    {/* Glow de fondo decorativo */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
 
-                {/* PWA Premium Promotion Banner */}
-                {isStandalone === false && (
-                    <div className="w-full mb-8 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/25 rounded-3xl p-6 relative overflow-hidden shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-500">
-                        {/* Decorative blur */}
-                        <div className="absolute -top-12 -right-12 w-24 h-24 bg-yellow-500/10 rounded-full blur-xl pointer-events-none" />
-                        <div className="flex items-center gap-4">
-                            <div className="text-4xl">📲</div>
-                            <div className="text-left">
-                                <h3 className="text-sm font-black text-yellow-500 uppercase tracking-wide">
-                                    ¡Juega con nuestra App Oficial!
-                                </h3>
-                                <p className="text-[10px] text-gray-400 font-medium max-w-xs leading-relaxed mt-1">
-                                    Instala la aplicación en tu celular para jugar sin interrupciones, guardar tus premios y participar en sorteos.
-                                </p>
-                            </div>
+                    <div className="flex justify-between items-center mb-6 z-10 relative gap-4">
+                        <div className="text-left">
+                            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight uppercase italic leading-none">
+                                Escoge tu <span className="text-primary">pantalla</span>
+                            </h1>
+                            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-[0.3em] mt-2 opacity-70">
+                                Fiestas Patrias 2026
+                            </p>
                         </div>
-                        <button
-                            onClick={handleInstallPromptTrigger}
-                            className="bg-yellow-500 hover:bg-yellow-400 text-black font-black px-5 py-3 rounded-xl text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-yellow-500/20 active:scale-95 flex-none text-center"
-                        >
-                            Instalar App 📥
-                        </button>
+                        <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 font-black px-3 py-1.5 rounded-xl text-[10px] uppercase tracking-wider shadow-sm flex-none">
+                            Presencial
+                        </span>
                     </div>
-                )}
 
-                {/* 2x2 Premium Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                    {[1, 2, 3, 4].map((id) => {
-                        const isActive = activeScreens.includes(id);
-                        const screenConf = screensConfig[id];
-                        const previewPath = screenConf?.image_preview || 'mario/selector/1.jpg';
-                        const imageUrl = getFullUrl(previewPath);
+                    {/* 2x2 Premium Grid */}
+                    <div className="grid grid-cols-2 gap-4 z-10 relative">
+                        {[1, 2, 3, 4].map((id) => {
+                            const isActive = activeScreens.includes(id);
+                            const screenConf = screensConfig[id];
+                            const previewPath = screenConf?.image_preview || 'mario/selector/1.jpg';
+                            const imageUrl = getFullUrl(previewPath);
 
-                        const content = (
-                            <>
-                                {/* Background Image with Blur */}
-                                {imageUrl && (
-                                    <>
-                                        <img
-                                            src={imageUrl}
-                                            alt={`Pantalla ${id}`}
-                                            className={`absolute inset-0 w-full h-full object-cover filter blur-[1.5px] scale-110 transition-transform duration-700
-                                                ${isActive ? 'group-hover:scale-125 opacity-80' : 'opacity-25 grayscale-[60%]'}`}
-                                        />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
-                                    </>
-                                )}
+                            const content = (
+                                <>
+                                    {/* Background Image with Blur */}
+                                    {imageUrl && (
+                                        <>
+                                            <img
+                                                src={imageUrl}
+                                                alt={`Pantalla ${id}`}
+                                                className={`absolute inset-0 w-full h-full object-cover filter blur-[1.5px] scale-110 transition-transform duration-700
+                                                    ${isActive ? 'group-hover:scale-125 opacity-80' : 'opacity-25 grayscale-[60%]'}`}
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
+                                        </>
+                                    )}
 
-                                {/* Active Glow Effect */}
-                                {isActive && (
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                )}
+                                    {/* Active Glow Effect */}
+                                    {isActive && (
+                                        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                    )}
 
-                                {/* Wheel Name Badge */}
-                                {screenConf?.wheel_name && (
-                                    <div className={`
-                                        absolute top-6 px-3.5 py-1.5 rounded-xl backdrop-blur-md border text-[9px] font-black uppercase tracking-widest z-10 transition-all duration-500
+                                    {/* Wheel Name Badge */}
+                                    {screenConf?.wheel_name && (
+                                        <div className={`
+                                            absolute top-6 px-3.5 py-1.5 rounded-xl backdrop-blur-md border text-[9px] font-black uppercase tracking-widest z-10 transition-all duration-500
+                                            ${isActive 
+                                                ? 'bg-primary/25 text-primary border-primary/30 shadow-[0_4px_12px_rgba(249,115,22,0.15)] group-hover:scale-105' 
+                                                : 'bg-black/60 text-white/30 border-white/5'
+                                            }
+                                        `}>
+                                            {screenConf.wheel_name}
+                                        </div>
+                                    )}
+
+                                    {/* Number Icon/Text */}
+                                    <span className={`
+                                        text-[10rem] font-black leading-none tracking-tighter transition-all duration-500 select-none z-10
                                         ${isActive 
-                                            ? 'bg-primary/25 text-primary border-primary/30 shadow-[0_4px_12px_rgba(249,115,22,0.15)] group-hover:scale-105' 
-                                            : 'bg-black/60 text-white/30 border-white/5'
+                                            ? 'text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] group-hover:scale-105' 
+                                            : 'text-white/10 drop-shadow-[0_2px_6px_rgba(0,0,0,0.3)]'
                                         }
                                     `}>
-                                        {screenConf.wheel_name}
-                                    </div>
-                                )}
-
-                                {/* Number Icon/Text */}
-                                <span className={`
-                                    text-[10rem] font-black leading-none tracking-tighter transition-all duration-500 select-none z-10
-                                    ${isActive 
-                                        ? 'text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] group-hover:scale-105' 
-                                        : 'text-white/10 drop-shadow-[0_2px_6px_rgba(0,0,0,0.3)]'
-                                    }
-                                `}>
-                                    {id}
-                                </span>
-
-                                {/* Status Label */}
-                                <div className={`
-                                    absolute bottom-6 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md transition-all z-10 border
-                                    ${isActive 
-                                        ? 'bg-black/40 text-emerald-400 border-emerald-500/20 shadow-[0_4px_12px_rgba(0,0,0,0.25)]' 
-                                        : 'bg-red-500/10 text-red-500 border-red-500/20 shadow-[0_4px_12px_rgba(239,68,68,0.15)]'
-                                    }
-                                `}>
-                                    <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-red-500 animate-pulse'}`} />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">
-                                        {isActive ? 'En Línea' : 'Offline'}
+                                        {id}
                                     </span>
-                                </div>
-                            </>
-                        );
 
-                        if (isActive) {
+                                    {/* Status Label */}
+                                    <div className={`
+                                        absolute bottom-6 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md transition-all z-10 border
+                                        ${isActive 
+                                            ? 'bg-black/40 text-emerald-400 border-emerald-500/20 shadow-[0_4px_12px_rgba(0,0,0,0.25)]' 
+                                            : 'bg-red-500/10 text-red-500 border-red-500/20 shadow-[0_4px_12px_rgba(239,68,68,0.15)]'
+                                        }
+                                    `}>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-red-500 animate-pulse'}`} />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">
+                                            {isActive ? 'En Línea' : 'Offline'}
+                                        </span>
+                                    </div>
+                                </>
+                            );
+
+                            if (isActive) {
+                                return (
+                                    <Link
+                                        key={id}
+                                        href={`/individual/screen/${id}${scannedCode ? '?redeemCode=' + scannedCode : ''}`}
+                                        className="relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-500 group overflow-hidden border-2 border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:scale-[1.05] active:scale-95 hover:border-white/20"
+                                    >
+                                        {content}
+                                    </Link>
+                                );
+                            }
+
                             return (
-                                <Link
+                                <div
                                     key={id}
-                                    href={`/individual/screen/${id}${scannedCode ? '?redeemCode=' + scannedCode : ''}`}
-                                    className="relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-500 group overflow-hidden border-2 border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:scale-[1.05] active:scale-95 hover:border-white/20"
+                                    className="relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center border-2 bg-white/5 border-red-500/10 opacity-35 cursor-not-allowed select-none overflow-hidden"
                                 >
                                     {content}
-                                </Link>
+                                </div>
                             );
-                        }
-
-                        return (
-                            <div
-                                key={id}
-                                className="relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center border-2 bg-white/5 border-red-500/10 opacity-35 cursor-not-allowed select-none overflow-hidden"
-                            >
-                                {content}
-                            </div>
-                        );
-                    })}
+                        })}
+                    </div>
                 </div>
 
                 {/* Sorteos en Curso */}
@@ -399,6 +385,31 @@ export default function HomePage() {
                                 </Link>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {/* PWA Premium Promotion Banner */}
+                {isStandalone === false && (
+                    <div className="w-full mt-8 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/25 rounded-3xl p-6 relative overflow-hidden shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-500">
+                        {/* Decorative blur */}
+                        <div className="absolute -top-12 -right-12 w-24 h-24 bg-yellow-500/10 rounded-full blur-xl pointer-events-none" />
+                        <div className="flex items-center gap-4">
+                            <div className="text-4xl">📲</div>
+                            <div className="text-left">
+                                <h3 className="text-sm font-black text-yellow-500 uppercase tracking-wide">
+                                    ¡Juega con nuestra App Oficial!
+                                </h3>
+                                <p className="text-[10px] text-gray-400 font-medium max-w-xs leading-relaxed mt-1">
+                                    Instala la aplicación en tu celular para jugar sin interrupciones, guardar tus premios y participar en sorteos.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleInstallPromptTrigger}
+                            className="bg-yellow-500 hover:bg-yellow-400 text-black font-black px-5 py-3 rounded-xl text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-yellow-500/20 active:scale-95 flex-none text-center"
+                        >
+                            Instalar App 📥
+                        </button>
                     </div>
                 )}
             </div>

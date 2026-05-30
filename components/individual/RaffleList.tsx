@@ -81,12 +81,20 @@ export default function RaffleList() {
     }
 
     return (
-        <div className="space-y-4">
-            <h2 className="text-xs font-bold text-indigo-400 font-mono uppercase tracking-[0.25em] opacity-80 flex items-center gap-2">
-                🎟️ Sorteos en Curso
-            </h2>
+        <div className="w-full bg-white/5 border border-white/10 rounded-[2.5rem] p-6 shadow-2xl relative overflow-hidden space-y-6">
+            {/* Glow de fondo decorativo */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
 
-            <div className="space-y-3">
+            <div className="flex justify-between items-center z-10 relative">
+                <h2 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    🎟️ Sorteos
+                </h2>
+                <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-black px-2.5 py-1 rounded-xl text-[9px] uppercase tracking-wider">
+                    Online
+                </span>
+            </div>
+
+            <div className="space-y-3 z-10 relative">
                 {raffles.map((raffle) => {
                     const sold = ticketCounts[raffle.id] || 0;
                     const available = 36 - sold;
