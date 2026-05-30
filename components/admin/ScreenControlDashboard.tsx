@@ -22,11 +22,18 @@ export default function ScreenControlDashboard() {
     const [screens, setScreens] = useState<ScreenState[]>([]);
     const [queues, setQueues] = useState<Record<number, QueueHead | null>>({});
     const [activeWheels, setActiveWheels] = useState<{ id: string; name: string }[]>([]);
+    const [venueMode, setVenueMode] = useState<'individual' | 'group_event' | null>(null);
     const [loading, setLoading] = useState(true);
     const supabase = createClient();
 
     const fetchData = async (isMounted: boolean) => {
         try {
+            // Fetch venue settings mode
+            const { data: settingsData } = await supabase.from('venue_settings').select('current_mode').single();
+            if (settingsData && isMounted) {
+                setVenueMode(settingsData.current_mode);
+            }
+
             // 1. Fetch Screens
             const { data: screenData, error: screenError } = await supabase
                 .from('screen_state')
@@ -106,6 +113,15 @@ export default function ScreenControlDashboard() {
                 { event: '*', schema: 'public', table: 'player_queue' },
                 () => { if (isMounted) fetchData(isMounted); }
             )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'venue_settings' },
+                (payload: any) => {
+                    if (isMounted && payload.new) {
+                        setVenueMode(payload.new.current_mode);
+                    }
+                }
+            )
             .subscribe();
 
         return () => {
@@ -153,6 +169,13 @@ export default function ScreenControlDashboard() {
         }
     };
 
+    const getScreenRaffleRole = (screenId: number) => {
+        if (screenId === 1) return 'Ruleta Sorteo (Central)';
+        if (screenId === 4) return 'Cartelera Boletos';
+        if (screenId === 3) return 'Estadísticas e Historial';
+        return 'Espera / Publicidad';
+    };
+
     if (loading) return (
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 animate-pulse">
             <div className="h-6 w-48 bg-slate-100 rounded mb-6"></div>
@@ -168,11 +191,17 @@ export default function ScreenControlDashboard() {
                 {screens.map((screen) => {
                     const nextPlayer = queues[screen.screen_number];
                     const isActive = screen.status !== 'idle';
+                    const isRaffleMode = venueMode === 'group_event';
 
                     let statusColor = 'bg-slate-50 text-slate-400 border-slate-100';
                     let statusLabelColor = 'bg-slate-200 text-slate-600';
+                    let statusLabelText = screen.status;
 
-                    if (screen.status === 'spinning') {
+                    if (isRaffleMode) {
+                        statusColor = 'bg-indigo-50/30 border-indigo-100/50 text-indigo-650';
+                        statusLabelColor = 'bg-indigo-600 text-white';
+                        statusLabelText = 'Sorteo';
+                    } else if (screen.status === 'spinning') {
                         statusColor = 'bg-indigo-50 border-indigo-100';
                         statusLabelColor = 'bg-indigo-600 text-white';
                     } else if (screen.status === 'result') {
@@ -216,15 +245,16 @@ export default function ScreenControlDashboard() {
                                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
                                         </button>
                                         <span className={`text-[9px] uppercase px-2 py-0.5 rounded-full font-black tracking-widest ${statusLabelColor}`}>
-                                            {screen.status}
+                                            {statusLabelText}
                                         </span>
                                     </div>
                                 </div>
 
-                                <div className="mb-3">
+                                <div className={`mb-3 ${isRaffleMode ? 'opacity-40 pointer-events-none' : ''}`}>
                                     <label className="text-[8px] text-slate-400 uppercase font-black tracking-widest mb-1 block">Tema Asignado:</label>
                                     <select
                                         value={screen.current_wheel_id || ''}
+                                        disabled={isRaffleMode}
                                         onChange={async (e) => {
                                             const wheelId = e.target.value || null;
                                             // Update local state optimistically
@@ -252,7 +282,12 @@ export default function ScreenControlDashboard() {
 
                                 <div className="mb-3 min-h-[3rem] flex flex-col justify-center">
                                     <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest mb-1">Activo:</p>
-                                    {screen.player_name ? (
+                                    {isRaffleMode ? (
+                                        <div className="py-2.5 px-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
+                                            <span className="text-sm">📺</span>
+                                            {getScreenRaffleRole(screen.screen_number)}
+                                        </div>
+                                    ) : screen.player_name ? (
                                         <div className="flex items-center gap-2">
                                             <div className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-lg overflow-hidden">
                                                 {screen.player_emoji?.startsWith('http') ? (
@@ -275,8 +310,8 @@ export default function ScreenControlDashboard() {
                                 </div>
 
                                 {/* Next Player Preview - Compacted */}
-                                <div className={`mt-2 pt-2 border-t ${isActive ? 'border-black/5' : 'border-slate-100'}`}>
-                                    {nextPlayer ? (
+                                <div className={`mt-2 pt-2 border-t ${isActive && !isRaffleMode ? 'border-black/5' : 'border-slate-100'} ${isRaffleMode ? 'opacity-40 pointer-events-none' : ''}`}>
+                                    {nextPlayer && !isRaffleMode ? (
                                         <div className="bg-white/60 rounded-xl p-3 border border-indigo-100 shadow-sm">
                                             <p className="text-[9px] text-indigo-500 uppercase font-black tracking-widest mb-2">Siguiente en Fila:</p>
                                             <div className="flex items-center gap-2">
@@ -297,7 +332,7 @@ export default function ScreenControlDashboard() {
                             </div>
 
                             {/* ACCIONES - Compacted */}
-                            <div className="mt-3 pt-2 border-t border-black/5 flex flex-col gap-1.5">
+                            <div className={`mt-3 pt-2 border-t border-black/5 flex flex-col gap-1.5 ${isRaffleMode ? 'opacity-40 pointer-events-none' : ''}`}>
                                 <div className="px-1 mb-1">
                                     <div className="flex justify-between items-center mb-1">
                                         <label className="text-[9px] uppercase text-slate-400 font-black tracking-widest">
@@ -311,6 +346,7 @@ export default function ScreenControlDashboard() {
                                         max="8.0"
                                         step="0.1"
                                         value={screen.idle_speed || 4.0}
+                                        disabled={isRaffleMode}
                                         onChange={async (e) => {
                                             const val = parseFloat(e.target.value);
                                             // Optimistic update locally
@@ -331,27 +367,30 @@ export default function ScreenControlDashboard() {
                                 <div className="grid grid-cols-1 gap-2">
                                     <button
                                         onClick={() => handleDemoSpin(screen.screen_number)}
-                                        disabled={screen.status === 'spinning' || screen.status === 'waiting_for_spin'}
+                                        disabled={isRaffleMode || screen.status === 'spinning' || screen.status === 'waiting_for_spin'}
                                         className={`w-full text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2
-                                            ${(screen.status === 'spinning' || screen.status === 'waiting_for_spin')
+                                            ${(isRaffleMode || screen.status === 'spinning' || screen.status === 'waiting_for_spin')
                                                 ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-50'
                                                 : 'bg-slate-900 border border-slate-900 hover:bg-slate-800 text-white shadow-md'
                                             }
                                         `}
-                                        title={screen.status === 'spinning' ? "Hay un giro en curso" : "Lanzar Giro de Show para el Público"}
+                                        title={isRaffleMode ? "Modo Sorteo Activo" : screen.status === 'spinning' ? "Hay un giro en curso" : "Lanzar Giro de Show para el Público"}
                                     >
                                         🎭 Giro Show
                                     </button>
 
                                     <button
                                         onClick={() => handleForceAdvance(screen.screen_number)}
+                                        disabled={isRaffleMode}
                                         className={`w-full text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 border
-                                            ${isActive
+                                            ${isRaffleMode
+                                                ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-50'
+                                                : isActive
                                                 ? 'bg-rose-600 border-rose-600 text-white shadow-rose-500/20'
                                                 : 'bg-white border-rose-100 text-rose-600 hover:bg-rose-50'
                                             }
                                         `}
-                                        title="Forzar limpieza de pantalla y avance de fila"
+                                        title={isRaffleMode ? "Modo Sorteo Activo" : "Forzar limpieza de pantalla y avance de fila"}
                                     >
                                         🧹 Destrabar / Limpiar
                                     </button>

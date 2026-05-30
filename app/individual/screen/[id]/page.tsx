@@ -5,6 +5,7 @@ import WheelSelector from '@/components/individual/WheelSelector';
 import NickEntry from '@/components/individual/NickEntry';
 import IdentityBadge from '@/components/individual/IdentityBadge';
 import { useAuth } from '@/hooks/useAuth';
+import { useVenueSettings } from '@/hooks/useVenueSettings';
 import { useGameStore } from '@/lib/store/gameStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -23,6 +24,7 @@ export default function JoinScreenPage({
     const [hasHydrated, setHasHydrated] = useState(false);
     const router = useRouter();
     const { user, profile, isLoading } = useAuth();
+    const { venueMode } = useVenueSettings();
 
     // Derivar de forma síncrona y reactiva si el usuario ya cuenta con un apodo/identidad establecido.
     // Esto evita estados asíncronos duplicados y parpadeos molestos de la vista de personalización.
@@ -221,7 +223,7 @@ export default function JoinScreenPage({
     // --- FLOW STEPS ---
 
     // 1. Initial Loading or Hydrating
-    if (isLoading || resolvingWheel || checkingQueue || !hasHydrated || spinsLoading || isBypassing) {
+    if (isLoading || resolvingWheel || checkingQueue || !hasHydrated || spinsLoading || isBypassing || venueMode === null) {
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-white space-y-6">
                 <div className="w-16 h-16 border-4 border-white/10 border-t-yellow-400 rounded-full animate-spin" />
@@ -237,7 +239,34 @@ export default function JoinScreenPage({
         );
     }
 
+    // 2. Block if venue is in Group Event (Raffle) mode
+    if (venueMode === 'group_event') {
+        return (
+            <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-white space-y-6 font-sans text-center relative overflow-hidden">
+                {/* Premium Background Blobs */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 blur-[120px] rounded-full animate-pulse" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full animate-pulse delay-1000" />
+                </div>
 
+                <div className="w-20 h-20 bg-indigo-600/20 border border-indigo-500/30 rounded-3xl flex items-center justify-center text-4xl mb-2 animate-bounce z-10 shadow-lg shadow-indigo-500/10">
+                    🎟️
+                </div>
+                <div className="space-y-2 max-w-sm z-10">
+                    <h2 className="text-2xl font-black uppercase tracking-tight text-indigo-400">Modo Sorteo Activo</h2>
+                    <p className="text-xs text-gray-400 font-medium leading-relaxed">
+                        Esta pantalla (<span className="text-white font-bold">#{id}</span>) no está disponible para juego individual en este momento porque el local se encuentra en modo Sorteo Grupal.
+                    </p>
+                </div>
+                <Link
+                    href="/"
+                    className="bg-white hover:bg-gray-100 text-black font-black px-8 py-4 rounded-2xl text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95 z-10"
+                >
+                    Volver al Inicio 🏠
+                </Link>
+            </div>
+        );
+    }
 
     // 3. Identity Setup
     if (!hasIdentity) {

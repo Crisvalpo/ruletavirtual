@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
+import { useVenueSettings } from '@/hooks/useVenueSettings';
 import { useRouter } from 'next/navigation';
 import IdentityBadge from '@/components/individual/IdentityBadge';
 import RaffleList from '@/components/individual/RaffleList';
@@ -12,6 +13,7 @@ import { ANIMAL_LIST } from '@/lib/constants/animals';
 export default function HomePage() {
     const { profile, isLoading, user } = useAuth();
     const router = useRouter();
+    const { venueMode } = useVenueSettings();
     const [isStandalone, setIsStandalone] = React.useState<boolean | null>(null);
     const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
     const [showInstallModal, setShowInstallModal] = React.useState(false);
@@ -261,10 +263,28 @@ export default function HomePage() {
                     {/* 2x2 Premium Grid */}
                     <div className="grid grid-cols-2 gap-4 z-10 relative">
                         {[1, 2, 3, 4].map((id) => {
-                            const isActive = activeScreens.includes(id);
+                            const isScreenConnected = activeScreens.includes(id);
+                            const isIndividualActive = venueMode === 'group_event' ? false : isScreenConnected;
                             const screenConf = screensConfig[id];
                             const previewPath = screenConf?.image_preview || 'mario/selector/1.jpg';
                             const imageUrl = getFullUrl(previewPath);
+
+                            // Configuración del badge de estado
+                            let statusText = 'Offline';
+                            let statusColorClass = 'bg-red-500/10 text-red-500 border-red-500/20 shadow-[0_4px_12px_rgba(239,68,68,0.15)]';
+                            let dotColorClass = 'bg-red-500';
+
+                            if (isScreenConnected) {
+                                if (venueMode === 'group_event') {
+                                    statusText = 'En Sorteo';
+                                    statusColorClass = 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 shadow-[0_4px_12px_rgba(99,102,241,0.15)]';
+                                    dotColorClass = 'bg-indigo-400 animate-pulse';
+                                } else {
+                                    statusText = 'En Línea';
+                                    statusColorClass = 'bg-black/40 text-emerald-400 border-emerald-500/20 shadow-[0_4px_12px_rgba(0,0,0,0.25)]';
+                                    dotColorClass = 'bg-emerald-400 animate-pulse';
+                                }
+                            }
 
                             const content = (
                                 <>
@@ -275,14 +295,14 @@ export default function HomePage() {
                                                 src={imageUrl}
                                                 alt={`Pantalla ${id}`}
                                                 className={`absolute inset-0 w-full h-full object-cover filter blur-[1.5px] scale-110 transition-transform duration-700
-                                                    ${isActive ? 'group-hover:scale-125 opacity-80' : 'opacity-25 grayscale-[60%]'}`}
+                                                    ${isIndividualActive ? 'group-hover:scale-125 opacity-80' : 'opacity-25 grayscale-[60%]'}`}
                                             />
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
                                         </>
                                     )}
 
                                     {/* Active Glow Effect */}
-                                    {isActive && (
+                                    {isIndividualActive && (
                                         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                     )}
 
@@ -290,7 +310,7 @@ export default function HomePage() {
                                     {screenConf?.wheel_name && (
                                         <div className={`
                                             absolute top-6 px-3.5 py-1.5 rounded-xl backdrop-blur-md border text-[9px] font-black uppercase tracking-widest z-10 transition-all duration-500
-                                            ${isActive 
+                                            ${isIndividualActive 
                                                 ? 'bg-primary/25 text-primary border-primary/30 shadow-[0_4px_12px_rgba(249,115,22,0.15)] group-hover:scale-105' 
                                                 : 'bg-black/60 text-white/30 border-white/5'
                                             }
@@ -302,7 +322,7 @@ export default function HomePage() {
                                     {/* Number Icon/Text */}
                                     <span className={`
                                         text-[10rem] font-black leading-none tracking-tighter transition-all duration-500 select-none z-10
-                                        ${isActive 
+                                        ${isIndividualActive 
                                             ? 'text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] group-hover:scale-105' 
                                             : 'text-white/10 drop-shadow-[0_2px_6px_rgba(0,0,0,0.3)]'
                                         }
@@ -311,22 +331,16 @@ export default function HomePage() {
                                     </span>
 
                                     {/* Status Label */}
-                                    <div className={`
-                                        absolute bottom-6 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md transition-all z-10 border
-                                        ${isActive 
-                                            ? 'bg-black/40 text-emerald-400 border-emerald-500/20 shadow-[0_4px_12px_rgba(0,0,0,0.25)]' 
-                                            : 'bg-red-500/10 text-red-500 border-red-500/20 shadow-[0_4px_12px_rgba(239,68,68,0.15)]'
-                                        }
-                                    `}>
-                                        <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-red-500 animate-pulse'}`} />
+                                    <div className={`absolute bottom-6 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md transition-all z-10 border ${statusColorClass}`}>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${dotColorClass}`} />
                                         <span className="text-[10px] font-black uppercase tracking-widest">
-                                            {isActive ? 'En Línea' : 'Offline'}
+                                            {statusText}
                                         </span>
                                     </div>
                                 </>
                             );
 
-                            if (isActive) {
+                            if (isIndividualActive) {
                                 return (
                                     <Link
                                         key={id}
@@ -341,7 +355,7 @@ export default function HomePage() {
                             return (
                                 <div
                                     key={id}
-                                    className="relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center border-2 bg-white/5 border-red-500/10 opacity-35 cursor-not-allowed select-none overflow-hidden"
+                                    className="relative aspect-square rounded-[2.5rem] flex flex-col items-center justify-center border-2 bg-white/5 border-white/5 opacity-35 cursor-not-allowed select-none overflow-hidden"
                                 >
                                     {content}
                                 </div>

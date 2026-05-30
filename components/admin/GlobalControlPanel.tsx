@@ -5,9 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function GlobalControlPanel() {
     const [mode, setMode] = useState<'individual' | 'group_event'>('individual');
-    const [baseUrl, setBaseUrl] = useState('');
     const [loading, setLoading] = useState(true);
-    const [savingUrl, setSavingUrl] = useState(false);
     const [settingsId, setSettingsId] = useState<string | null>(null);
     const supabase = createClient();
 
@@ -22,7 +20,6 @@ export default function GlobalControlPanel() {
                 (payload) => {
                     if (isMounted) {
                         setMode(payload.new.current_mode);
-                        setBaseUrl(payload.new.base_url || '');
                     }
                 }
             )
@@ -37,11 +34,10 @@ export default function GlobalControlPanel() {
 
     async function fetchSettings(isMounted: boolean) {
         try {
-            const { data, error } = await supabase.from('venue_settings').select('id, current_mode, base_url').single();
+            const { data, error } = await supabase.from('venue_settings').select('id, current_mode').single();
             if (error) throw error;
             if (data && isMounted) {
                 setMode(data.current_mode as any);
-                setBaseUrl(data.base_url || '');
                 setSettingsId(data.id);
             }
         } catch (err: any) {
@@ -51,25 +47,6 @@ export default function GlobalControlPanel() {
         } finally {
             if (isMounted) setLoading(false);
         }
-    }
-
-    async function saveBaseUrl() {
-        if (!settingsId) return;
-        setSavingUrl(true);
-
-        const { error } = await supabase
-            .from('venue_settings')
-            .update({ base_url: baseUrl.trim() || null })
-            .eq('id', settingsId);
-
-        if (error) {
-            console.error("Error updating domain:", error);
-            alert("Error: " + error.message);
-        } else {
-            alert("✅ Dominio guardado correctamente.");
-        }
-
-        setSavingUrl(false);
     }
 
     async function toggleMode(newMode: 'individual' | 'group_event') {
@@ -141,40 +118,6 @@ export default function GlobalControlPanel() {
                         ? 'Configuración Actual: Jugadores pueden unirse libremente a cualquier pantalla.'
                         : 'Configuración Actual: Acceso restringido. Las pantallas individuales están en pausa.'}
                 </p>
-            </div>
-
-            {/* DOMAIN CONFIGURATION - Compacted */}
-            <div className="mt-6 pt-4 border-t border-slate-100">
-                <h3 className="text-[10px] font-black text-slate-900 mb-2 flex items-center gap-2 uppercase tracking-tight">
-                    🌐 Dominio (QR)
-                </h3>
-                <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                    Define la dirección base que se incluirá en los códigos QR. Si dejas esto vacío, se usará la dirección actual del navegador (útil para pruebas en localhost).
-                </p>
-
-                <div className="flex gap-4">
-                    <input
-                        type="text"
-                        placeholder="https://tu-dominio.cloudflare.com"
-                        value={baseUrl}
-                        onChange={(e) => setBaseUrl(e.target.value)}
-                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
-                    />
-                    <button
-                        onClick={saveBaseUrl}
-                        disabled={savingUrl}
-                        className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-3 rounded-xl transition-all active:scale-95 disabled:opacity-50 text-xs uppercase tracking-widest"
-                    >
-                        {savingUrl ? 'Guardando...' : 'Guardar Dominio'}
-                    </button>
-                </div>
-
-                <div className="mt-3 flex items-center gap-2 px-2">
-                    <div className="w-1 h-1 rounded-full bg-slate-300" />
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        Actual: <span className="text-slate-600 lowercase">{baseUrl || '(Usando origen local)'}</span>
-                    </p>
-                </div>
             </div>
         </div>
     );
