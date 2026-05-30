@@ -87,7 +87,7 @@ export default function WheelCanvas({
     const stoppingRef = useRef<{
         startRotation: number;
         targetRotation: number;
-        startTime: number;
+        startTime: number | null;
         duration: number;
     } | null>(null);
 
@@ -158,7 +158,7 @@ export default function WheelCanvas({
                 stoppingRef.current = {
                     startRotation: currentRot,
                     targetRotation: targetRot,
-                    startTime: performance.now(),
+                    startTime: null,
                     duration: 8000 // 8 seconds deceleration
                 };
             }
@@ -245,8 +245,11 @@ export default function WheelCanvas({
             if (isSpinning) {
                 if (stoppingRef.current) {
                     // Deceleration Phase
+                    if (stoppingRef.current.startTime === null) {
+                        stoppingRef.current.startTime = time;
+                    }
                     const { startTime, duration, startRotation, targetRotation } = stoppingRef.current;
-                    const elapsed = time - startTime;
+                    const elapsed = time - startTime!;
                     const progress = Math.min(elapsed / duration, 1);
                     const ease = easeOutCubic(progress);
 
@@ -274,7 +277,11 @@ export default function WheelCanvas({
             // Continue loop only if:
             // 1. Spinning (Game) AND not finished stopping
             // 2. Idle Mode (Always loops)
-            const isGameSpinning = isSpinning && (!stoppingRef.current || (performance.now() - stoppingRef.current.startTime < stoppingRef.current.duration));
+            const isGameSpinning = isSpinning && (
+                !stoppingRef.current || 
+                stoppingRef.current.startTime === null || 
+                (time - stoppingRef.current.startTime < stoppingRef.current.duration)
+            );
 
             if (isGameSpinning || isIdle) {
                 animationFrameId = requestAnimationFrame(animate);
